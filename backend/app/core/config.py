@@ -7,6 +7,10 @@ class Settings(BaseSettings):
     
     SECRET_KEY: str = "change-me-in-production"  # ⚠️ 【需修改】生产环境必须换
 
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    ALGORITHM: str = "HS256"
+
     class Config:
         env_file = ".env"
 

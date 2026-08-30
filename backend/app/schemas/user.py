@@ -7,6 +7,12 @@ class UserCreate(BaseModel):
     username: str
     password: str  # 明文入，后端哈希
 
+
+# 新增：登录专用
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
 class UserResponse(BaseModel):
     id: UUID
     email: str
