@@ -1,13 +1,11 @@
 from fastapi import FastAPI
+from app.api.v1.api import api_router
 
-app = FastAPI()
+app = FastAPI(title="Cloud Drive API")
 
+# ⚠️ 【需修改】确认前缀正确
+app.include_router(api_router, prefix="/api/v1")
 
-@app.get("/")
-def read_root():
-    return {"Hello": "World"}
-
-
-@app.get("/items/{item_id}")
-def read_item(item_id: int, q: str | None = None):
-    return {"item_id": item_id, "q": q}
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
