@@ -9,7 +9,7 @@ from alembic import context
 
 # ⚠️ 【关键】导入你的模型和配置
 from app.db.base_class import Base
-from app.models import User
+from app.models import User, File
 from app.core.config import settings
 
 # Alembic Config

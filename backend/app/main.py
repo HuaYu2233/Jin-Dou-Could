@@ -1,8 +1,15 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.api import api_router
+from app.core.storage import ensure_bucket
 
-app = FastAPI(title="Cloud Drive API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    ensure_bucket()
+    yield
+
+app = FastAPI(title="Cloud Drive API", lifespan=lifespan)
 
 #加 CORS
 app.add_middleware(
