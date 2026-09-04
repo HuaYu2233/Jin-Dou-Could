@@ -19,6 +19,8 @@ class UserResponse(BaseModel):
     username: str
     is_active: bool
     created_at: datetime
+    storage_quota: int
+    used_storage: int
 
     class Config:
         from_attributes = True  # Pydantic v2 读取 ORM 对象

@@ -11,6 +11,7 @@ class FileResponse(BaseModel):
     status: str
     created_at: datetime
     updated_at: datetime
+    deleted_at: datetime | None = None
 
     class Config:
         from_attributes = True
@@ -30,3 +31,7 @@ class FileUploadResponse(BaseModel):
 class FileDownloadResponse(BaseModel):
     url: str
     expires: int
+
+class FileMoveRequest(BaseModel):
+    file_ids: list[UUID]
+    target_folder_id: UUID | None = None
