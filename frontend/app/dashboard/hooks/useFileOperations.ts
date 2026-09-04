@@ -23,7 +23,7 @@ interface UseFileOperationsParams {
   currentFolderId: string | null;
   folderName: string;
   folderDialog: { mode: "create" } | { mode: "rename"; folder: FolderItem } | null;
-  loadFiles: () => Promise<void>;
+  loadFiles: (active?: boolean) => Promise<void>;
   fetchMe: () => Promise<void>;
   setSelectedIds: (ids: Set<string>) => void;
   setError: (msg: string) => void;

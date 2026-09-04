@@ -23,6 +23,7 @@ import MoveDialog from "./components/MoveDialog";
 import SharesView from "./components/SharesView";
 import TransfersView from "./components/TransfersView";
 import ShareResultDialog from "./components/ShareResultDialog";
+import FolderDialog from "./components/FolderDialog";
 import { useFileOperations } from "./hooks/useFileOperations";
 import pageStyles from "./page.module.css";
 
@@ -61,34 +62,44 @@ export default function DashboardPage() {
     { id: "root", name: "全部文件", path: "/" },
   ]);
 
-  const loadFiles = useCallback(async () => {
+  const loadFiles = useCallback(async (active = true) => {
     if (category === "shares" || category === "transfers") return;
+    if (!active) return;
     setLoading(true);
     setError("");
     try {
-      if (category === "all") {
+      if (debouncedKeyword) {
+        const res = await searchFiles(debouncedKeyword, (page - 1) * PAGE_SIZE, PAGE_SIZE);
+        if (!active) return;
+        setFiles(res.items);
+        setTotal(res.total);
+        setFolders([]);
+      } else if (category === "all") {
         const res = await listFolderContents(currentFolderId ?? undefined, (page - 1) * PAGE_SIZE, PAGE_SIZE);
+        if (!active) return;
         setFolders(res.folders);
         setFiles(res.files);
         setBreadcrumbs(res.breadcrumbs.map((b) => ({ ...b, id: b.id ?? "root" })));
         setTotal(res.total_files);
       } else if (category === "trash") {
         const res = await listTrashFiles((page - 1) * PAGE_SIZE, PAGE_SIZE);
+        if (!active) return;
         setFiles(res.items);
         setTotal(res.total);
         setFolders([]);
       } else {
         const res = await listFiles((page - 1) * PAGE_SIZE, PAGE_SIZE, category);
+        if (!active) return;
         setFiles(res.items);
         setTotal(res.total);
         setFolders([]);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "加载失败");
+      if (active) setError(err instanceof Error ? err.message : "加载失败");
     } finally {
-      setLoading(false);
+      if (active) setLoading(false);
     }
-  }, [category, page, currentFolderId]);
+  }, [category, page, currentFolderId, debouncedKeyword]);
 
   const {
     uploading,
@@ -123,46 +134,10 @@ export default function DashboardPage() {
   useEffect(() => {
     let active = true;
     (async () => {
-      if (debouncedKeyword) {
-        if (active) { setLoading(true); setError(""); }
-        try {
-          const res = await searchFiles(debouncedKeyword, (page - 1) * PAGE_SIZE, PAGE_SIZE);
-          if (active) { setFiles(res.items); setTotal(res.total); setFolders([]); }
-        } catch (err) {
-          if (active) setError(err instanceof Error ? err.message : "搜索失败");
-        } finally {
-          if (active) setLoading(false);
-        }
-        return;
-      }
-      if (category === "shares" || category === "transfers") {
-        return;
-      }
-      if (active) { setLoading(true); setError(""); }
-      try {
-        if (category === "all") {
-          const res = await listFolderContents(currentFolderId ?? undefined, (page - 1) * PAGE_SIZE, PAGE_SIZE);
-          if (active) {
-            setFolders(res.folders);
-            setFiles(res.files);
-            setBreadcrumbs(res.breadcrumbs.map((b) => ({ ...b, id: b.id ?? "root" })));
-            setTotal(res.total_files);
-          }
-        } else if (category === "trash") {
-          const res = await listTrashFiles((page - 1) * PAGE_SIZE, PAGE_SIZE);
-          if (active) { setFiles(res.items); setTotal(res.total); setFolders([]); }
-        } else {
-          const res = await listFiles((page - 1) * PAGE_SIZE, PAGE_SIZE, category);
-          if (active) { setFiles(res.items); setTotal(res.total); setFolders([]); }
-        }
-      } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : "加载失败");
-      } finally {
-        if (active) setLoading(false);
-      }
+      await loadFiles(active);
     })();
     return () => { active = false; };
-  }, [category, page, currentFolderId, debouncedKeyword]);
+  }, [category, page, currentFolderId, debouncedKeyword, loadFiles]);
 
   function handleCategoryChange(id: CategoryId) {
     setCategory(id);
@@ -317,31 +292,13 @@ export default function DashboardPage() {
       {previewFile && (
         <FilePreview file={previewFile} onClose={() => setPreviewFile(null)} />
       )}
-      {folderDialog && (
-        <div className={pageStyles.modalOverlay} onClick={() => setFolderDialog(null)}>
-          <div className={pageStyles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h3 className={pageStyles.modalTitle}>
-              {folderDialog.mode === "create" ? "新建文件夹" : "重命名文件夹"}
-            </h3>
-            <input
-              className={pageStyles.modalInput}
-              value={folderName}
-              onChange={(e) => setFolderName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleFolderDialogSubmit()}
-              autoFocus
-              placeholder="请输入文件夹名称"
-            />
-            <div className={pageStyles.modalActions}>
-              <button className={pageStyles.modalCancelBtn} onClick={() => setFolderDialog(null)}>
-                取消
-              </button>
-              <button className={pageStyles.modalConfirmBtn} onClick={handleFolderDialogSubmit} disabled={!folderName.trim()}>
-                确定
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <FolderDialog
+        dialog={folderDialog}
+        folderName={folderName}
+        onFolderNameChange={setFolderName}
+        onSubmit={handleFolderDialogSubmit}
+        onClose={() => setFolderDialog(null)}
+      />
       <MoveDialog
         open={moveDialogOpen}
         selectedIds={selectedIds}
