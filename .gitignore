@@ -1,4 +1,46 @@
+# ===== 敏感文件 =====
 .env
+.env.*
+*.env
+测试账号.txt
+
+# ===== 系统/编辑器 =====
 .DS_Store
 .vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ===== Python 后端 =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+backend/venv/
+backend/.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+backend/.python-version
+
+# ===== Node.js 前端（根级保护，frontend/.gitignore 已覆盖） =====
+node_modules/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# ===== 日志/数据库文件 =====
+*.log
+*.sqlite3
+*.db
+
+# ===== 项目文档（可选忽略） =====
 开发文档.md
+CloudDrive_开发计划.md
