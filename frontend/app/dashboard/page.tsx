@@ -9,6 +9,7 @@ import {
   listFolderContents,
   type FileItem,
   type FolderItem,
+  type ShareCreateResponse,
 } from "@/lib/api/files";
 import type { CategoryId, ViewMode, BreadcrumbItem, StorageInfo } from "./types";
 import { useAuthStore } from "@/stores/auth";
@@ -20,6 +21,8 @@ import Pagination from "./components/Pagination";
 import FilePreview from "./components/FilePreview";
 import MoveDialog from "./components/MoveDialog";
 import SharesView from "./components/SharesView";
+import TransfersView from "./components/TransfersView";
+import ShareResultDialog from "./components/ShareResultDialog";
 import { useFileOperations } from "./hooks/useFileOperations";
 import pageStyles from "./page.module.css";
 
@@ -43,6 +46,7 @@ export default function DashboardPage() {
   const [folderName, setFolderName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
+  const [shareResults, setShareResults] = useState<ShareCreateResponse[]>([]);
   const [keyword, setKeyword] = useState("");
   const [debouncedKeyword, setDebouncedKeyword] = useState("");
 
@@ -58,6 +62,7 @@ export default function DashboardPage() {
   ]);
 
   const loadFiles = useCallback(async () => {
+    if (category === "shares" || category === "transfers") return;
     setLoading(true);
     setError("");
     try {
@@ -130,7 +135,7 @@ export default function DashboardPage() {
         }
         return;
       }
-      if (category === "shares") {
+      if (category === "shares" || category === "transfers") {
         return;
       }
       if (active) { setLoading(true); setError(""); }
@@ -223,7 +228,10 @@ export default function DashboardPage() {
           onUpload={() => fileInputRef.current?.click()}
           onDownload={() => selectedFile && handleDownload(selectedFile)}
           onDelete={handleDelete}
-          onShare={handleCreateShare}
+          onShare={async () => {
+            const results = await handleCreateShare();
+            if (results.length > 0) setShareResults(results);
+          }}
           onNewFolder={category === "all" ? openCreateFolderDialog : undefined}
           onMove={category === "all" ? () => setMoveDialogOpen(true) : undefined}
           selectedCount={selectedCount}
@@ -275,6 +283,10 @@ export default function DashboardPage() {
                 onTotalChange={setTotal}
                 reloadKey={sharesReloadKey}
               />
+            </div>
+          ) : category === "transfers" ? (
+            <div className="p-6">
+              <TransfersView />
             </div>
           ) : (
             <FileList
@@ -342,6 +354,12 @@ export default function DashboardPage() {
         onError={(msg) => setError(msg)}
         onClose={() => setMoveDialogOpen(false)}
       />
+      {shareResults.length > 0 && (
+        <ShareResultDialog
+          results={shareResults}
+          onClose={() => setShareResults([])}
+        />
+      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 // /Users/zero/project/JinDou-Cloud/frontend/app/dashboard/types.ts
-export type CategoryId = "all" | "image" | "document" | "video" | "audio" | "other" | "trash" | "shares";
+export type CategoryId = "all" | "image" | "document" | "video" | "audio" | "other" | "trash" | "shares" | "transfers";
 
 export type ViewMode = "list" | "grid";
 

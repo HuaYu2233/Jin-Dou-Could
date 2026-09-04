@@ -49,13 +49,78 @@ export async function uploadFile(file: File, folderId?: string): Promise<FileUpl
   });
 }
 
+const API_BASE_URL = "http://localhost:8000";
+
+export function uploadFileWithProgress(
+  file: File,
+  folderId: string | undefined,
+  onProgress: (loaded: number, total: number) => void,
+  signal?: AbortSignal
+): Promise<FileUploadResponse> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const formData = new FormData();
+    formData.append("file", file);
+    const params = new URLSearchParams();
+    if (folderId) params.set("folder_id", folderId);
+    const query = params.toString();
+    xhr.open("POST", `${API_BASE_URL}/api/v1/files${query ? `?${query}` : ""}`);
+    const token = localStorage.getItem("access_token");
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(e.loaded, e.total);
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try { resolve(JSON.parse(xhr.responseText)); } catch { reject(new Error("解析响应失败")); }
+      } else if (xhr.status === 401) {
+        localStorage.removeItem("access_token");
+        window.location.href = "/login";
+        reject(new Error("Unauthorized"));
+      } else {
+        try { const err = JSON.parse(xhr.responseText); reject(new Error(err.detail || "上传失败")); } catch { reject(new Error("上传失败")); }
+      }
+    };
+    xhr.onerror = () => reject(new Error("网络错误"));
+    xhr.onabort = () => reject(new Error("已取消"));
+    if (signal) signal.addEventListener("abort", () => xhr.abort());
+    xhr.send(formData);
+  });
+}
+
 export async function downloadFile(id: string): Promise<Blob> {
   const token = localStorage.getItem("access_token");
-  const res = await fetch(`http://localhost:8000/api/v1/files/${id}/download`, {
+  const res = await fetch(`${API_BASE_URL}/api/v1/files/${id}/download`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) throw new Error("下载失败");
   return res.blob();
+}
+
+export async function downloadFileWithProgress(
+  id: string,
+  onProgress: (loaded: number, total: number) => void,
+  signal?: AbortSignal
+): Promise<Blob> {
+  const token = localStorage.getItem("access_token");
+  const res = await fetch(`${API_BASE_URL}/api/v1/files/${id}/download`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    signal,
+  });
+  if (!res.ok) throw new Error("下载失败");
+  const total = Number(res.headers.get("content-length")) || 0;
+  const reader = res.body?.getReader();
+  if (!reader) return res.blob();
+  const chunks: BlobPart[] = [];
+  let loaded = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    loaded += value.length;
+    onProgress(loaded, total);
+  }
+  return new Blob(chunks);
 }
 
 export async function getFileBlob(id: string): Promise<Blob> {

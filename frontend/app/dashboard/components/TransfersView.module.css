@@ -1,0 +1,237 @@
+.container {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 8px 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+.activeBadge {
+  font-size: 12px;
+  color: #2563eb;
+  background: #eff6ff;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.clearBtn {
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #4b5563;
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.clearBtn:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 0;
+  text-align: center;
+}
+
+.emptyIcon {
+  font-size: 56px;
+  margin-bottom: 16px;
+  opacity: 0.6;
+}
+
+.emptyTitle {
+  font-size: 16px;
+  font-weight: 500;
+  color: #6b7280;
+  margin: 0 0 4px;
+}
+
+.emptyDesc {
+  font-size: 13px;
+  color: #9ca3af;
+  margin: 0;
+}
+
+.taskList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.taskItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid #f0f0f0;
+  border-radius: 10px;
+  background: #fff;
+  transition: border-color 0.15s ease;
+}
+
+.taskItem:hover {
+  border-color: #e5e7eb;
+}
+
+.taskIcon {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.taskBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.taskTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.taskName {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1f2937;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.taskStatus {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.status_pending {
+  color: #9ca3af;
+}
+
+.status_transferring {
+  color: #2563eb;
+}
+
+.status_completed {
+  color: #16a34a;
+}
+
+.status_error {
+  color: #ef4444;
+}
+
+.status_canceled {
+  color: #9ca3af;
+}
+
+.progressBar {
+  height: 6px;
+  background: #f3f4f6;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.2s ease;
+}
+
+.fill_pending {
+  background: #d1d5db;
+}
+
+.fill_transferring {
+  background: linear-gradient(90deg, #60a5fa, #3b82f6);
+}
+
+.fill_completed {
+  background: #22c55e;
+}
+
+.fill_error {
+  background: #ef4444;
+}
+
+.fill_canceled {
+  background: #d1d5db;
+}
+
+.taskBottom {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.taskPercent {
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.taskError {
+  color: #ef4444;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.removeBtn {
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.removeBtn:hover {
+  color: #ef4444;
+  background: #fef2f2;
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding: 8px 4px;
+  }
+  .taskItem {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  .taskBottom {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+}

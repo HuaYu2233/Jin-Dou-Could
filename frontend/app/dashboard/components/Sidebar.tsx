@@ -2,6 +2,7 @@
 "use client";
 
 import type { CategoryId, StorageInfo } from "../types";
+import { useTransferStore } from "@/stores/transfers";
 import styles from "./Sidebar.module.css";
 
 interface NavItem {
@@ -20,6 +21,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "other", label: "其他", icon: "📦", group: "我的文件" },
   { id: "trash", label: "回收站", icon: "🗑️", group: "其他" },
   { id: "shares", label: "我的分享", icon: "🔗", group: "其他" },
+  { id: "transfers", label: "传输", icon: "⚡", group: "其他" },
 ];
 
 interface SidebarProps {
@@ -36,6 +38,7 @@ function formatSize(bytes: number): string {
 export default function Sidebar({ activeCategory, onCategoryChange, storage }: SidebarProps) {
   const groups = [...new Set(NAV_ITEMS.map((i) => i.group))];
   const usagePercent = storage.total > 0 ? (storage.used / storage.total) * 100 : 0;
+  const hasActive = useTransferStore((s) => s.hasActive());
 
   return (
     <nav className={styles.sidebar}>
@@ -46,11 +49,12 @@ export default function Sidebar({ activeCategory, onCategoryChange, storage }: S
             {NAV_ITEMS.filter((i) => i.group === group).map((item) => (
               <button
                 key={item.id}
-                className={`${styles.navItem} ${activeCategory === item.id ? styles.navItemActive : ""}`}
+                className={`${styles.navItem} ${styles.badge} ${activeCategory === item.id ? styles.navItemActive : ""}`}
                 onClick={() => onCategoryChange(item.id)}
               >
                 <span className={styles.navIcon}>{item.icon}</span>
                 <span className={styles.navLabel}>{item.label}</span>
+                {item.id === "transfers" && hasActive && <span className={styles.redDot} />}
               </button>
             ))}
           </div>

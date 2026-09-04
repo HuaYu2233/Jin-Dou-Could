@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import {
-  uploadFile,
-  downloadFile,
+  uploadFileWithProgress,
+  downloadFileWithProgress,
   deleteFile,
   restoreFile,
   purgeFile,
@@ -14,7 +14,9 @@ import {
   deleteFolder,
   type FileItem,
   type FolderItem,
+  type ShareCreateResponse,
 } from "@/lib/api/files";
+import { useTransferStore } from "@/stores/transfers";
 
 interface UseFileOperationsParams {
   selectedIds: Set<string>;
@@ -46,12 +48,27 @@ export function useFileOperations({
   async function handleUpload(file: File) {
     setUploading(true);
     setError("");
+    const addTask = useTransferStore.getState().addTask;
+    const updateTask = useTransferStore.getState().updateTask;
+    const taskId = addTask({ filename: file.name, type: "upload", total: file.size });
     try {
-      await uploadFile(file, currentFolderId ?? undefined);
+      updateTask(taskId, { status: "transferring" });
+      const res = await uploadFileWithProgress(
+        file,
+        currentFolderId ?? undefined,
+        (loaded, total) => updateTask(taskId, { loaded, total })
+      );
+      updateTask(taskId, { status: "completed", loaded: file.size, progress: 100, fileId: res.id });
       await loadFiles();
       fetchMe();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "上传失败");
+      const msg = err instanceof Error ? err.message : "上传失败";
+      if (msg === "已取消") {
+        updateTask(taskId, { status: "canceled" });
+      } else {
+        updateTask(taskId, { status: "error", error: msg });
+        setError(msg);
+      }
     } finally {
       setUploading(false);
     }
@@ -70,8 +87,16 @@ export function useFileOperations({
   }
 
   async function handleDownload(file: FileItem) {
+    const addTask = useTransferStore.getState().addTask;
+    const updateTask = useTransferStore.getState().updateTask;
+    const taskId = addTask({ filename: file.filename, type: "download", total: file.size, fileId: file.id });
     try {
-      const blob = await downloadFile(file.id);
+      updateTask(taskId, { status: "transferring" });
+      const blob = await downloadFileWithProgress(
+        file.id,
+        (loaded, total) => updateTask(taskId, { loaded, total })
+      );
+      updateTask(taskId, { status: "completed", progress: 100 });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -81,7 +106,13 @@ export function useFileOperations({
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "下载失败");
+      const msg = err instanceof Error ? err.message : "下载失败";
+      if (msg === "已取消") {
+        updateTask(taskId, { status: "canceled" });
+      } else {
+        updateTask(taskId, { status: "error", error: msg });
+        setError(msg);
+      }
     }
   }
 
@@ -123,11 +154,13 @@ export function useFileOperations({
     }
   }
 
-  async function handleCreateShare() {
-    if (selectedIds.size === 0) return;
+  async function handleCreateShare(): Promise<ShareCreateResponse[]> {
+    if (selectedIds.size === 0) return [];
+    const results: ShareCreateResponse[] = [];
     try {
       for (const id of selectedIds) {
-        await createShare(id);
+        const res = await createShare(id);
+        results.push(res);
       }
       setSelectedIds(new Set());
       await loadFiles();
@@ -135,6 +168,7 @@ export function useFileOperations({
     } catch (err) {
       setError(err instanceof Error ? err.message : "创建分享失败");
     }
+    return results;
   }
 
   async function handleMoveToFolder(fileIds: string[], folderId: string | null) {
