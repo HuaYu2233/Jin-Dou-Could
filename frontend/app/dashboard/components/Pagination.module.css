@@ -43,3 +43,18 @@
   color: #6b7280;
   padding: 0 8px;
 }
+
+@media (max-width: 640px) {
+  .pagination {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .info {
+    font-size: 11px;
+  }
+  .pageBtn {
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+}

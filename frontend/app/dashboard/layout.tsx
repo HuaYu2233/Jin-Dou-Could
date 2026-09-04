@@ -26,10 +26,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex h-screen flex-col">
       <header className="flex h-14 items-center border-b border-gray-200 bg-white">
-        <div className="flex h-full items-center px-4" style={{ width: 200, flexShrink: 0 }}>
-          <span className="text-lg font-bold text-gray-700">JinDou Cloud</span>
+        <div className="flex h-full items-center px-3 md:px-4" style={{ width: 160, flexShrink: 0 }}>
+          <span className="text-base md:text-lg font-bold text-gray-700">JinDou Cloud</span>
         </div>
-        <div className="flex h-full flex-1 items-center justify-end gap-4 px-6">
+        <div className="flex h-full flex-1 items-center justify-end gap-2 md:gap-4 px-3 md:px-6">
           <span className="text-sm text-gray-600">
             {error ? "获取用户失败" : isLoading && !user ? "加载中..." : user ? user.username : ""}
           </span>

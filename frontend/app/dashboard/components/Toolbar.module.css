@@ -30,9 +30,9 @@
   padding: 0 10px;
   height: 32px;
   background: #fff;
-  flex: 1 1 200px;
-  min-width: 160px;
-  max-width: 320px;
+  flex: 1 1 160px;
+  min-width: 120px;
+  max-width: 240px;
 }
 
 .searchBox:focus-within {
@@ -162,4 +162,74 @@
 .viewBtnActive {
   background: #eff6ff;
   color: #2563eb;
+}
+
+@media (max-width: 768px) {
+  .toolbar {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  .actionGroup {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .primaryBtn,
+  .secondaryBtn,
+  .dangerBtn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+  .btnLabel {
+    display: none;
+  }
+  .searchBox {
+    order: 99;
+    flex: 1 1 100%;
+    max-width: none;
+  }
+  .rightGroup {
+    gap: 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  .toolbar {
+    padding: 8px 10px;
+  }
+  .searchBox {
+    height: 36px;
+  }
+}
+
+@media (max-width: 768px) {
+  .toolbar {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .actionGroup {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .primaryBtn,
+  .secondaryBtn,
+  .dangerBtn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .btnLabel {
+    display: none;
+  }
+
+  .searchBox {
+    order: 99;
+    flex: 1 1 100%;
+    max-width: none;
+  }
+
+  .rightGroup {
+    gap: 6px;
+  }
 }

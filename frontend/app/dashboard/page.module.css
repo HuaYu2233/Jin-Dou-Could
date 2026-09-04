@@ -105,3 +105,16 @@
 .modalConfirmBtn:not(:disabled):hover {
   background: #1d4ed8;
 }
+
+@media (max-width: 768px) {
+  .contentArea {
+    padding: 12px 12px;
+  }
+  .paginationArea {
+    padding: 10px 12px;
+  }
+  .modalContent {
+    width: 320px;
+    padding: 16px;
+  }
+}
