@@ -21,20 +21,18 @@ import { useTransferStore } from "@/stores/transfers";
 interface UseFileOperationsParams {
   selectedIds: Set<string>;
   currentFolderId: string | null;
-  folderName: string;
-  folderDialog: { mode: "create" } | { mode: "rename"; folder: FolderItem } | null;
+  folderDialog: { mode: "create"; name: string } | { mode: "rename"; folder: FolderItem; name: string } | null;
   loadFiles: (active?: boolean) => Promise<void>;
   fetchMe: () => Promise<void>;
   setSelectedIds: (ids: Set<string>) => void;
   setError: (msg: string) => void;
-  setFolderDialog: (dialog: { mode: "create" } | { mode: "rename"; folder: FolderItem } | null) => void;
+  setFolderDialog: (dialog: { mode: "create"; name: string } | { mode: "rename"; folder: FolderItem; name: string } | null) => void;
   setSharesReloadKey: (updater: (k: number) => number) => void;
 }
 
 export function useFileOperations({
   selectedIds,
   currentFolderId,
-  folderName,
   folderDialog,
   loadFiles,
   fetchMe,
@@ -192,8 +190,9 @@ export function useFileOperations({
   }
 
   async function handleFolderDialogSubmit() {
-    const name = folderName.trim();
-    if (!name || !folderDialog) return;
+    if (!folderDialog) return;
+    const name = folderDialog.name.trim();
+    if (!name) return;
     setError("");
     try {
       if (folderDialog.mode === "create") {

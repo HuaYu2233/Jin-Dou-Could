@@ -27,8 +27,9 @@ export default function DashboardPage() {
   const [dragOver, setDragOver] = useState(false);
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
   const [sharesReloadKey, setSharesReloadKey] = useState(0);
-  const [folderDialog, setFolderDialog] = useState<{ mode: "create" } | { mode: "rename"; folder: FolderItem } | null>(null);
-  const [folderName, setFolderName] = useState("");
+  const [folderDialog, setFolderDialog] = useState<
+    { mode: "create"; name: string } | { mode: "rename"; folder: FolderItem; name: string } | null
+  >(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
   const [shareResults, setShareResults] = useState<ShareCreateResponse[]>([]);
@@ -63,7 +64,6 @@ export default function DashboardPage() {
   } = useFileOperations({
     selectedIds,
     currentFolderId,
-    folderName,
     folderDialog,
     loadFiles,
     fetchMe,
@@ -111,13 +111,11 @@ export default function DashboardPage() {
   }
 
   function openCreateFolderDialog() {
-    setFolderName("");
-    setFolderDialog({ mode: "create" });
+    setFolderDialog({ mode: "create", name: "" });
   }
 
   function openRenameFolderDialog(folder: FolderItem) {
-    setFolderName(folder.name);
-    setFolderDialog({ mode: "rename", folder });
+    setFolderDialog({ mode: "rename", folder, name: folder.name });
   }
 
   const selectedCount = selectedIds.size;
@@ -228,8 +226,8 @@ export default function DashboardPage() {
       )}
       <FolderDialog
         dialog={folderDialog}
-        folderName={folderName}
-        onFolderNameChange={setFolderName}
+        folderName={folderDialog?.name ?? ""}
+        onFolderNameChange={(name) => setFolderDialog((prev) => (prev ? { ...prev, name } : prev))}
         onSubmit={handleFolderDialogSubmit}
         onClose={() => setFolderDialog(null)}
       />

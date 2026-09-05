@@ -2,6 +2,7 @@
 .env
 .env.*
 *.env
+!.env.example
 测试账号.txt
 
 # ===== 系统/编辑器 =====

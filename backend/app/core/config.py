@@ -2,10 +2,10 @@ from pydantic_settings import BaseSettings
 from functools import lru_cache
 
 class Settings(BaseSettings):
-    # ⚠️ 【需修改】如果用 Docker，host 改为 db；本地开发保持 localhost
     DATABASE_URL: str = "postgresql+asyncpg://clouduser:cloudpass123@db:5432/clouddrive"
+    REDIS_URL: str = "redis://redis:6379/0"
     
-    SECRET_KEY: str = "change-me-in-production"  # ⚠️ 【需修改】生产环境必须换
+    SECRET_KEY: str = "change-me-in-production"
 
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     MINIO_SECRET_KEY: str = "minioadmin123"
     MINIO_BUCKET: str = "cloud-drive"
     MINIO_DOWNLOAD_EXPIRES: int = 3600
+
+    CORS_ORIGINS: str = "http://localhost:3000"
 
     class Config:
         env_file = ".env"

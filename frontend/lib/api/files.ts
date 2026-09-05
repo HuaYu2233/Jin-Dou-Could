@@ -49,7 +49,7 @@ export async function uploadFile(file: File, folderId?: string): Promise<FileUpl
   });
 }
 
-const API_BASE_URL = "http://localhost:8000";
+import { API_BASE_URL } from "@/lib/config";
 
 export function uploadFileWithProgress(
   file: File,
@@ -137,7 +137,7 @@ export async function downloadFileWithProgress(
 
 export async function getFileBlob(id: string): Promise<Blob> {
   const token = localStorage.getItem("access_token");
-  const res = await fetch(`http://localhost:8000/api/v1/files/${id}/preview`, {
+  const res = await fetch(`${API_BASE_URL}/api/v1/files/${id}/preview`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) throw new Error("获取文件失败");
@@ -281,7 +281,7 @@ export async function deleteShare(id: string): Promise<void> {
 }
 
 export async function getShareInfo(token: string): Promise<ShareInfo> {
-  const res = await fetch(`http://localhost:8000/api/v1/shares/public/${token}`);
+  const res = await fetch(`${API_BASE_URL}/api/v1/shares/public/${token}`);
   if (!res.ok) throw new Error("分享不存在或已过期");
   return res.json();
 }
@@ -291,7 +291,7 @@ export async function verifyShare(
   extractCode: string
 ): Promise<{ share_token: string; filename: string; file_size: number; file_type: string }> {
   const res = await fetch(
-    `http://localhost:8000/api/v1/shares/public/${token}/verify`,
+    `${API_BASE_URL}/api/v1/shares/public/${token}/verify`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -307,7 +307,7 @@ export async function downloadSharedFile(
   extractCode: string
 ): Promise<Blob> {
   const res = await fetch(
-    `http://localhost:8000/api/v1/shares/public/${token}/download?extract_code=${encodeURIComponent(extractCode)}`
+    `${API_BASE_URL}/api/v1/shares/public/${token}/download?extract_code=${encodeURIComponent(extractCode)}`
   );
   if (!res.ok) throw new Error("下载失败");
   return res.blob();
