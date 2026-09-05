@@ -93,7 +93,13 @@ export async function downloadFile(id: string): Promise<Blob> {
   const res = await fetch(`${API_BASE_URL}/api/v1/files/${id}/download`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
-  if (!res.ok) throw new Error("下载失败");
+  if (res.status === 401) {
+    localStorage.removeItem("access_token");
+    document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    window.location.href = "/login";
+    throw new Error("登录已过期，请重新登录");
+  }
+  if (!res.ok) throw new Error(`下载失败 (${res.status})`);
   return res.blob();
 }
 
@@ -107,7 +113,13 @@ export async function downloadFileWithProgress(
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     signal,
   });
-  if (!res.ok) throw new Error("下载失败");
+  if (res.status === 401) {
+    localStorage.removeItem("access_token");
+    document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    window.location.href = "/login";
+    throw new Error("登录已过期，请重新登录");
+  }
+  if (!res.ok) throw new Error(`下载失败 (${res.status})`);
   const total = Number(res.headers.get("content-length")) || 0;
   const reader = res.body?.getReader();
   if (!reader) return res.blob();

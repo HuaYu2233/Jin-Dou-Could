@@ -1,17 +1,10 @@
 // /Users/zero/project/JinDou-Cloud/frontend/app/dashboard/page.tsx
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import {
-  listFiles,
-  listTrashFiles,
-  searchFiles,
-  listFolderContents,
-  type FileItem,
-  type FolderItem,
-  type ShareCreateResponse,
-} from "@/lib/api/files";
-import type { CategoryId, ViewMode, BreadcrumbItem, StorageInfo } from "./types";
+import { useState, useRef } from "react";
+import { type FileItem, type FolderItem, type ShareCreateResponse } from "@/lib/api/files";
+import type { CategoryId, ViewMode, StorageInfo } from "./types";
+import { useFileList } from "./hooks/useFileList";
 import { useAuthStore } from "@/stores/auth";
 import Sidebar from "./components/Sidebar";
 import Toolbar from "./components/Toolbar";
@@ -27,29 +20,18 @@ import FolderDialog from "./components/FolderDialog";
 import { useFileOperations } from "./hooks/useFileOperations";
 import pageStyles from "./page.module.css";
 
-const PAGE_SIZE = 20;
-
 export default function DashboardPage() {
   const [category, setCategory] = useState<CategoryId>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
-  const [files, setFiles] = useState<FileItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [dragOver, setDragOver] = useState(false);
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
   const [sharesReloadKey, setSharesReloadKey] = useState(0);
-  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
-  const [folders, setFolders] = useState<FolderItem[]>([]);
   const [folderDialog, setFolderDialog] = useState<{ mode: "create" } | { mode: "rename"; folder: FolderItem } | null>(null);
   const [folderName, setFolderName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
   const [shareResults, setShareResults] = useState<ShareCreateResponse[]>([]);
-  const [keyword, setKeyword] = useState("");
-  const [debouncedKeyword, setDebouncedKeyword] = useState("");
 
   const user = useAuthStore((s) => s.user);
   const fetchMe = useAuthStore((s) => s.fetchMe);
@@ -58,48 +40,13 @@ export default function DashboardPage() {
     total: user?.storage_quota ?? 1024 * 1024 * 1024,
   };
 
-  const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([
-    { id: "root", name: "全部文件", path: "/" },
-  ]);
-
-  const loadFiles = useCallback(async (active = true) => {
-    if (category === "shares" || category === "transfers") return;
-    if (!active) return;
-    setLoading(true);
-    setError("");
-    try {
-      if (debouncedKeyword) {
-        const res = await searchFiles(debouncedKeyword, (page - 1) * PAGE_SIZE, PAGE_SIZE);
-        if (!active) return;
-        setFiles(res.items);
-        setTotal(res.total);
-        setFolders([]);
-      } else if (category === "all") {
-        const res = await listFolderContents(currentFolderId ?? undefined, (page - 1) * PAGE_SIZE, PAGE_SIZE);
-        if (!active) return;
-        setFolders(res.folders);
-        setFiles(res.files);
-        setBreadcrumbs(res.breadcrumbs.map((b) => ({ ...b, id: b.id ?? "root" })));
-        setTotal(res.total_files);
-      } else if (category === "trash") {
-        const res = await listTrashFiles((page - 1) * PAGE_SIZE, PAGE_SIZE);
-        if (!active) return;
-        setFiles(res.items);
-        setTotal(res.total);
-        setFolders([]);
-      } else {
-        const res = await listFiles((page - 1) * PAGE_SIZE, PAGE_SIZE, category);
-        if (!active) return;
-        setFiles(res.items);
-        setTotal(res.total);
-        setFolders([]);
-      }
-    } catch (err) {
-      if (active) setError(err instanceof Error ? err.message : "加载失败");
-    } finally {
-      if (active) setLoading(false);
-    }
-  }, [category, page, currentFolderId, debouncedKeyword]);
+  const {
+    files, folders, total, page, loading, error, breadcrumbs,
+    keyword, currentFolderId,
+    PAGE_SIZE,
+    setPage, setKeyword, setError, setCurrentFolderId, setTotal,
+    loadFiles,
+  } = useFileList(category);
 
   const {
     uploading,
@@ -125,19 +72,6 @@ export default function DashboardPage() {
     setFolderDialog,
     setSharesReloadKey,
   });
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedKeyword(keyword), 300);
-    return () => clearTimeout(timer);
-  }, [keyword]);
-
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      await loadFiles(active);
-    })();
-    return () => { active = false; };
-  }, [category, page, currentFolderId, debouncedKeyword, loadFiles]);
 
   function handleCategoryChange(id: CategoryId) {
     setCategory(id);
