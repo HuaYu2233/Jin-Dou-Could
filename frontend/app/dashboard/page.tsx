@@ -127,6 +127,7 @@ export default function DashboardPage() {
         activeCategory={category}
         onCategoryChange={handleCategoryChange}
         storage={storage}
+        isAdmin={!!user?.is_admin}
       />
       <div className={pageStyles.mainArea}>
         <Toolbar

@@ -26,6 +26,13 @@ async def upload_file(
     content = await file.read()
     mime_type = file.content_type or "application/octet-stream"
     filename = file.filename or "unknown"
+
+    if current_user.used_storage + len(content) > current_user.storage_quota:
+        raise HTTPException(
+            status_code=413,
+            detail="存储空间不足，请联系管理员扩容",
+        )
+
     try:
         file_record = await file_service.create_file(
             db, current_user, filename, content, mime_type, folder_id

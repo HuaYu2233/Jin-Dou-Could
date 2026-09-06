@@ -1,0 +1,35 @@
+.bar {
+  height: 6px;
+  background: #f3f4f6;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.barSm {
+  height: 4px;
+}
+
+.fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.fillNormal {
+  background: linear-gradient(90deg, #60a5fa, #3b82f6);
+}
+
+.fillDanger {
+  background: linear-gradient(90deg, #f87171, #ef4444);
+}
+
+.text {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.percent {
+  margin-left: 8px;
+  color: #d1d5db;
+}

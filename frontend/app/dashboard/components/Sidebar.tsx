@@ -1,6 +1,7 @@
 // /Users/zero/project/JinDou-Cloud/frontend/app/dashboard/components/Sidebar.tsx
 "use client";
 
+import Link from "next/link";
 import type { CategoryId, StorageInfo } from "../types";
 import { useTransferStore } from "@/stores/transfers";
 import styles from "./Sidebar.module.css";
@@ -28,6 +29,7 @@ interface SidebarProps {
   activeCategory: CategoryId;
   onCategoryChange: (id: CategoryId) => void;
   storage: StorageInfo;
+  isAdmin?: boolean;
 }
 
 function formatSize(bytes: number): string {
@@ -35,7 +37,7 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
-export default function Sidebar({ activeCategory, onCategoryChange, storage }: SidebarProps) {
+export default function Sidebar({ activeCategory, onCategoryChange, storage, isAdmin }: SidebarProps) {
   const groups = [...new Set(NAV_ITEMS.map((i) => i.group))];
   const usagePercent = storage.total > 0 ? (storage.used / storage.total) * 100 : 0;
   const hasActive = useTransferStore((s) => s.hasActive());
@@ -60,6 +62,12 @@ export default function Sidebar({ activeCategory, onCategoryChange, storage }: S
           </div>
         ))}
       </div>
+      {isAdmin && (
+        <Link href="/admin" className={styles.navItem}>
+          <span className={styles.navIcon}>⚙️</span>
+          <span className={styles.navLabel}>管理后台</span>
+        </Link>
+      )}
       <div className={styles.storageSection}>
         <div className={styles.storageTitle}>存储空间</div>
         <div className={styles.storageBar}>

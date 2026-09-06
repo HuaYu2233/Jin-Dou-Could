@@ -74,6 +74,9 @@ services:
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
       - REFRESH_TOKEN_EXPIRE_DAYS=${REFRESH_TOKEN_EXPIRE_DAYS:-7}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
+      - MAX_USERS=${MAX_USERS:-0}
+      - DEFAULT_STORAGE_QUOTA=${DEFAULT_STORAGE_QUOTA:-1073741824}
     volumes:
       - ./backend:/app
       - /app/__pycache__

@@ -20,6 +20,10 @@ class Settings(BaseSettings):
 
     CORS_ORIGINS: str = "http://localhost:3000"
 
+    DEFAULT_STORAGE_QUOTA: int = 1073741824  # 1GB
+    MAX_USERS: int = 0  # 0 = 不限制
+    ADMIN_EMAIL: str = ""  # 用此邮箱注册的首个用户自动成为管理员
+
     class Config:
         env_file = ".env"
 

@@ -18,9 +18,36 @@ class UserResponse(BaseModel):
     email: str
     username: str
     is_active: bool
+    is_admin: bool
     created_at: datetime
     storage_quota: int
     used_storage: int
 
     class Config:
-        from_attributes = True  # Pydantic v2 读取 ORM 对象
+        from_attributes = True
+
+class UserUpdate(BaseModel):
+    username: str | None = None
+    storage_quota: int | None = None
+    is_active: bool | None = None
+    is_admin: bool | None = None
+
+class UserListItem(BaseModel):
+    id: UUID
+    email: str
+    username: str
+    is_active: bool
+    is_admin: bool
+    storage_quota: int
+    used_storage: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class AdminStats(BaseModel):
+    total_users: int
+    active_users: int
+    admin_users: int
+    total_quota: int
+    total_used: int
