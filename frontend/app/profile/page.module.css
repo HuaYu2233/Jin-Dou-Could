@@ -1,24 +1,11 @@
 .page {
-  padding: 32px 24px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   max-width: 640px;
   margin: 0 auto;
-}
-
-.header {
-  margin-bottom: 24px;
-}
-
-.title {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.subtitle {
-  margin: 4px 0 0 0;
-  font-size: 14px;
-  color: #6b7280;
+  background: #f9fafb;
 }
 
 .avatarSection {
@@ -155,21 +142,9 @@
   color: #dc2626;
 }
 
-.backLink {
-  display: inline-block;
-  margin-top: 16px;
-  font-size: 14px;
-  color: #2563eb;
-  text-decoration: none;
-}
-
-.backLink:hover {
-  color: #1d4ed8;
-}
-
 @media (max-width: 768px) {
   .page {
-    padding: 16px 12px;
+    padding: 12px;
   }
   .avatarSection {
     flex-direction: column;

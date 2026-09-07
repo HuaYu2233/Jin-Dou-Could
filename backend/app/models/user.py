@@ -15,6 +15,8 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     avatar_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    security_question: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    security_answer: Mapped[str | None] = mapped_column(String(255), nullable=True)
     storage_quota: Mapped[int] = mapped_column(BigInteger, default=1073741824)  # 1GB
     used_storage: Mapped[int] = mapped_column(BigInteger, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -4,6 +4,8 @@ import { useState } from "react";
 import Pagination from "@/app/dashboard/components/Pagination";
 import UserTable from "../components/UserTable";
 import QuotaDialog from "../components/QuotaDialog";
+import PageHeader from "../components/PageHeader";
+import ErrorBar from "../components/ErrorBar";
 import { useAdminUsers } from "../hooks/useAdminUsers";
 import type { AdminUserItem } from "@/lib/api/admin";
 import styles from "./page.module.css";
@@ -41,17 +43,9 @@ export default function AdminUsersPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.header}>
-        <h1 className={styles.title}>用户管理</h1>
-        <p className={styles.subtitle}>管理用户账号、配额与权限</p>
-      </div>
+      <PageHeader title="用户管理" subtitle="管理用户账号、配额与权限" />
 
-      {error && (
-        <div className={styles.errorBar}>
-          {error}
-          <button className={styles.errorClose} onClick={() => setError(null)}>关闭</button>
-        </div>
-      )}
+      <ErrorBar message={error} onClose={() => setError(null)} />
 
       <UserTable
         users={users}

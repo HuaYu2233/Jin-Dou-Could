@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { login } from "@/lib/api/auth";
 // import { useAuthStore } from "@/stores/auth";
 
@@ -32,6 +33,9 @@ export default function LoginPage() {
       <input type="email" placeholder="邮箱" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full rounded border px-3 py-2" required />
       <input type="password" placeholder="密码" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full rounded border px-3 py-2" required />
       <button type="submit" className="w-full rounded bg-blue-600 py-2 text-white hover:bg-blue-700">登录</button>
+      <div className="text-right">
+        <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">忘记密码?</Link>
+      </div>
     </form>
   );
 }

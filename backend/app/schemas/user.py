@@ -20,6 +20,7 @@ class UserResponse(BaseModel):
     is_active: bool
     is_admin: bool
     avatar_key: str | None = None
+    security_question: str | None = None
     created_at: datetime
     storage_quota: int
     used_storage: int
@@ -29,6 +30,10 @@ class UserResponse(BaseModel):
 
 class ProfileUpdate(BaseModel):
     username: str | None = None
+
+class SecurityQuestionUpdate(BaseModel):
+    security_question: str
+    security_answer: str
 
 class PasswordChange(BaseModel):
     old_password: str

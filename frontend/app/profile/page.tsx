@@ -1,29 +1,24 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { useState, useRef } from "react";
 import { useAuthStore } from "@/stores/auth";
 import Avatar from "../dashboard/components/Avatar";
 import AvatarEditor from "../dashboard/components/AvatarEditor";
-import { updateProfile, changePassword, uploadAvatar } from "@/lib/api/auth";
+import PageHeader from "../admin/components/PageHeader";
+import { updateProfile, changePassword, uploadAvatar, setSecurityQuestion } from "@/lib/api/auth";
 import styles from "./page.module.css";
 
 export default function ProfilePage() {
-  const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-
-  useEffect(() => {
-    if (!isAuthenticated) router.replace("/login");
-  }, [isAuthenticated, router]);
 
   const [username, setUsername] = useState(user?.username ?? "");
+  const [secQuestion, setSecQuestion] = useState(user?.security_question ?? "");
   const [prevUser, setPrevUser] = useState(user);
   if (user !== prevUser) {
     setPrevUser(user);
     setUsername(user?.username ?? "");
+    setSecQuestion(user?.security_question ?? "");
   }
   const [oldPwd, setOldPwd] = useState("");
   const [newPwd, setNewPwd] = useState("");
@@ -34,6 +29,9 @@ export default function ProfilePage() {
   const [editingFile, setEditingFile] = useState<File | null>(null);
   const [nameMsg, setNameMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pwdMsg, setPwdMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [secAnswer, setSecAnswer] = useState("");
+  const [savingSec, setSavingSec] = useState(false);
+  const [secMsg, setSecMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   if (!user) return null;
@@ -72,6 +70,21 @@ export default function ProfilePage() {
     }
   }
 
+  async function handleSaveSecurity() {
+    setSavingSec(true);
+    setSecMsg(null);
+    try {
+      const updated = await setSecurityQuestion(secQuestion, secAnswer);
+      setUser(updated);
+      setSecAnswer("");
+      setSecMsg({ ok: true, text: "密保问题已设置" });
+    } catch (err) {
+      setSecMsg({ ok: false, text: err instanceof Error ? err.message : "设置失败" });
+    } finally {
+      setSavingSec(false);
+    }
+  }
+
   function handlePickFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -94,10 +107,7 @@ export default function ProfilePage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.header}>
-        <h1 className={styles.title}>用户中心</h1>
-        <p className={styles.subtitle}>管理你的个人信息与安全设置</p>
-      </div>
+      <PageHeader title="用户中心" subtitle="管理你的个人信息与安全设置" />
 
       <div className={styles.avatarSection}>
         <Avatar
@@ -107,7 +117,7 @@ export default function ProfilePage() {
           size="lg"
         />
         <div className={styles.avatarInfo}>
-          <div className={styles.username}>{user.username}</div>
+          <div className={styles.avatarName}>{user.username}</div>
           <div className={styles.avatarEmail}>{user.email}</div>
         </div>
         <input
@@ -198,7 +208,42 @@ export default function ProfilePage() {
         )}
       </div>
 
-      <Link href="/dashboard" className={styles.backLink}>← 返回网盘</Link>
+      <div className={styles.section}>
+        <h2 className={styles.sectionTitle}>密保设置</h2>
+        <p className={styles.label} style={{ marginBottom: 12 }}>
+          设置密保问题后，忘记密码时可通过密保问题重置密码
+        </p>
+        <div className={styles.field}>
+          <label className={styles.label}>密保问题</label>
+          <input
+            type="text"
+            value={secQuestion}
+            onChange={(e) => setSecQuestion(e.target.value)}
+            className={styles.input}
+            placeholder="如：你的小学叫什么名字？"
+          />
+        </div>
+        <div className={styles.field}>
+          <label className={styles.label}>密保答案</label>
+          <input
+            type="text"
+            value={secAnswer}
+            onChange={(e) => setSecAnswer(e.target.value)}
+            className={styles.input}
+            placeholder={user.security_question ? "输入新答案以更换密保" : "请输入答案"}
+          />
+        </div>
+        <div className={styles.actions}>
+          <button className={styles.saveBtn} onClick={handleSaveSecurity} disabled={savingSec}>
+            {savingSec ? "保存中..." : "保存"}
+          </button>
+        </div>
+        {secMsg && (
+          <div className={`${styles.message} ${secMsg.ok ? styles.messageOk : styles.messageErr}`}>
+            {secMsg.text}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

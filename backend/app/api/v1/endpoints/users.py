@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.db.base import get_db
 from app.models.user import User
-from app.schemas.user import UserResponse, ProfileUpdate, PasswordChange
+from app.schemas.user import UserResponse, ProfileUpdate, PasswordChange, SecurityQuestionUpdate
 from app.core.security import hash_password, verify_password
 from app.core.storage import upload_file, get_object_stream
 import uuid
@@ -71,6 +71,23 @@ async def change_password(
     if len(data.new_password) < 6:
         raise HTTPException(status_code=400, detail="新密码至少 6 个字符")
     current_user.hashed_password = hash_password(data.new_password)
+    await db.commit()
+    await db.refresh(current_user)
+    return current_user
+
+
+@router.patch("/me/security-question", response_model=UserResponse)
+async def update_security_question(
+    data: SecurityQuestionUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if len(data.security_question.strip()) < 2:
+        raise HTTPException(status_code=400, detail="密保问题至少 2 个字符")
+    if len(data.security_answer.strip()) < 1:
+        raise HTTPException(status_code=400, detail="密保答案不能为空")
+    current_user.security_question = data.security_question.strip()
+    current_user.security_answer = hash_password(data.security_answer.strip().lower())
     await db.commit()
     await db.refresh(current_user)
     return current_user

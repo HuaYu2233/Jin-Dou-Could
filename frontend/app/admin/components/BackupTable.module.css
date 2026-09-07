@@ -1,0 +1,157 @@
+.wrapper {
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.count {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.triggerBtn {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 6px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.triggerBtn:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.triggerBtn:disabled {
+  background: #93c5fd;
+  cursor: not-allowed;
+}
+
+.scroll {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  font-size: 14px;
+  border-collapse: collapse;
+}
+
+.head {
+  background: #f9fafb;
+  color: #6b7280;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 500;
+}
+
+.thRight {
+  text-align: right;
+}
+
+.row {
+  border-top: 1px solid #f3f4f6;
+}
+
+.row:hover {
+  background: #f9fafb;
+}
+
+.td {
+  padding: 12px 16px;
+  color: #4b5563;
+}
+
+.tdRight {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.date {
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.badge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.badgeOk {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.badgeWarn {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.badgeEncrypted {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #f5f3ff;
+  color: #6d28d9;
+}
+
+.muted {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.files {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.actionBtn {
+  font-size: 12px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.actionPrimary {
+  color: #2563eb;
+}
+
+.actionPrimary:hover {
+  color: #1d4ed8;
+}
+
+.actionDanger {
+  color: #dc2626;
+  margin-left: 12px;
+}
+
+.actionDanger:hover {
+  color: #b91c1c;
+}
+
+.empty,
+.loading {
+  padding: 32px 16px;
+  text-align: center;
+  color: #9ca3af;
+}

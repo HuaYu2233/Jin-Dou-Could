@@ -2,6 +2,9 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Docker CLI（用于触发备份容器执行备份脚本）
+COPY --from=docker:24-cli /usr/local/bin/docker /usr/local/bin/docker
+
 # 安装系统依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \

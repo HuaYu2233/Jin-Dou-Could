@@ -5,6 +5,7 @@ import Link from "next/link";
 import { getAdminStats, type AdminStats } from "@/lib/api/admin";
 import StatCard from "./components/StatCard";
 import StorageBar from "./components/StorageBar";
+import PageHeader from "./components/PageHeader";
 import styles from "./page.module.css";
 
 export default function AdminDashboardPage() {
@@ -33,10 +34,7 @@ export default function AdminDashboardPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.header}>
-        <h1 className={styles.title}>系统概览</h1>
-        <p className={styles.subtitle}>查看网盘整体运行情况</p>
-      </div>
+      <PageHeader title="系统概览" subtitle="查看网盘整体运行情况" />
 
       <div className={styles.cardGrid}>
         <StatCard label="用户总数" value={stats.total_users} hint="所有注册用户" color="blue" />
@@ -59,6 +57,16 @@ export default function AdminDashboardPage() {
         </div>
         <p className={styles.sectionDesc}>
           调整用户存储配额、启用/禁用账号、设置管理员权限或删除用户。
+        </p>
+      </div>
+
+      <div className={styles.section}>
+        <div className={styles.sectionHead}>
+          <h2 className={styles.sectionTitle}>备份管理</h2>
+          <Link href="/admin/backups" className={styles.link}>进入 →</Link>
+        </div>
+        <p className={styles.sectionDesc}>
+          查看备份记录、手动触发备份或下载备份文件。
         </p>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { client } from "./client";
+import { API_BASE_URL } from "@/lib/config";
 
 export interface AdminStats {
   total_users: number;
@@ -46,4 +47,56 @@ export async function updateAdminUser(
 
 export async function deleteAdminUser(userId: string): Promise<void> {
   await client<{ detail: string }>(`/api/v1/admin/users/${userId}`, { method: "DELETE" });
+}
+
+export interface BackupFile {
+  name: string;
+  size: number;
+  encrypted: boolean;
+}
+
+export interface BackupInfo {
+  timestamp: string;
+  created_at: string;
+  status: string;
+  encrypted: boolean;
+  total_size: number;
+  files: BackupFile[];
+}
+
+export async function listAdminBackups(): Promise<BackupInfo[]> {
+  return client<BackupInfo[]>(`/api/v1/admin/backups`);
+}
+
+export async function triggerAdminBackup(): Promise<{ detail: string }> {
+  return client<{ detail: string }>(`/api/v1/admin/backups/trigger`, {
+    method: "POST",
+  });
+}
+
+export async function deleteAdminBackup(timestamp: string): Promise<void> {
+  await client<{ detail: string }>(`/api/v1/admin/backups/${timestamp}`, {
+    method: "DELETE",
+  });
+}
+
+export async function downloadAdminBackup(timestamp: string, file: string): Promise<void> {
+  const token = localStorage.getItem("access_token");
+  const url = `${API_BASE_URL}/api/v1/admin/backups/${encodeURIComponent(timestamp)}/download?file=${encodeURIComponent(file)}`;
+  const res = await fetch(url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `下载失败 (${res.status})`);
+  }
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objectUrl;
+  a.download = file;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(objectUrl);
 }

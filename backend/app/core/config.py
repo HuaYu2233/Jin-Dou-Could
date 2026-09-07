@@ -24,6 +24,20 @@ class Settings(BaseSettings):
     MAX_USERS: int = 0  # 0 = 不限制
     ADMIN_EMAIL: str = ""  # 用此邮箱注册的首个用户自动成为管理员
 
+    # 备份
+    BACKUP_DIR: str = "/backups"
+    BACKUP_TRIGGER_CMD: str = ""
+
+    # 找回密码
+    RESET_PASSWORD_SMTP_HOST: str = ""
+    RESET_PASSWORD_SMTP_PORT: int = 465
+    RESET_PASSWORD_SMTP_USER: str = ""
+    RESET_PASSWORD_SMTP_PASSWORD: str = ""
+    RESET_PASSWORD_FROM_EMAIL: str = ""
+    RESET_PASSWORD_FROM_NAME: str = "金斗云盘"
+    RESET_PASSWORD_CODE_EXPIRE_SECONDS: int = 600
+    RESET_PASSWORD_CODE_LENGTH: int = 6
+
     # 日志
     LOG_LEVEL: str = "INFO"
     LOG_DIR: str = "logs"

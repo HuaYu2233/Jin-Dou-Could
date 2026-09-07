@@ -26,6 +26,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const navItems = [
     { href: "/admin", label: "概览" },
     { href: "/admin/users", label: "用户管理" },
+    { href: "/admin/backups", label: "备份管理" },
   ];
 
   return (

@@ -3,7 +3,7 @@ import { API_BASE_URL } from "@/lib/config";
 
 export interface LoginData { email: string; password: string; }
 export interface RegisterData { email: string; username: string; password: string; }
-export interface User { id: string; email: string; username: string; is_active: boolean; is_admin: boolean; avatar_key: string | null; created_at: string; storage_quota: number; used_storage: number; }
+export interface User { id: string; email: string; username: string; is_active: boolean; is_admin: boolean; avatar_key: string | null; security_question: string | null; created_at: string; storage_quota: number; used_storage: number; }
 export interface TokenResponse { access_token: string; token_type: string; }
 
 export async function login(data: LoginData): Promise<TokenResponse> {
@@ -12,6 +12,49 @@ export async function login(data: LoginData): Promise<TokenResponse> {
 
 export async function register(data: RegisterData): Promise<User> {
   return client<User>("/api/v1/auth/register", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function forgotPassword(email: string): Promise<{ detail: string }> {
+  return client<{ detail: string }>("/api/v1/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function resetPassword(
+  email: string,
+  code: string,
+  newPassword: string
+): Promise<{ detail: string }> {
+  return client<{ detail: string }>("/api/v1/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ email, code, new_password: newPassword }),
+  });
+}
+
+export async function setSecurityQuestion(question: string, answer: string): Promise<User> {
+  return client<User>("/api/v1/users/me/security-question", {
+    method: "PATCH",
+    body: JSON.stringify({ security_question: question, security_answer: answer }),
+  });
+}
+
+export async function getSecurityQuestion(email: string): Promise<{ question: string }> {
+  return client<{ question: string }>("/api/v1/auth/security-question", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function resetPasswordBySecurity(
+  email: string,
+  answer: string,
+  newPassword: string
+): Promise<{ detail: string }> {
+  return client<{ detail: string }>("/api/v1/auth/reset-password-by-security", {
+    method: "POST",
+    body: JSON.stringify({ email, answer, new_password: newPassword }),
+  });
 }
 
 export async function getMe(): Promise<User> {

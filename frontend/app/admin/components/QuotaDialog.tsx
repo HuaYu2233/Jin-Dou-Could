@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import type { AdminUserItem } from "@/lib/api/admin";
-import pageStyles from "../page.module.css";
+import Modal from "./Modal";
+import styles from "./QuotaDialog.module.css";
 
 interface QuotaDialogProps {
   user: AdminUserItem | null;
@@ -24,8 +25,6 @@ export default function QuotaDialog({ user, saving, onSave, onClose }: QuotaDial
     return () => { active = false; };
   }, [user]);
 
-  if (!user) return null;
-
   function handleSubmit() {
     const gb = parseFloat(value);
     if (isNaN(gb) || gb < 0) return;
@@ -33,31 +32,24 @@ export default function QuotaDialog({ user, saving, onSave, onClose }: QuotaDial
   }
 
   return (
-    <div className={pageStyles.modalOverlay} onClick={() => !saving && onClose()}>
-      <div className={pageStyles.modalContent} onClick={(e) => e.stopPropagation()}>
-        <h3 className={pageStyles.modalTitle}>修改存储配额</h3>
-        <p className={pageStyles.modalDesc}>
-          用户：{user.username}（{user.email}）
-        </p>
-        <label className={pageStyles.modalLabel}>配额大小（GB）</label>
-        <input
-          type="number"
-          step="0.1"
-          min="0"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          className={pageStyles.modalInput}
-          autoFocus
-        />
-        <div className={pageStyles.modalActions}>
-          <button className={pageStyles.modalCancelBtn} onClick={onClose} disabled={saving}>
-            取消
-          </button>
-          <button className={pageStyles.modalConfirmBtn} onClick={handleSubmit} disabled={saving}>
-            {saving ? "保存中..." : "保存"}
-          </button>
-        </div>
-      </div>
-    </div>
+    <Modal
+      open={!!user}
+      title="修改存储配额"
+      description={user ? `用户：${user.username}（${user.email}）` : undefined}
+      saving={saving}
+      onConfirm={handleSubmit}
+      onClose={onClose}
+    >
+      <label className={styles.label}>配额大小（GB）</label>
+      <input
+        type="number"
+        step="0.1"
+        min="0"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        className={styles.input}
+        autoFocus
+      />
+    </Modal>
   );
 }
