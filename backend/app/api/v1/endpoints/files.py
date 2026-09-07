@@ -1,12 +1,13 @@
 from uuid import UUID
 from urllib.parse import quote
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.db.base import get_db
 from app.models.user import User
 from app.services import file_service
+from app.core.config import settings
 from app.schemas.file import (
     FileResponse,
     FileListResponse,
@@ -18,12 +19,24 @@ router = APIRouter()
 
 @router.post("", response_model=FileUploadResponse)
 async def upload_file(
+    request: Request,
     file: UploadFile = File(...),
     folder_id: UUID | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    content = await file.read()
+    declared = request.headers.get("content-length")
+    if declared and int(declared) > settings.MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=413, detail="文件过大，单文件上限 100MB")
+
+    chunks: list[bytes] = []
+    total = 0
+    while chunk := await file.read(1024 * 1024):
+        total += len(chunk)
+        if total > settings.MAX_UPLOAD_SIZE:
+            raise HTTPException(status_code=413, detail="文件过大，单文件上限 100MB")
+        chunks.append(chunk)
+    content = b"".join(chunks)
     mime_type = file.content_type or "application/octet-stream"
     filename = file.filename or "unknown"
 

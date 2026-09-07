@@ -65,8 +65,7 @@ export function uploadFileWithProgress(
     if (folderId) params.set("folder_id", folderId);
     const query = params.toString();
     xhr.open("POST", `${API_BASE_URL}/api/v1/files${query ? `?${query}` : ""}`);
-    const token = localStorage.getItem("access_token");
-    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.withCredentials = true;
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) onProgress(e.loaded, e.total);
     };
@@ -74,7 +73,6 @@ export function uploadFileWithProgress(
       if (xhr.status >= 200 && xhr.status < 300) {
         try { resolve(JSON.parse(xhr.responseText)); } catch { reject(new Error("解析响应失败")); }
       } else if (xhr.status === 401) {
-        localStorage.removeItem("access_token");
         window.location.href = "/login";
         reject(new Error("Unauthorized"));
       } else {
@@ -89,13 +87,10 @@ export function uploadFileWithProgress(
 }
 
 export async function downloadFile(id: string): Promise<Blob> {
-  const token = localStorage.getItem("access_token");
   const res = await fetch(`${API_BASE_URL}/api/v1/files/${id}/download`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    credentials: "include",
   });
   if (res.status === 401) {
-    localStorage.removeItem("access_token");
-    document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     window.location.href = "/login";
     throw new Error("登录已过期，请重新登录");
   }
@@ -108,14 +103,11 @@ export async function downloadFileWithProgress(
   onProgress: (loaded: number, total: number) => void,
   signal?: AbortSignal
 ): Promise<Blob> {
-  const token = localStorage.getItem("access_token");
   const res = await fetch(`${API_BASE_URL}/api/v1/files/${id}/download`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    credentials: "include",
     signal,
   });
   if (res.status === 401) {
-    localStorage.removeItem("access_token");
-    document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     window.location.href = "/login";
     throw new Error("登录已过期，请重新登录");
   }
@@ -136,9 +128,8 @@ export async function downloadFileWithProgress(
 }
 
 export async function getFileBlob(id: string): Promise<Blob> {
-  const token = localStorage.getItem("access_token");
   const res = await fetch(`${API_BASE_URL}/api/v1/files/${id}/preview`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    credentials: "include",
   });
   if (!res.ok) throw new Error("获取文件失败");
   return res.blob();

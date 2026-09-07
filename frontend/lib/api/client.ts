@@ -14,18 +14,19 @@ export async function client<T>(endpoint: string, options: FetchOptions = {}): P
     headers["Content-Type"] = "application/json";
   }
 
-  if (!skipAuth) {
-    const token = localStorage.getItem("access_token");
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-  }
-
-  const res = await fetch(`${API_BASE_URL}${endpoint}`, { ...rest, body, headers });
+  const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+    ...rest,
+    body,
+    headers,
+    credentials: "include",
+  });
 
   if (res.status === 401) {
-    localStorage.removeItem("access_token");
-    document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     useAuthStore.getState().logout();
-    window.location.href = "/login";    
+    try {
+      await fetch(`${API_BASE_URL}/api/v1/auth/logout`, { method: "POST", credentials: "include" });
+    } catch {}
+    window.location.href = "/login";
     throw new Error("Unauthorized");
   }
 

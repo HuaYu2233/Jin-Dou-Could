@@ -4,7 +4,7 @@ from sqlalchemy import select
 from app.db.base import get_db
 from app.models.user import User
 from app.schemas.user import UserCreate, UserLogin, UserResponse
-from app.schemas.token import TokenResponse
+from app.schemas.token import LoginResponse
 from app.schemas.reset_password import (
     ForgotPasswordRequest,
     ResetPasswordRequest,
@@ -14,6 +14,7 @@ from app.schemas.reset_password import (
 from app.services.user_service import create_user
 from app.services import reset_password_service
 from app.core.security import verify_password, create_access_token, create_refresh_token
+from app.core.config import settings
 
 router = APIRouter()
 
@@ -25,7 +26,7 @@ async def register(data: UserCreate, db: AsyncSession = Depends(get_db)):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=LoginResponse)
 async def login(
     response: Response,
     data: UserLogin,  
@@ -38,20 +39,28 @@ async def login(
     if not user or not verify_password(data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
-    # 生成 Token
     access_token = create_access_token({"sub": str(user.id)})
     refresh_token = create_refresh_token({"sub": str(user.id)})
-    
-    # Refresh Token 放 HttpOnly Cookie
+
+    secure = settings.ENVIRONMENT == "production"
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        samesite="lax",
+        secure=secure,
+    )
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        max_age=7 * 24 * 3600,  # 7 天
+        max_age=7 * 24 * 3600,
         samesite="lax",
+        secure=secure,
     )
-    
-    return TokenResponse(access_token=access_token)
+
+    return LoginResponse()
 
 
 @router.post("/forgot-password")
@@ -101,3 +110,10 @@ async def reset_password_by_security(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"detail": "密码重置成功"}
+
+
+@router.post("/logout")
+async def logout(response: Response):
+    response.delete_cookie("access_token")
+    response.delete_cookie("refresh_token")
+    return {"detail": "已退出登录"}

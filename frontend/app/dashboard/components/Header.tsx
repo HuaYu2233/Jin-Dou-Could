@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/stores/auth";
+import { API_BASE_URL } from "@/lib/config";
 import Avatar from "./Avatar";
 import styles from "./Header.module.css";
 
@@ -19,13 +20,13 @@ export default function Header({ extra }: HeaderProps) {
   const fetchMe = useAuthStore((s) => s.fetchMe);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    if (token && !user) fetchMe();
+    if (!user) fetchMe();
   }, [user, fetchMe]);
 
-  function handleLogout() {
-    localStorage.removeItem("access_token");
-    document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+  async function handleLogout() {
+    try {
+      await fetch(`${API_BASE_URL}/api/v1/auth/logout`, { method: "POST", credentials: "include" });
+    } catch {}
     useAuthStore.getState().logout();
     router.push("/");
   }

@@ -1,15 +1,19 @@
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 from functools import lru_cache
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://clouduser:cloudpass123@db:5432/clouddrive"
     REDIS_URL: str = "redis://redis:6379/0"
     
-    SECRET_KEY: str = "change-me-in-production"
+    SECRET_KEY: str
 
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     ALGORITHM: str = "HS256"
+
+    ENVIRONMENT: str = "development"
+    MAX_UPLOAD_SIZE: int = 104857600
 
     MINIO_ENDPOINT: str = "minio:9000"
     MINIO_PUBLIC_ENDPOINT: str = "localhost:9000"
@@ -57,6 +61,18 @@ class Settings(BaseSettings):
     ALERT_EMAIL_FROM: str = ""
     ALERT_EMAIL_TO: str = ""
     ALERT_EMAIL_USE_TLS: bool = True
+
+    @field_validator("SECRET_KEY")
+    @classmethod
+    def _validate_secret_key(cls, v: str) -> str:
+        weak = {
+            "change-me-in-production",
+            "your-super-secret-key-change-this-in-production",
+            "change-this-to-a-random-secret-key",
+        }
+        if not v or v in weak or len(v) < 32:
+            raise ValueError("SECRET_KEY 必须设置为不少于 32 字符的强随机值")
+        return v
 
     class Config:
         env_file = ".env"

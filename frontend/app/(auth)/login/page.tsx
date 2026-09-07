@@ -1,4 +1,4 @@
-"use client";  // ⚠️ 必须用，因为用了 useState / localStorage / window
+"use client";
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -16,9 +16,7 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     try {
-      const res = await login({ email, password });
-      localStorage.setItem("access_token", res.access_token);
-      document.cookie = "access_token=" + res.access_token + "; path=/; SameSite=Lax";
+      await login({ email, password });
       router.push("/dashboard");
     } catch (err) {
         const message = err instanceof Error ? err.message : "登录失败";

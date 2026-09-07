@@ -1,5 +1,4 @@
 from pydantic import BaseModel
 
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
+class LoginResponse(BaseModel):
+    detail: str = "登录成功"

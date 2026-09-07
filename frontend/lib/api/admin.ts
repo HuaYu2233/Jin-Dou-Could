@@ -81,10 +81,9 @@ export async function deleteAdminBackup(timestamp: string): Promise<void> {
 }
 
 export async function downloadAdminBackup(timestamp: string, file: string): Promise<void> {
-  const token = localStorage.getItem("access_token");
   const url = `${API_BASE_URL}/api/v1/admin/backups/${encodeURIComponent(timestamp)}/download?file=${encodeURIComponent(file)}`;
   const res = await fetch(url, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    credentials: "include",
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

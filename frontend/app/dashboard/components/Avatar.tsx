@@ -30,9 +30,8 @@ export default function Avatar({ userId, username, avatarKey, size = "md" }: Ava
         return;
       }
       try {
-        const token = localStorage.getItem("access_token");
         const res = await fetch(getAvatarUrl(userId), {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          credentials: "include",
         });
         if (!res.ok) throw new Error("fetch failed");
         const blob = await res.blob();

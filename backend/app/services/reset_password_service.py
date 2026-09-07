@@ -1,4 +1,4 @@
-import random
+import secrets
 import string
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +12,7 @@ CODE_KEY = "reset_password_code:{email}"
 SEND_LIMIT_KEY = "reset_password_send_limit:{email}"
 
 def _generate_code() -> str:
-    return "".join(random.choices(string.digits, k=settings.RESET_PASSWORD_CODE_LENGTH))
+    return "".join(secrets.choice(string.digits) for _ in range(settings.RESET_PASSWORD_CODE_LENGTH))
 
 async def send_code(db: AsyncSession, email: str) -> None:
     result = await db.execute(select(User).where(User.email == email))

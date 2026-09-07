@@ -4,10 +4,9 @@ import { API_BASE_URL } from "@/lib/config";
 export interface LoginData { email: string; password: string; }
 export interface RegisterData { email: string; username: string; password: string; }
 export interface User { id: string; email: string; username: string; is_active: boolean; is_admin: boolean; avatar_key: string | null; security_question: string | null; created_at: string; storage_quota: number; used_storage: number; }
-export interface TokenResponse { access_token: string; token_type: string; }
 
-export async function login(data: LoginData): Promise<TokenResponse> {
-  return client<TokenResponse>("/api/v1/auth/login", { method: "POST", body: JSON.stringify(data) });
+export async function login(data: LoginData): Promise<{ detail: string }> {
+  return client<{ detail: string }>("/api/v1/auth/login", { method: "POST", body: JSON.stringify(data) });
 }
 
 export async function register(data: RegisterData): Promise<User> {
