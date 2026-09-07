@@ -29,6 +29,21 @@ class Settings(BaseSettings):
     LOG_DIR: str = "logs"
     LOG_RETENTION_DAYS: int = 30
 
+    # 告警
+    ALERT_ENABLED: bool = False
+    ALERT_MIN_LEVEL: str = "ERROR"
+    ALERT_COOLDOWN_SECONDS: int = 300
+    ALERT_WEBHOOK_URL: str = ""
+    ALERT_WEBHOOK_TYPE: str = "generic"
+    ALERT_EMAIL_ENABLED: bool = False
+    ALERT_EMAIL_SMTP_HOST: str = ""
+    ALERT_EMAIL_SMTP_PORT: int = 587
+    ALERT_EMAIL_SMTP_USER: str = ""
+    ALERT_EMAIL_SMTP_PASSWORD: str = ""
+    ALERT_EMAIL_FROM: str = ""
+    ALERT_EMAIL_TO: str = ""
+    ALERT_EMAIL_USE_TLS: bool = True
+
     class Config:
         env_file = ".env"
 

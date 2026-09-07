@@ -17,7 +17,8 @@
 - **ORM**：SQLAlchemy 2.0（异步）
 - **数据库迁移**：Alembic
 - **认证**：python-jose（JWT）+ bcrypt
-- **对象存储**：MinIO（S3 兼容）
+- **对象存储**：MinIO（S3 兑容）
+- **日志**：Loguru（结构化 JSON + 轮转）
 - **语言**：Python 3.11
 
 ### 基础设施
@@ -37,8 +38,9 @@ JinDou-Cloud/
 │   │   ├── api/v1/             # API 路由
 │   │   │   ├── endpoints/      # auth, files, folders, shares, users
 │   │   │   └── api.py          # 路由聚合
-│   │   ├── core/               # config, security, storage
+│   │   ├── core/               # config, security, storage, logging, redis, alerting
 │   │   ├── db/                 # 数据库引擎与会话
+│   │   ├── middleware/         # request_logging 中间件
 │   │   ├── models/             # SQLAlchemy 模型
 │   │   ├── schemas/            # Pydantic 模型
 │   │   ├── services/           # 业务逻辑层
@@ -49,6 +51,7 @@ JinDou-Cloud/
 ├── frontend/                   # Next.js 前端
 │   ├── app/
 │   │   ├── (auth)/             # 登录/注册页
+│   │   ├── admin/              # 管理后台（统计、用户管理）
 │   │   ├── dashboard/          # 主界面
 │   │   │   ├── components/      # UI 组件
 │   │   │   ├── hooks/          # useFileList, useFileOperations
@@ -62,6 +65,8 @@ JinDou-Cloud/
 │   ├── package.json
 │   └── Dockerfile
 ├── nginx/                      # Nginx 配置（可选）
+├── scripts/                    # 备份/恢复脚本 + Dockerfile.backup
+├── backups/                    # 备份输出目录
 ├── .env.example                # 配置模板
 ├── .gitignore
 └── docker-compose.yml
@@ -110,19 +115,31 @@ docker compose logs -f backend
 
 所有配置通过 `.env` 文件管理，参考 `.env.example`：
 
-| 配置项                        | 说明                     | 默认值                |
-| ----------------------------- | ------------------------ | --------------------- |
-| `POSTGRES_USER`               | 数据库用户名             | clouduser             |
-| `POSTGRES_PASSWORD`           | 数据库密码               | -                     |
-| `POSTGRES_DB`                 | 数据库名                 | clouddrive            |
-| `MINIO_ROOT_USER`             | MinIO 用户名             | minioadmin            |
-| `MINIO_ROOT_PASSWORD`         | MinIO 密码               | -                     |
-| `SECRET_KEY`                  | JWT 签名密钥             | -                     |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | Access Token 过期时间    | 30                    |
-| `REFRESH_TOKEN_EXPIRE_DAYS`   | Refresh Token 过期时间   | 7                     |
-| `NEXT_PUBLIC_API_URL`         | 浏览器访问后端地址       | http://localhost:8000 |
-| `API_URL`                     | Docker 内部后端地址      | http://backend:8000   |
-| `CORS_ORIGINS`                | 允许的前端源（逗号分隔） | http://localhost:3000 |
+| 配置项                        | 说明                       | 默认值                |
+| ----------------------------- | -------------------------- | --------------------- |
+| `POSTGRES_USER`               | 数据库用户名               | clouduser             |
+| `POSTGRES_PASSWORD`           | 数据库密码                 | -                     |
+| `POSTGRES_DB`                 | 数据库名                   | clouddrive            |
+| `MINIO_ROOT_USER`             | MinIO 用户名               | minioadmin            |
+| `MINIO_ROOT_PASSWORD`         | MinIO 密码                 | -                     |
+| `SECRET_KEY`                  | JWT 签名密钥               | -                     |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | Access Token 过期时间      | 30                    |
+| `REFRESH_TOKEN_EXPIRE_DAYS`   | Refresh Token 过期时间     | 7                     |
+| `NEXT_PUBLIC_API_URL`         | 浏览器访问后端地址         | http://localhost:8000 |
+| `API_URL`                     | Docker 内部后端地址        | http://backend:8000   |
+| `CORS_ORIGINS`                | 允许的前端源（逗号分隔）   | http://localhost:3000 |
+| `ADMIN_EMAIL`                 | 自动成为管理员的邮箱       | -                     |
+| `MAX_USERS`                   | 最大注册用户数（0=不限）   | 0                     |
+| `DEFAULT_STORAGE_QUOTA`       | 新用户默认配额（字节）     | 1073741824            |
+| `LOG_LEVEL`                   | 日志级别                   | INFO                  |
+| `LOG_DIR`                     | 日志目录                   | logs                  |
+| `LOG_RETENTION_DAYS`          | 日志保留天数               | 30                    |
+| `BACKUP_RETENTION_DAYS`       | 备份保留天数               | 7                     |
+| `BACKUP_CRON`                 | 备份 Cron 表达式           | 0 3 \* \* \*          |
+| `BACKUP_ENCRYPT_KEY`          | 备份加密密钥（留空不加密） | -                     |
+| `ALERT_ENABLED`               | 启用日志告警               | false                 |
+| `ALERT_WEBHOOK_URL`           | 告警 Webhook 地址          | -                     |
+| `ALERT_EMAIL_ENABLED`         | 启用邮件告警               | false                 |
 
 ### 迁移到生产环境
 
@@ -148,6 +165,82 @@ docker compose up -d --build
 
 完整 API 文档：http://localhost:8000/docs
 
+## 管理后台
+
+使用 `.env` 中 `ADMIN_EMAIL` 配置的邮箱注册的首个用户自动成为管理员，登录后侧边栏出现「⚙️ 管理后台」入口。
+
+- **系统统计**：用户数、存储使用量、文件数
+- **用户管理**：查看/搜索用户、调整存储配额、启用/禁用账号
+
+> 若注册时未生效，检查 `ADMIN_EMAIL` 环境变量是否已传入 backend 容器：
+> `docker compose exec backend env | grep ADMIN_EMAIL`
+
+## 日志系统
+
+基于 Loguru 的结构化日志，输出 JSON 格式，支持轮转和脱敏。
+
+| 日志文件     | 说明                           |
+| ------------ | ------------------------------ |
+| `app.log`    | 全量日志（按级别过滤）         |
+| `error.log`  | 仅 ERROR 及以上                |
+| `access.log` | HTTP 请求日志（含 request_id） |
+
+- **轮转**：每日 0 点切割，超期自动清理
+- **脱敏**：password/token/secret 等字段自动替换为 `***`
+- **查看**：`tail -f backend/logs/app.log`
+
+## 备份系统
+
+独立 `backup` 容器，定时备份 PostgreSQL 和 MinIO 数据。
+
+```bash
+# 手动备份
+docker compose exec backup /scripts/backup.sh
+
+# 恢复（会覆盖当前数据，需交互确认）
+docker compose exec -it backup /scripts/restore.sh 20260907_030000
+```
+
+- **Cron 定时**：`BACKUP_CRON` 配置，默认每天 3:00
+- **保留策略**：`BACKUP_RETENTION_DAYS` 天后自动清理
+- **GPG 加密**：设置 `BACKUP_ENCRYPT_KEY` 后用 AES256 加密数据库备份
+- **备份目录**：`./backups/<时间戳>/`
+
+## 告警
+
+ERROR 及以上日志自动发送通知（需启用）。
+
+```env
+ALERT_ENABLED=true
+ALERT_WEBHOOK_URL=https://oapi.dingtalk.com/robot/send?access_token=xxx
+ALERT_WEBHOOK_TYPE=dingtalk  # dingtalk/feishu/wechat/generic
+```
+
+- **去重冷却**：同一错误在 `ALERT_COOLDOWN_SECONDS` 内不重复告警
+- **邮件通知**：配置 `ALERT_EMAIL_*` 系列 SMTP 参数
+- **异步发送**：不阻塞请求和日志主流程
+
+## 健康检查
+
+```bash
+curl http://localhost:8000/health
+```
+
+返回各组件状态与延迟：
+
+```json
+{
+  "status": "ok",
+  "checks": {
+    "postgres": { "status": "ok", "latency_ms": 2.35 },
+    "minio": { "status": "ok", "latency_ms": 5.12 },
+    "redis": { "status": "ok", "latency_ms": 1.08 }
+  }
+}
+```
+
+任一组件异常时 `status` 为 `degraded`，可用于负载均衡器健康探测。
+
 ## 核心功能
 
 - **文件管理**：上传、下载、删除、重命名、文件夹嵌套
@@ -159,6 +252,12 @@ docker compose up -d --build
 - **存储统计**：侧边栏显示已用容量
 - **回收站**：文件恢复、彻底删除
 - **响应式设计**：适配平板和手机屏幕
+- **管理后台**：系统统计、用户管理、配额调整
+- **用户中心**：头像上传/裁剪、修改用户名/密码
+- **结构化日志**：JSON 格式、轮转、敏感数据脱敏
+- **自动备份**：PostgreSQL + MinIO 定时备份、GPG 加密
+- **日志告警**：ERROR 日志通过 Webhook/邮件通知
+- **健康检查**：检测 DB/MinIO/Redis 连通性与延迟
 
 ## 常用命令
 
@@ -185,6 +284,15 @@ docker compose down -v
 
 # 执行数据库迁移
 docker compose exec backend alembic upgrade head
+
+# 手动执行备份
+docker compose exec backup /scripts/backup.sh
+
+# 恢复备份（交互式确认）
+docker compose exec -it backup /scripts/restore.sh <备份目录名>
+
+# 查看备份列表
+ls -la backups/
 
 # 进入容器
 docker compose exec backend bash

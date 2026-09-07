@@ -5,6 +5,7 @@ import traceback
 from pathlib import Path
 from loguru import logger
 from app.core.config import settings
+from app.core.alerting import alert_sink
 
 SENSITIVE_KEYS = {
     "password", "token", "authorization", "secret",
@@ -100,6 +101,12 @@ def setup_logging():
         retention=f"{settings.LOG_RETENTION_DAYS} days",
         compression="zip",
         encoding="utf-8",
+    )
+
+    logger.add(
+        alert_sink,
+        level=settings.ALERT_MIN_LEVEL,
+        filter=lambda record: record["extra"].get("log_type") != "access",
     )
 
     class InterceptHandler(logging.Handler):
