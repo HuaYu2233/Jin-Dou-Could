@@ -114,6 +114,36 @@ services:
     depends_on:
       - backend
 
+  # ==================== 备份服务 ====================
+  backup:
+    build:
+      context: ./scripts
+      dockerfile: Dockerfile.backup
+    container_name: cloud-drive-backup
+    restart: unless-stopped
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_USER=${POSTGRES_USER:-clouduser}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-cloudpass123}
+      - POSTGRES_DB=${POSTGRES_DB:-clouddrive}
+      - MINIO_HOST=minio
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin123}
+      - MINIO_BUCKET=cloud-drive
+      - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-7}
+      - BACKUP_CRON=${BACKUP_CRON:-0 3 * * *}
+      - RUN_ON_START=${BACKUP_RUN_ON_START:-false}
+      - BACKUP_ENCRYPT_KEY=${BACKUP_ENCRYPT_KEY:-}
+    volumes:
+      - ./scripts:/scripts:ro
+      - ./backups:/backups
+      - backup_logs:/var/log
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
+
   # ==================== Nginx 反向代理 (可选) ====================
   nginx:
     image: nginx:alpine
@@ -131,3 +161,4 @@ volumes:
   postgres_data:
   redis_data:
   minio_data:
+  backup_logs:

@@ -1,0 +1,24 @@
+FROM alpine:3.18
+
+RUN apk add --no-cache \
+    postgresql-client \
+    postgresql-dev \
+    gzip \
+    curl \
+    busybox-suid \
+    gnupg \
+    && curl -fsSL https://dl.min.io/client/mc/release/linux-amd64/mc \
+       -o /usr/local/bin/mc \
+    && chmod +x /usr/local/bin/mc
+
+COPY backup.sh /scripts/backup.sh
+COPY restore.sh /scripts/restore.sh
+COPY backup-entrypoint.sh /scripts/backup-entrypoint.sh
+
+RUN chmod +x /scripts/backup.sh /scripts/restore.sh /scripts/backup-entrypoint.sh
+
+RUN mkdir -p /backups /var/log
+
+WORKDIR /scripts
+
+ENTRYPOINT ["/scripts/backup-entrypoint.sh"]
