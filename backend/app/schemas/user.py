@@ -19,12 +19,20 @@ class UserResponse(BaseModel):
     username: str
     is_active: bool
     is_admin: bool
+    avatar_key: str | None = None
     created_at: datetime
     storage_quota: int
     used_storage: int
 
     class Config:
         from_attributes = True
+
+class ProfileUpdate(BaseModel):
+    username: str | None = None
+
+class PasswordChange(BaseModel):
+    old_password: str
+    new_password: str
 
 class UserUpdate(BaseModel):
     username: str | None = None

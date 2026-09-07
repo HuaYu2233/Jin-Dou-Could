@@ -4,9 +4,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.api import api_router
 from app.core.storage import ensure_bucket
 from app.core.config import settings
+from app.core.logging import setup_logging
+from app.middleware.request_logging import RequestLoggingMiddleware
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    setup_logging()
     ensure_bucket()
     yield
 
@@ -21,7 +24,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ⚠️ 【需修改】确认前缀正确
+app.add_middleware(RequestLoggingMiddleware)
+
 app.include_router(api_router, prefix="/api/v1")
 
 @app.get("/health")

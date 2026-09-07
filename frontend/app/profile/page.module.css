@@ -1,0 +1,179 @@
+.page {
+  padding: 32px 24px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.header {
+  margin-bottom: 24px;
+}
+
+.title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.subtitle {
+  margin: 4px 0 0 0;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.avatarSection {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.avatarInfo {
+  flex: 1;
+}
+
+.avatarEmail {
+  font-size: 14px;
+  color: #6b7280;
+  margin-top: 4px;
+}
+
+.uploadBtn {
+  padding: 6px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  color: #4b5563;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.uploadBtn:hover {
+  background: #f9fafb;
+}
+
+.uploadBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.section {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.sectionTitle {
+  margin: 0 0 16px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.field {
+  margin-bottom: 16px;
+}
+
+.label {
+  display: block;
+  font-size: 13px;
+  color: #4b5563;
+  margin-bottom: 6px;
+}
+
+.input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.cancelBtn {
+  padding: 8px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  color: #4b5563;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.cancelBtn:hover {
+  background: #f9fafb;
+}
+
+.saveBtn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.saveBtn:disabled {
+  background: #93c5fd;
+  cursor: not-allowed;
+}
+
+.saveBtn:not(:disabled):hover {
+  background: #1d4ed8;
+}
+
+.message {
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+.messageOk {
+  color: #059669;
+}
+
+.messageErr {
+  color: #dc2626;
+}
+
+.backLink {
+  display: inline-block;
+  margin-top: 16px;
+  font-size: 14px;
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.backLink:hover {
+  color: #1d4ed8;
+}
+
+@media (max-width: 768px) {
+  .page {
+    padding: 16px 12px;
+  }
+  .avatarSection {
+    flex-direction: column;
+    text-align: center;
+    align-items: center;
+  }
+}

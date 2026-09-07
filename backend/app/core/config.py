@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     MAX_USERS: int = 0  # 0 = 不限制
     ADMIN_EMAIL: str = ""  # 用此邮箱注册的首个用户自动成为管理员
 
+    # 日志
+    LOG_LEVEL: str = "INFO"
+    LOG_DIR: str = "logs"
+    LOG_RETENTION_DAYS: int = 30
+
     class Config:
         env_file = ".env"
 
