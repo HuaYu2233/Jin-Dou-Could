@@ -35,6 +35,15 @@ def upload_file(storage_key: str, data: bytes, mime_type: str, length: int) -> N
         content_type=mime_type,
     )
 
+def upload_fileobj(storage_key: str, fileobj, mime_type: str, length: int) -> None:
+    minio_client.put_object(
+        bucket_name=settings.MINIO_BUCKET,
+        object_name=storage_key,
+        data=fileobj,
+        length=length,
+        content_type=mime_type,
+    )
+
 def get_object_stream(storage_key: str):
     return minio_client.get_object(
         bucket_name=settings.MINIO_BUCKET,

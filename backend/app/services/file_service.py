@@ -1,9 +1,10 @@
 import uuid
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.models.file import File
 from app.models.user import User
-from app.core.storage import upload_file, delete_file, get_object_stream
+from app.core.storage import upload_fileobj, delete_file, get_object_stream
 
 def categorize_file_type(mime_type: str) -> str:
     if mime_type.startswith("image/"):
@@ -36,11 +37,11 @@ async def create_file(
     db: AsyncSession,
     owner: User,
     filename: str,
-    content: bytes,
+    fileobj,
     mime_type: str,
+    size: int,
     folder_id: uuid.UUID | None = None,
 ) -> File:
-    size = len(content)
     if owner.used_storage + size > owner.storage_quota:
         raise ValueError("存储空间不足")
 
@@ -56,7 +57,7 @@ async def create_file(
         file_type=categorize_file_type(mime_type),
     )
 
-    upload_file(file.storage_key, content, mime_type, size)
+    await run_in_threadpool(upload_fileobj, file.storage_key, fileobj, mime_type, size)
 
     owner.used_storage += size
     db.add(file)
@@ -212,7 +213,7 @@ async def purge_file(
     if not file:
         return False
 
-    delete_file(file.storage_key)
+    await run_in_threadpool(delete_file, file.storage_key)
 
     owner_result = await db.execute(select(User).where(User.id == owner_id))
     owner = owner_result.scalar_one()

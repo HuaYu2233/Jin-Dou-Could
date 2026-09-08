@@ -1,3 +1,4 @@
+import io
 from uuid import UUID
 from urllib.parse import quote
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query, Request
@@ -27,22 +28,29 @@ async def upload_file(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    declared = request.headers.get("content-length")
-    if declared and int(declared) > settings.MAX_UPLOAD_SIZE:
-        raise HTTPException(status_code=413, detail="文件过大，单文件上限 100MB")
-
-    chunks: list[bytes] = []
-    total = 0
-    while chunk := await file.read(1024 * 1024):
-        total += len(chunk)
-        if total > settings.MAX_UPLOAD_SIZE:
-            raise HTTPException(status_code=413, detail="文件过大，单文件上限 100MB")
-        chunks.append(chunk)
-    content = b"".join(chunks)
     mime_type = file.content_type or "application/octet-stream"
     filename = file.filename or "unknown"
 
-    if current_user.used_storage + len(content) > current_user.storage_quota:
+    size = file.size if file.size is not None else 0
+    if size > settings.MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=413, detail="文件过大，单文件上限 100MB")
+
+    if size == 0:
+        buf = io.BytesIO()
+        total = 0
+        while chunk := await file.read(1024 * 1024):
+            total += len(chunk)
+            if total > settings.MAX_UPLOAD_SIZE:
+                raise HTTPException(status_code=413, detail="文件过大，单文件上限 100MB")
+            buf.write(chunk)
+        size = total
+        buf.seek(0)
+        fileobj = buf
+    else:
+        await file.seek(0)
+        fileobj = file.file
+
+    if current_user.used_storage + size > current_user.storage_quota:
         raise HTTPException(
             status_code=413,
             detail="存储空间不足，请联系管理员扩容",
@@ -50,7 +58,7 @@ async def upload_file(
 
     try:
         file_record = await file_service.create_file(
-            db, current_user, filename, content, mime_type, folder_id
+            db, current_user, filename, fileobj, mime_type, size, folder_id
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
