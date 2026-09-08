@@ -12,6 +12,10 @@ from app.models.file import File
 from app.services import share_service
 from app.core.storage import get_presigned_download_url
 from app.core.config import settings
+from app.core.redis import redis_client
+
+SHARE_VERIFY_MAX_ATTEMPTS = 5
+SHARE_VERIFY_LOCK_SECONDS = 900
 from app.schemas.share import (
     ShareCreateRequest,
     ShareCreateResponse,
@@ -75,9 +79,24 @@ async def verify_share(
     body: ShareVerifyRequest,
     db: AsyncSession = Depends(get_db),
 ):
+    lock_key = f"share_lock:{token}"
+    if await redis_client.exists(lock_key):
+        ttl = await redis_client.ttl(lock_key)
+        raise HTTPException(
+            status_code=429,
+            detail=f"提取码错误次数过多，请 {max(ttl, 1)} 秒后再试",
+        )
     info = await share_service.verify_share(db, token, body.extract_code)
     if not info:
+        attempts_key = f"share_verify:{token}"
+        attempts = await redis_client.incr(attempts_key)
+        if attempts == 1:
+            await redis_client.expire(attempts_key, SHARE_VERIFY_LOCK_SECONDS)
+        if attempts >= SHARE_VERIFY_MAX_ATTEMPTS:
+            await redis_client.setex(lock_key, SHARE_VERIFY_LOCK_SECONDS, "1")
+            await redis_client.delete(attempts_key)
         raise HTTPException(status_code=403, detail="提取码错误或分享已过期")
+    await redis_client.delete(f"share_verify:{token}")
     return info
 
 @router.get("/public/{token}/download")
@@ -86,9 +105,24 @@ async def download_shared_file(
     extract_code: str,
     db: AsyncSession = Depends(get_db),
 ):
+    lock_key = f"share_lock:{token}"
+    if await redis_client.exists(lock_key):
+        ttl = await redis_client.ttl(lock_key)
+        raise HTTPException(
+            status_code=429,
+            detail=f"提取码错误次数过多，请 {max(ttl, 1)} 秒后再试",
+        )
     info = await share_service.verify_share(db, token, extract_code)
     if not info:
+        attempts_key = f"share_verify:{token}"
+        attempts = await redis_client.incr(attempts_key)
+        if attempts == 1:
+            await redis_client.expire(attempts_key, SHARE_VERIFY_LOCK_SECONDS)
+        if attempts >= SHARE_VERIFY_MAX_ATTEMPTS:
+            await redis_client.setex(lock_key, SHARE_VERIFY_LOCK_SECONDS, "1")
+            await redis_client.delete(attempts_key)
         raise HTTPException(status_code=403, detail="提取码错误或分享已过期")
+    await redis_client.delete(f"share_verify:{token}")
 
     file_result = await db.execute(
         select(File).where(File.storage_key == info["storage_key"])

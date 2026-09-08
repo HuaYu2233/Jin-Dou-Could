@@ -19,6 +19,16 @@ from app.core.config import settings
 
 router = APIRouter()
 
+
+def get_client_ip(request: Request) -> str:
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
+    x_real_ip = request.headers.get("x-real-ip")
+    if x_real_ip:
+        return x_real_ip.strip()
+    return request.client.host if request.client else "unknown"
+
 @router.post("/register", response_model=UserResponse)
 async def register(data: UserCreate, db: AsyncSession = Depends(get_db)):
     try:
@@ -34,7 +44,7 @@ async def login(
     data: UserLogin,
     db: AsyncSession = Depends(get_db),
 ):
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = get_client_ip(request)
     rl_key = f"login_rl:{client_ip}:{data.email}"
     lock_key = f"login_lock:{client_ip}:{data.email}"
 
