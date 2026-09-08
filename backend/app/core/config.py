@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     MAX_UPLOAD_SIZE: int = 104857600
 
+    LOGIN_RATE_LIMIT_MAX_ATTEMPTS: int = 5
+    LOGIN_RATE_LIMIT_WINDOW_SECONDS: int = 300
+    LOGIN_RATE_LIMIT_LOCK_SECONDS: int = 900
+
     MINIO_ENDPOINT: str = "minio:9000"
     MINIO_PUBLIC_ENDPOINT: str = "localhost:9000"
     MINIO_ACCESS_KEY: str = "minioadmin"

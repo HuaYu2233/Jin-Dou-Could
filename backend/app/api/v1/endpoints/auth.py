@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.db.base import get_db
 from app.models.user import User
+from app.core.redis import redis_client
 from app.schemas.user import UserCreate, UserLogin, UserResponse
 from app.schemas.token import LoginResponse
 from app.schemas.reset_password import (
@@ -28,17 +29,40 @@ async def register(data: UserCreate, db: AsyncSession = Depends(get_db)):
 
 @router.post("/login", response_model=LoginResponse)
 async def login(
+    request: Request,
     response: Response,
-    data: UserLogin,  
+    data: UserLogin,
     db: AsyncSession = Depends(get_db),
 ):
-    # 查用户
+    client_ip = request.client.host if request.client else "unknown"
+    rl_key = f"login_rl:{client_ip}:{data.email}"
+    lock_key = f"login_lock:{client_ip}:{data.email}"
+
+    if await redis_client.exists(lock_key):
+        ttl = await redis_client.ttl(lock_key)
+        raise HTTPException(
+            status_code=429,
+            detail=f"登录尝试过于频繁，请 {max(ttl, 1)} 秒后再试",
+        )
+
     result = await db.execute(select(User).where(User.email == data.email))
     user = result.scalar_one_or_none()
-    
+
     if not user or not verify_password(data.password, user.hashed_password):
+        attempts = await redis_client.incr(rl_key)
+        if attempts == 1:
+            await redis_client.expire(rl_key, settings.LOGIN_RATE_LIMIT_WINDOW_SECONDS)
+        if attempts >= settings.LOGIN_RATE_LIMIT_MAX_ATTEMPTS:
+            await redis_client.setex(
+                lock_key,
+                settings.LOGIN_RATE_LIMIT_LOCK_SECONDS,
+                "1",
+            )
+            await redis_client.delete(rl_key)
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    
+
+    await redis_client.delete(rl_key)
+
     access_token = create_access_token({"sub": str(user.id)})
     refresh_token = create_refresh_token({"sub": str(user.id)})
 
