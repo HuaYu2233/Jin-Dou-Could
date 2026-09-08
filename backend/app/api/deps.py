@@ -19,12 +19,9 @@ def _serialize_user(user: User) -> str:
         "id": str(user.id),
         "email": user.email,
         "username": user.username,
-        "hashed_password": user.hashed_password,
         "is_active": user.is_active,
         "is_admin": user.is_admin,
         "avatar_key": user.avatar_key,
-        "security_question": user.security_question,
-        "security_answer": user.security_answer,
         "storage_quota": user.storage_quota,
         "used_storage": user.used_storage,
         "created_at": user.created_at.isoformat() if user.created_at else None,
@@ -37,17 +34,20 @@ def _deserialize_user(data: str) -> User:
     user.id = UUID(d["id"])
     user.email = d["email"]
     user.username = d["username"]
-    user.hashed_password = d["hashed_password"]
+    user.hashed_password = None
     user.is_active = d["is_active"]
     user.is_admin = d["is_admin"]
     user.avatar_key = d["avatar_key"]
-    user.security_question = d["security_question"]
-    user.security_answer = d["security_answer"]
+    user.security_question = None
+    user.security_answer = None
     user.storage_quota = d["storage_quota"]
     user.used_storage = d["used_storage"]
     user.created_at = datetime.fromisoformat(d["created_at"]) if d["created_at"] else None
     user.updated_at = datetime.fromisoformat(d["updated_at"]) if d["updated_at"] else None
     return user
+
+async def invalidate_user_cache(user_id: UUID | str) -> None:
+    await redis_client.delete(f"user:{user_id}")
 
 async def get_current_user(
     request: Request,
