@@ -11,6 +11,13 @@ minio_client = Minio(
     secure=False,
 )
 
+_presigned_client = Minio(
+    settings.MINIO_PUBLIC_ENDPOINT,
+    access_key=settings.MINIO_ACCESS_KEY,
+    secret_key=settings.MINIO_SECRET_KEY,
+    secure=False,
+)
+
 def ensure_bucket() -> None:
     try:
         if not minio_client.bucket_exists(settings.MINIO_BUCKET):
@@ -49,4 +56,21 @@ def delete_file(storage_key: str) -> None:
     minio_client.remove_object(
         bucket_name=settings.MINIO_BUCKET,
         object_name=storage_key,
+    )
+
+def get_presigned_download_url(
+    storage_key: str,
+    expires: int = 3600,
+    filename: str | None = None,
+) -> str:
+    from urllib.parse import quote
+    response_headers: dict[str, str] = {}
+    if filename:
+        disposition = f"attachment; filename*=UTF-8''{quote(filename)}"
+        response_headers["response-content-disposition"] = disposition
+    return _presigned_client.presigned_get_object(
+        bucket_name=settings.MINIO_BUCKET,
+        object_name=storage_key,
+        expires=timedelta(seconds=expires),
+        response_headers=response_headers,
     )

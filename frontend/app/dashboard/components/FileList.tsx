@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import type { FileItem, FolderItem } from "@/lib/api/files";
-import { getFileBlob } from "@/lib/api/files";
+import { getFilePreviewUrl } from "@/lib/api/files";
 import type { ViewMode } from "../types";
 import styles from "./FileList.module.css";
 
@@ -56,20 +56,16 @@ function Thumbnail({ file, variant = "grid" }: { file: FileItem; variant?: "grid
 
   useEffect(() => {
     if (file.file_type !== "image" || failed) return;
-    let objectUrl: string | null = null;
     let active = true;
-    getFileBlob(file.id)
-      .then((blob) => {
-        if (!active) return;
-        objectUrl = URL.createObjectURL(blob);
-        setUrl(objectUrl);
+    getFilePreviewUrl(file.id)
+      .then((previewUrl) => {
+        if (active) setUrl(previewUrl);
       })
       .catch(() => {
         if (active) setFailed(true);
       });
     return () => {
       active = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [file.id, file.file_type, failed]);
 

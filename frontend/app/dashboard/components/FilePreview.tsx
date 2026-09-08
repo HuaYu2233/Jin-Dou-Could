@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import type { FileItem } from "@/lib/api/files";
-import { downloadFile } from "@/lib/api/files";
+import { getFilePreviewUrl } from "@/lib/api/files";
 import styles from "./FilePreview.module.css";
 
 interface FilePreviewProps {
@@ -19,17 +19,16 @@ export default function FilePreview({ file, onClose }: FilePreviewProps) {
 
   useEffect(() => {
     let active = true;
-    let objectUrl = "";
     (async () => {
       try {
-        const blob = await downloadFile(file.id);
+        const previewUrl = await getFilePreviewUrl(file.id);
         if (!active) return;
         if (file.mime_type.startsWith("text/")) {
-          const text = await blob.text();
+          const res = await fetch(previewUrl);
+          const text = await res.text();
           if (active) setTextContent(text);
         } else {
-          objectUrl = URL.createObjectURL(blob);
-          if (active) setUrl(objectUrl);
+          if (active) setUrl(previewUrl);
         }
       } catch (err) {
         if (active) setError(err instanceof Error ? err.message : "加载失败");
@@ -39,7 +38,6 @@ export default function FilePreview({ file, onClose }: FilePreviewProps) {
     })();
     return () => {
       active = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [file]);
 

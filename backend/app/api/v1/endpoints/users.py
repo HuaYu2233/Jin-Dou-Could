@@ -5,7 +5,7 @@ from app.db.base import get_db
 from app.models.user import User
 from app.schemas.user import UserResponse, ProfileUpdate, PasswordChange, SecurityQuestionUpdate
 from app.core.security import hash_password, verify_password
-from app.core.storage import upload_file, get_object_stream
+from app.core.storage import upload_file, get_presigned_download_url
 import uuid
 
 router = APIRouter()
@@ -42,9 +42,8 @@ async def upload_avatar(
 async def get_avatar(current_user: User = Depends(get_current_user)):
     if not current_user.avatar_key:
         raise HTTPException(status_code=404, detail="未设置头像")
-    stream = get_object_stream(current_user.avatar_key)
-    from fastapi.responses import StreamingResponse
-    return StreamingResponse(stream, media_type="image/octet-stream")
+    url = get_presigned_download_url(current_user.avatar_key, 300)
+    return {"url": url}
 
 @router.patch("/me/profile", response_model=UserResponse)
 async def update_profile(

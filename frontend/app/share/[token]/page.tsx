@@ -50,15 +50,7 @@ export default function SharePage() {
     setDownloading(true);
     setError("");
     try {
-      const blob = await downloadSharedFile(token, code);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = info?.filename || "download";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      await downloadSharedFile(token, code);
     } catch (err) {
       setError(err instanceof Error ? err.message : "下载失败");
     } finally {

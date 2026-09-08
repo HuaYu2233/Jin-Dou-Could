@@ -1,5 +1,4 @@
 import { client } from "./client";
-import { API_BASE_URL } from "@/lib/config";
 
 export interface LoginData { email: string; password: string; }
 export interface RegisterData { email: string; username: string; password: string; }
@@ -83,6 +82,7 @@ export async function uploadAvatar(blob: Blob): Promise<User> {
   });
 }
 
-export function getAvatarUrl(userId: string): string {
-  return `${API_BASE_URL}/api/v1/users/me/avatar?_t=${userId}`;
+export async function getAvatarDownloadUrl(): Promise<string> {
+  const { url } = await client<{ url: string }>("/api/v1/users/me/avatar");
+  return url;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getAvatarUrl } from "@/lib/api/auth";
+import { getAvatarDownloadUrl } from "@/lib/api/auth";
 import styles from "./Avatar.module.css";
 
 interface AvatarProps {
@@ -22,31 +22,22 @@ export default function Avatar({ userId, username, avatarKey, size = "md" }: Ava
 
   useEffect(() => {
     let active = true;
-    let objectUrl: string | null = null;
     (async () => {
       if (!avatarKey) {
-        await Promise.resolve();
         if (active) setImgSrc(null);
         return;
       }
       try {
-        const res = await fetch(getAvatarUrl(userId), {
-          credentials: "include",
-        });
-        if (!res.ok) throw new Error("fetch failed");
-        const blob = await res.blob();
-        if (!active) return;
-        objectUrl = URL.createObjectURL(blob);
-        setImgSrc(objectUrl);
+        const url = await getAvatarDownloadUrl();
+        if (active) setImgSrc(url);
       } catch {
         if (active) setImgSrc(null);
       }
     })();
     return () => {
       active = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [avatarKey, userId]);
+  }, [avatarKey]);
 
   const initial = username ? username.charAt(0).toUpperCase() : "?";
   const sizeClass = SIZE_CLASS[size];

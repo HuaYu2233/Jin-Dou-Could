@@ -8,6 +8,7 @@ from app.db.base import get_db
 from app.models.user import User
 from app.services import file_service
 from app.core.config import settings
+from app.core.storage import get_presigned_download_url
 from app.schemas.file import (
     FileResponse,
     FileListResponse,
@@ -116,19 +117,8 @@ async def preview_file(
     file = await file_service.get_file(db, file_id, current_user.id)
     if not file:
         raise HTTPException(status_code=404, detail="文件不存在")
-    info = file_service.get_download_stream(file)
-    headers = {
-        "Content-Length": str(info["size"]),
-        "Access-Control-Allow-Origin": "http://localhost:3000",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Access-Control-Allow-Headers": "Authorization, Content-Type",
-        "Access-Control-Allow-Credentials": "true",
-    }
-    return StreamingResponse(
-        content=info["stream"],
-        media_type=info["mime_type"],
-        headers=headers,
-    )
+    url = get_presigned_download_url(file.storage_key, settings.MINIO_DOWNLOAD_EXPIRES)
+    return {"url": url}
 
 @router.get("/{file_id}/download")
 async def download_file(
@@ -139,22 +129,10 @@ async def download_file(
     file = await file_service.get_file(db, file_id, current_user.id)
     if not file:
         raise HTTPException(status_code=404, detail="文件不存在")
-    info = file_service.get_download_stream(file)
-    filename = info["filename"]
-    disposition = f"attachment; filename*=UTF-8''{quote(filename)}"
-    headers = {
-        "Content-Disposition": disposition,
-        "Content-Length": str(info["size"]),
-        "Access-Control-Allow-Origin": "http://localhost:3000",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Access-Control-Allow-Headers": "Authorization, Content-Type",
-        "Access-Control-Allow-Credentials": "true",
-    }
-    return StreamingResponse(
-        content=info["stream"],
-        media_type=info["mime_type"],
-        headers=headers,
+    url = get_presigned_download_url(
+        file.storage_key, settings.MINIO_DOWNLOAD_EXPIRES, file.filename
     )
+    return {"url": url}
 
 @router.delete("/{file_id}")
 async def delete_file(

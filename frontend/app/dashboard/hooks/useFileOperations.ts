@@ -90,19 +90,11 @@ export function useFileOperations({
     const taskId = addTask({ filename: file.filename, type: "download", total: file.size, fileId: file.id });
     try {
       updateTask(taskId, { status: "transferring" });
-      const blob = await downloadFileWithProgress(
+      await downloadFileWithProgress(
         file.id,
         (loaded, total) => updateTask(taskId, { loaded, total })
       );
       updateTask(taskId, { status: "completed", progress: 100 });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = file.filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "下载失败";
       if (msg === "已取消") {

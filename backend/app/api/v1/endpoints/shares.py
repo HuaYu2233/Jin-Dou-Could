@@ -10,7 +10,8 @@ from app.db.base import get_db
 from app.models.user import User
 from app.models.file import File
 from app.services import share_service
-from app.services import file_service
+from app.core.storage import get_presigned_download_url
+from app.core.config import settings
 from app.schemas.share import (
     ShareCreateRequest,
     ShareCreateResponse,
@@ -96,17 +97,7 @@ async def download_shared_file(
     if not file:
         raise HTTPException(status_code=404, detail="文件不存在")
 
-    stream_info = file_service.get_download_stream(file)
-    filename = stream_info["filename"]
-    disposition = f"attachment; filename*=UTF-8''{quote(filename)}"
-    headers = {
-        "Content-Disposition": disposition,
-        "Content-Length": str(stream_info["size"]),
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-    }
-    return StreamingResponse(
-        content=stream_info["stream"],
-        media_type=stream_info["mime_type"],
-        headers=headers,
+    url = get_presigned_download_url(
+        file.storage_key, settings.MINIO_DOWNLOAD_EXPIRES, file.filename
     )
+    return {"url": url}

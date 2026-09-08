@@ -86,54 +86,72 @@ export function uploadFileWithProgress(
   });
 }
 
-export async function downloadFile(id: string): Promise<Blob> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/files/${id}/download`, {
-    credentials: "include",
-  });
-  if (res.status === 401) {
-    window.location.href = "/login";
-    throw new Error("登录已过期，请重新登录");
-  }
-  if (!res.ok) throw new Error(`下载失败 (${res.status})`);
-  return res.blob();
+export async function getFileDownloadUrl(id: string): Promise<string> {
+  const { url } = await client<{ url: string }>(`/api/v1/files/${id}/download`);
+  return url;
+}
+
+export async function getFilePreviewUrl(id: string): Promise<string> {
+  const { url } = await client<{ url: string }>(`/api/v1/files/${id}/preview`);
+  return url;
+}
+
+export async function downloadFile(id: string): Promise<void> {
+  const url = await getFileDownloadUrl(id);
+  const a = document.createElement("a");
+  a.href = url;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 export async function downloadFileWithProgress(
   id: string,
   onProgress: (loaded: number, total: number) => void,
   signal?: AbortSignal
-): Promise<Blob> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/files/${id}/download`, {
-    credentials: "include",
-    signal,
-  });
-  if (res.status === 401) {
-    window.location.href = "/login";
-    throw new Error("登录已过期，请重新登录");
+): Promise<void> {
+  const url = await getFileDownloadUrl(id);
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("GET", url);
+      xhr.responseType = "blob";
+      xhr.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(e.loaded, e.total);
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          const blobUrl = URL.createObjectURL(xhr.response);
+          const a = document.createElement("a");
+          a.href = blobUrl;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(blobUrl);
+          resolve();
+        } else {
+          reject(new Error(`下载失败 (${xhr.status})`));
+        }
+      };
+      xhr.onerror = () => reject(new Error("__CORS_FALLBACK__"));
+      xhr.onabort = () => reject(new Error("已取消"));
+      if (signal) signal.addEventListener("abort", () => xhr.abort());
+      xhr.send();
+    });
+  } catch (err) {
+    if (err instanceof Error && err.message === "__CORS_FALLBACK__") {
+      const a = document.createElement("a");
+      a.href = url;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } else {
+      throw err;
+    }
   }
-  if (!res.ok) throw new Error(`下载失败 (${res.status})`);
-  const total = Number(res.headers.get("content-length")) || 0;
-  const reader = res.body?.getReader();
-  if (!reader) return res.blob();
-  const chunks: BlobPart[] = [];
-  let loaded = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    loaded += value.length;
-    onProgress(loaded, total);
-  }
-  return new Blob(chunks);
 }
 
-export async function getFileBlob(id: string): Promise<Blob> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/files/${id}/preview`, {
-    credentials: "include",
-  });
-  if (!res.ok) throw new Error("获取文件失败");
-  return res.blob();
-}
+
 
 export async function deleteFile(id: string): Promise<void> {
   return client<void>(`/api/v1/files/${id}`, { method: "DELETE" });
@@ -296,10 +314,15 @@ export async function verifyShare(
 export async function downloadSharedFile(
   token: string,
   extractCode: string
-): Promise<Blob> {
+): Promise<void> {
   const res = await fetch(
     `${API_BASE_URL}/api/v1/shares/public/${token}/download?extract_code=${encodeURIComponent(extractCode)}`
   );
   if (!res.ok) throw new Error("下载失败");
-  return res.blob();
+  const { url } = await res.json();
+  const a = document.createElement("a");
+  a.href = url;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
