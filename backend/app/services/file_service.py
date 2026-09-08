@@ -1,3 +1,4 @@
+import re
 import uuid
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -5,6 +6,79 @@ from sqlalchemy import select, func
 from app.models.file import File
 from app.models.user import User
 from app.core.storage import upload_fileobj, delete_file, get_object_stream
+
+_FILENAME_MAX_LEN = 255
+_CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]")
+_PATH_SEP_RE = re.compile(r"[\\/]+")
+
+ALLOWED_MIME_TYPES = {
+    "image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp", "image/svg+xml",
+    "video/mp4", "video/webm", "video/x-msvideo", "video/quicktime",
+    "audio/mpeg", "audio/wav", "audio/ogg", "audio/x-m4a", "audio/flac",
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "text/plain", "text/csv", "text/html",
+    "application/zip", "application/x-rar-compressed", "application/x-7z-compressed",
+    "application/octet-stream",
+}
+
+
+def sanitize_filename(name: str) -> str:
+    name = _PATH_SEP_RE.sub("_", name)
+    name = _CONTROL_CHARS_RE.sub("", name)
+    name = name.strip(" .")
+    if not name:
+        name = "unknown"
+    return name[:_FILENAME_MAX_LEN]
+
+
+def detect_real_mime_type(fileobj, declared: str) -> str:
+    try:
+        import magic
+        current_pos = None
+        if hasattr(fileobj, "seek"):
+            try:
+                current_pos = fileobj.tell()
+                fileobj.seek(0)
+            except Exception:
+                current_pos = None
+        try:
+            detected = magic.from_buffer(fileobj.read(2048), mime=True)
+        finally:
+            if current_pos is not None and hasattr(fileobj, "seek"):
+                try:
+                    fileobj.seek(current_pos)
+                except Exception:
+                    pass
+        if detected and detected in ALLOWED_MIME_TYPES:
+            return detected
+    except Exception:
+        pass
+    return declared
+
+
+def validate_mime_type(declared: str, detected: str) -> None:
+    if detected not in ALLOWED_MIME_TYPES:
+        raise ValueError(f"不允许的文件类型: {detected}")
+    if declared and declared in ALLOWED_MIME_TYPES and declared != detected:
+        if not _is_compatible_mime(declared, detected):
+            raise ValueError(f"文件类型与声明不符: 声明 {declared}, 实际 {detected}")
+
+
+def _is_compatible_mime(declared: str, detected: str) -> bool:
+    if declared == detected:
+        return True
+    aliases = {
+        ("application/octet-stream", detected): True,
+        ("audio/mpeg", "audio/mp3"): True,
+        ("video/mp4", "application/mp4"): True,
+    }
+    return aliases.get((declared, detected), False) or aliases.get((detected, declared), False)
 
 def categorize_file_type(mime_type: str) -> str:
     if mime_type.startswith("image/"):
@@ -44,6 +118,11 @@ async def create_file(
 ) -> File:
     if owner.used_storage + size > owner.storage_quota:
         raise ValueError("存储空间不足")
+
+    filename = sanitize_filename(filename)
+    real_mime = detect_real_mime_type(fileobj, mime_type)
+    validate_mime_type(mime_type, real_mime)
+    mime_type = real_mime
 
     file_id = uuid.uuid4()
     file = File(
