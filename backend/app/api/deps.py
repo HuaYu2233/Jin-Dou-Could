@@ -62,6 +62,9 @@ async def get_current_user(
     if not payload or not payload.get("sub"):
         raise HTTPException(status_code=401, detail="Invalid token")
 
+    if payload.get("type") != "access":
+        raise HTTPException(status_code=401, detail="Token 类型错误，请使用 access token")
+
     jti = payload.get("jti")
     if jti and await redis_client.exists(f"token_blacklist:{jti}"):
         raise HTTPException(status_code=401, detail="Token 已被撤销，请重新登录")

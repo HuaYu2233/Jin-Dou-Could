@@ -12,17 +12,17 @@ def verify_password(plain: str, hashed: str) -> bool:
     return bcrypt.checkpw(plain.encode('utf-8'), hashed.encode('utf-8'))
 
 # ========== JWT ==========
-def _create_token(data: dict, expires_delta: timedelta) -> str:
+def _create_token(data: dict, expires_delta: timedelta, token_type: str) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + expires_delta
-    to_encode.update({"exp": expire, "jti": str(uuid.uuid4())})
+    to_encode.update({"exp": expire, "jti": str(uuid.uuid4()), "type": token_type})
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 def create_access_token(data: dict) -> str:
-    return _create_token(data, timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+    return _create_token(data, timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES), token_type="access")
 
 def create_refresh_token(data: dict) -> str:
-    return _create_token(data, timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS))
+    return _create_token(data, timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS), token_type="refresh")
 
 def decode_token(token: str) -> dict | None:
     try:

@@ -154,6 +154,8 @@ async def refresh_token(request: Request, response: Response):
     payload = decode_token(refresh)
     if not payload or not payload.get("sub"):
         raise HTTPException(status_code=401, detail="Invalid refresh token")
+    if payload.get("type") != "refresh":
+        raise HTTPException(status_code=401, detail="Token 类型错误，请使用 refresh token")
     jti = payload.get("jti")
     if jti and await redis_client.exists(f"token_blacklist:{jti}"):
         raise HTTPException(status_code=401, detail="Refresh token 已失效")
