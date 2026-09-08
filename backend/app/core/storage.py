@@ -16,6 +16,7 @@ _presigned_client = Minio(
     access_key=settings.MINIO_ACCESS_KEY,
     secret_key=settings.MINIO_SECRET_KEY,
     secure=False,
+    region='us-east-1',
 )
 
 def ensure_bucket() -> None:

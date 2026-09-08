@@ -16,7 +16,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Cloud Drive API", lifespan=lifespan)
 
-#加 CORS
+app.add_middleware(RequestLoggingMiddleware)
+
+#加 CORS（最外层，确保错误响应也带 CORS 头）
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS.split(","),
@@ -25,8 +27,6 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
     expose_headers=["Content-Disposition", "Content-Length"],
 )
-
-app.add_middleware(RequestLoggingMiddleware)
 
 app.include_router(api_router, prefix="/api/v1")
 app.include_router(health.router, tags=["health"])

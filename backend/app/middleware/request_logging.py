@@ -14,9 +14,12 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         user_id = None
         auth = request.headers.get("authorization", "")
         if auth.startswith("Bearer "):
-            payload = decode_token(auth[7:])
-            if payload:
-                user_id = payload.get("sub")
+            try:
+                payload = decode_token(auth[7:])
+                if payload:
+                    user_id = payload.get("sub")
+            except Exception:
+                pass
 
         try:
             response: Response = await call_next(request)
