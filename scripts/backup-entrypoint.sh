@@ -18,5 +18,9 @@ if [ "${RUN_ON_START:-false}" = "true" ]; then
   /scripts/backup.sh || true
 fi
 
+# 启动备份触发文件监听器（后台，替代 docker exec）
+sh /scripts/backup-trigger-watcher.sh &
+echo "备份触发监听器已启动（共享卷触发文件模式）"
+
 # 启动 crond 前台运行
 exec crond -f -l 2

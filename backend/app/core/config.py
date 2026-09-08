@@ -5,6 +5,7 @@ from functools import lru_cache
 class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://clouduser:cloudpass123@db:5432/clouddrive"
     REDIS_URL: str = "redis://redis:6379/0"
+    REDIS_PASSWORD: str = ""
     
     SECRET_KEY: str
 

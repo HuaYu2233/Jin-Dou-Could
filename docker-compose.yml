@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   # ==================== PostgreSQL ====================
   db:
@@ -13,9 +11,9 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,12 +23,13 @@ services:
     image: redis:7-alpine
     container_name: cloud-drive-redis
     restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redispass123} --rename-command FLUSHALL ""
     volumes:
       - redis_data:/data
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redispass123}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -47,8 +46,8 @@ services:
     volumes:
       - minio_data:/data
     ports:
-      - "9000:9000"   # S3 API
-      - "9001:9001"   # Web Console
+      - "127.0.0.1:9000:9000"   # S3 API
+      - "127.0.0.1:9001:9001"   # Web Console
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 30s
@@ -67,7 +66,7 @@ services:
       - "localhost:host-gateway"
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-clouduser}:${POSTGRES_PASSWORD:-cloudpass123}@db:5432/${POSTGRES_DB:-clouddrive}
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redispass123}@redis:6379/0
       - MINIO_ENDPOINT=minio:9000
       - MINIO_PUBLIC_ENDPOINT=localhost:9000
       - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
@@ -99,12 +98,11 @@ services:
       - ALERT_EMAIL_TO=${ALERT_EMAIL_TO:-}
       - ALERT_EMAIL_USE_TLS=${ALERT_EMAIL_USE_TLS:-true}
       - BACKUP_DIR=/backups
-      - BACKUP_TRIGGER_CMD=${BACKUP_TRIGGER_CMD:-docker exec cloud-drive-backup /scripts/backup.sh}
+      - BACKUP_TRIGGER_CMD=${BACKUP_TRIGGER_CMD:-}
     volumes:
       - ./backend:/app
       - /app/__pycache__
       - ./backups:/backups
-      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "8000:8000"
     depends_on:

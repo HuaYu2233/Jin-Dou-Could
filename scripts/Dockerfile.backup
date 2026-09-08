@@ -1,21 +1,35 @@
 FROM alpine:3.18
 
+# 换阿里云镜像源加速 apk
+RUN sed -i 's#dl-cdn.alpinelinux.org#mirrors.aliyun.com#g' /etc/apk/repositories
+
+# apk 层独立，可被缓存复用
 RUN apk add --no-cache \
     postgresql-client \
     postgresql-dev \
     gzip \
     curl \
     busybox-suid \
-    gnupg \
-    && curl -fsSL https://dl.min.io/client/mc/release/linux-amd64/mc \
-       -o /usr/local/bin/mc \
-    && chmod +x /usr/local/bin/mc
+    gnupg
 
-COPY backup.sh /scripts/backup.sh
-COPY restore.sh /scripts/restore.sh
-COPY backup-entrypoint.sh /scripts/backup-entrypoint.sh
+# mc 下载独立一层，多源回退提升国内可用性
+RUN (curl -fsSL --connect-timeout 15 --retry 2 \
+    https://dl.min.io/client/mc/release/linux-amd64/mc \
+    -o /usr/local/bin/mc \
+    && chmod +x /usr/local/bin/mc) \
+    || (curl -fsSL --connect-timeout 15 --retry 2 \
+    https://ghproxy.com/https://github.com/minio/mc/releases/latest/download/mc \
+    -o /usr/local/bin/mc \
+    && chmod +x /usr/local/bin/mc) \
+    || (curl -fsSL --connect-timeout 15 --retry 2 \
+    https://mirror.ghproxy.com/https://github.com/minio/mc/releases/latest/download/mc \
+    -o /usr/local/bin/mc \
+    && chmod +x /usr/local/bin/mc)
 
-RUN chmod +x /scripts/backup.sh /scripts/restore.sh /scripts/backup-entrypoint.sh
+COPY --chmod=755 backup.sh /scripts/backup.sh
+COPY --chmod=755 restore.sh /scripts/restore.sh
+COPY --chmod=755 backup-entrypoint.sh /scripts/backup-entrypoint.sh
+COPY --chmod=755 backup-trigger-watcher.sh /scripts/backup-trigger-watcher.sh
 
 RUN mkdir -p /backups /var/log
 
