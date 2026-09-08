@@ -4,6 +4,7 @@ from sqlalchemy import select, func
 from app.db.base import get_db
 from app.models.user import User
 from app.api.deps import get_current_admin
+from app.core.redis import redis_client
 from app.schemas.user import UserListItem, UserUpdate, AdminStats
 
 router = APIRouter()
@@ -75,6 +76,7 @@ async def update_user(
 
     await db.commit()
     await db.refresh(target)
+    await redis_client.delete(f"user:{target.id}")
     return target
 
 @router.delete("/users/{user_id}")
@@ -100,4 +102,5 @@ async def delete_user(
 
     await db.delete(target)
     await db.commit()
+    await redis_client.delete(f"user:{target.id}")
     return {"detail": "用户已删除"}

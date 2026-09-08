@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.db.base import get_db
 from app.models.user import User
 from app.schemas.user import UserResponse, ProfileUpdate, PasswordChange, SecurityQuestionUpdate
-from app.core.security import hash_password, verify_password
+from app.core.security import hash_password, verify_password, revoke_token
 from app.core.storage import upload_file, get_presigned_download_url
+from app.core.redis import redis_client
 import uuid
 
 router = APIRouter()
@@ -36,6 +37,7 @@ async def upload_avatar(
     current_user.avatar_key = storage_key
     await db.commit()
     await db.refresh(current_user)
+    await redis_client.delete(f"user:{current_user.id}")
     return current_user
 
 @router.get("/me/avatar")
@@ -57,21 +59,25 @@ async def update_profile(
         current_user.username = data.username.strip()
     await db.commit()
     await db.refresh(current_user)
+    await redis_client.delete(f"user:{current_user.id}")
     return current_user
 
 @router.patch("/me/password", response_model=UserResponse)
 async def change_password(
+    request: Request,
     data: PasswordChange,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     if not verify_password(data.old_password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="原密码错误")
-    if len(data.new_password) < 6:
-        raise HTTPException(status_code=400, detail="新密码至少 6 个字符")
     current_user.hashed_password = hash_password(data.new_password)
     await db.commit()
     await db.refresh(current_user)
+    await redis_client.delete(f"user:{current_user.id}")
+    token = request.cookies.get("access_token")
+    if token:
+        await revoke_token(token)
     return current_user
 
 
@@ -89,4 +95,5 @@ async def update_security_question(
     current_user.security_answer = hash_password(data.security_answer.strip().lower())
     await db.commit()
     await db.refresh(current_user)
+    await redis_client.delete(f"user:{current_user.id}")
     return current_user

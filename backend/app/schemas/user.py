@@ -1,11 +1,26 @@
-from pydantic import BaseModel, EmailStr
+import re
+from pydantic import BaseModel, EmailStr, field_validator
 from uuid import UUID
 from datetime import datetime
+
+def _validate_password_complexity(v: str) -> str:
+    if len(v) < 8:
+        raise ValueError("密码至少 8 个字符")
+    if not re.search(r"[A-Za-z]", v):
+        raise ValueError("密码必须包含字母")
+    if not re.search(r"\d", v):
+        raise ValueError("密码必须包含数字")
+    return v
 
 class UserCreate(BaseModel):
     email: EmailStr
     username: str
-    password: str  # 明文入，后端哈希
+    password: str
+
+    @field_validator("password")
+    @classmethod
+    def _validate_password(cls, v: str) -> str:
+        return _validate_password_complexity(v)
 
 
 # 新增：登录专用
@@ -38,6 +53,11 @@ class SecurityQuestionUpdate(BaseModel):
 class PasswordChange(BaseModel):
     old_password: str
     new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def _validate_new_password(cls, v: str) -> str:
+        return _validate_password_complexity(v)
 
 class UserUpdate(BaseModel):
     username: str | None = None

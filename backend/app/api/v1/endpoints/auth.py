@@ -14,7 +14,7 @@ from app.schemas.reset_password import (
 )
 from app.services.user_service import create_user
 from app.services import reset_password_service
-from app.core.security import verify_password, create_access_token, create_refresh_token
+from app.core.security import verify_password, create_access_token, create_refresh_token, decode_token, revoke_token
 from app.core.config import settings
 
 router = APIRouter()
@@ -137,7 +137,34 @@ async def reset_password_by_security(
 
 
 @router.post("/logout")
-async def logout(response: Response):
+async def logout(request: Request, response: Response):
+    for name in ("access_token", "refresh_token"):
+        token = request.cookies.get(name)
+        if token:
+            await revoke_token(token)
     response.delete_cookie("access_token")
     response.delete_cookie("refresh_token")
     return {"detail": "已退出登录"}
+
+@router.post("/refresh")
+async def refresh_token(request: Request, response: Response):
+    refresh = request.cookies.get("refresh_token")
+    if not refresh:
+        raise HTTPException(status_code=401, detail="无 refresh token")
+    payload = decode_token(refresh)
+    if not payload or not payload.get("sub"):
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+    jti = payload.get("jti")
+    if jti and await redis_client.exists(f"token_blacklist:{jti}"):
+        raise HTTPException(status_code=401, detail="Refresh token 已失效")
+    access_token = create_access_token({"sub": payload["sub"]})
+    secure = settings.ENVIRONMENT == "production"
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        samesite="lax",
+        secure=secure,
+    )
+    return {"detail": "Token 已刷新"}

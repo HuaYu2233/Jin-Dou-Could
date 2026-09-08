@@ -21,11 +21,20 @@ export async function client<T>(endpoint: string, options: FetchOptions = {}): P
     credentials: "include",
   });
 
-  if (res.status === 401) {
+  if (res.status === 401 && !options.skipAuth) {
+    const refreshed = await tryRefreshToken();
+    if (refreshed) {
+      const retryRes = await fetch(`${API_BASE_URL}${endpoint}`, {
+        ...rest,
+        body,
+        headers,
+        credentials: "include",
+      });
+      if (retryRes.ok) {
+        return retryRes.json();
+      }
+    }
     useAuthStore.getState().logout();
-    try {
-      await fetch(`${API_BASE_URL}/api/v1/auth/logout`, { method: "POST", credentials: "include" });
-    } catch {}
     window.location.href = "/login";
     throw new Error("Unauthorized");
   }
@@ -36,4 +45,21 @@ export async function client<T>(endpoint: string, options: FetchOptions = {}): P
   }
 
   return res.json();
+}
+
+let refreshPromise: Promise<boolean> | null = null;
+
+async function tryRefreshToken(): Promise<boolean> {
+  if (!refreshPromise) {
+    refreshPromise = fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+      method: "POST",
+      credentials: "include",
+    })
+      .then((r) => r.ok)
+      .catch(() => false)
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
 }

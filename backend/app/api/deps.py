@@ -1,3 +1,6 @@
+import json
+from datetime import datetime
+from uuid import UUID
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -5,8 +8,46 @@ from sqlalchemy import select
 from app.db.base import get_db
 from app.models.user import User
 from app.core.security import decode_token
+from app.core.redis import redis_client
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
+
+USER_CACHE_TTL = 60
+
+def _serialize_user(user: User) -> str:
+    return json.dumps({
+        "id": str(user.id),
+        "email": user.email,
+        "username": user.username,
+        "hashed_password": user.hashed_password,
+        "is_active": user.is_active,
+        "is_admin": user.is_admin,
+        "avatar_key": user.avatar_key,
+        "security_question": user.security_question,
+        "security_answer": user.security_answer,
+        "storage_quota": user.storage_quota,
+        "used_storage": user.used_storage,
+        "created_at": user.created_at.isoformat() if user.created_at else None,
+        "updated_at": user.updated_at.isoformat() if user.updated_at else None,
+    })
+
+def _deserialize_user(data: str) -> User:
+    d = json.loads(data)
+    user = User()
+    user.id = UUID(d["id"])
+    user.email = d["email"]
+    user.username = d["username"]
+    user.hashed_password = d["hashed_password"]
+    user.is_active = d["is_active"]
+    user.is_admin = d["is_admin"]
+    user.avatar_key = d["avatar_key"]
+    user.security_question = d["security_question"]
+    user.security_answer = d["security_answer"]
+    user.storage_quota = d["storage_quota"]
+    user.used_storage = d["used_storage"]
+    user.created_at = datetime.fromisoformat(d["created_at"]) if d["created_at"] else None
+    user.updated_at = datetime.fromisoformat(d["updated_at"]) if d["updated_at"] else None
+    return user
 
 async def get_current_user(
     request: Request,
@@ -20,12 +61,27 @@ async def get_current_user(
     payload = decode_token(token)
     if not payload or not payload.get("sub"):
         raise HTTPException(status_code=401, detail="Invalid token")
+
+    jti = payload.get("jti")
+    if jti and await redis_client.exists(f"token_blacklist:{jti}"):
+        raise HTTPException(status_code=401, detail="Token 已被撤销，请重新登录")
+
+    user_id = payload["sub"]
+    cache_key = f"user:{user_id}"
+
+    if request.method == "GET":
+        cached = await redis_client.get(cache_key)
+        if cached:
+            return _deserialize_user(cached)
     
-    result = await db.execute(select(User).where(User.id == payload["sub"]))
+    result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+
+    if request.method == "GET":
+        await redis_client.setex(cache_key, USER_CACHE_TTL, _serialize_user(user))
     
     return user
 

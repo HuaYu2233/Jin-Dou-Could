@@ -1,3 +1,4 @@
+import uuid
 import bcrypt
 from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
@@ -14,7 +15,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 def _create_token(data: dict, expires_delta: timedelta) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + expires_delta
-    to_encode.update({"exp": expire})
+    to_encode.update({"exp": expire, "jti": str(uuid.uuid4())})
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 def create_access_token(data: dict) -> str:
@@ -28,3 +29,15 @@ def decode_token(token: str) -> dict | None:
         return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
     except JWTError:
         return None
+
+async def revoke_token(token: str) -> None:
+    from app.core.redis import redis_client
+    payload = decode_token(token)
+    if not payload or not payload.get("jti"):
+        return
+    exp = payload.get("exp")
+    if not exp:
+        return
+    remaining = int(exp - datetime.now(timezone.utc).timestamp())
+    if remaining > 0:
+        await redis_client.setex(f"token_blacklist:{payload['jti']}", remaining, "1")

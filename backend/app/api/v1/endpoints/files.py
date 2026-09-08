@@ -8,6 +8,7 @@ from app.db.base import get_db
 from app.models.user import User
 from app.services import file_service
 from app.core.config import settings
+from app.core.redis import redis_client
 from app.core.storage import get_presigned_download_url
 from app.schemas.file import (
     FileResponse,
@@ -53,6 +54,7 @@ async def upload_file(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    await redis_client.delete(f"user:{current_user.id}")
     return file_record
 
 @router.get("", response_model=FileListResponse)
@@ -165,4 +167,5 @@ async def purge_file(
     purged = await file_service.purge_file(db, file_id, current_user.id)
     if not purged:
         raise HTTPException(status_code=404, detail="文件不存在或不在回收站")
+    await redis_client.delete(f"user:{current_user.id}")
     return {"message": "已彻底删除"}

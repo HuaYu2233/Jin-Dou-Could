@@ -34,9 +34,6 @@ async def send_code(db: AsyncSession, email: str) -> None:
     send_verification_code_async(email, code)
 
 async def reset_password(db: AsyncSession, email: str, code: str, new_password: str) -> None:
-    if len(new_password) < 6:
-        raise ValueError("新密码至少 6 个字符")
-
     key = CODE_KEY.format(email=email)
     stored = await redis_client.get(key)
     if not stored or stored != code:
@@ -50,6 +47,7 @@ async def reset_password(db: AsyncSession, email: str, code: str, new_password: 
     user.hashed_password = hash_password(new_password)
     await db.commit()
     await redis_client.delete(key)
+    await redis_client.delete(f"user:{user.id}")
 
 
 async def get_security_question(db: AsyncSession, email: str) -> str | None:
@@ -63,9 +61,6 @@ async def get_security_question(db: AsyncSession, email: str) -> str | None:
 async def reset_password_by_security(
     db: AsyncSession, email: str, answer: str, new_password: str
 ) -> None:
-    if len(new_password) < 6:
-        raise ValueError("新密码至少 6 个字符")
-
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
     if not user:
@@ -78,3 +73,4 @@ async def reset_password_by_security(
 
     user.hashed_password = hash_password(new_password)
     await db.commit()
+    await redis_client.delete(f"user:{user.id}")
