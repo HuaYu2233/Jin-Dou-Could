@@ -74,6 +74,11 @@ services:
       - MINIO_BUCKET=cloud-drive
       - SECRET_KEY=${SECRET_KEY:?SECRET_KEY 必须在 .env 中设置}
       - ENVIRONMENT=${ENVIRONMENT:-development}
+      - BACKEND_WORKERS=${BACKEND_WORKERS:-4}
+      - DB_POOL_SIZE=${DB_POOL_SIZE:-20}
+      - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-10}
+      - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT:-30}
+      - HTTPS_REDIRECT=${HTTPS_REDIRECT:-false}
       - MAX_UPLOAD_SIZE=${MAX_UPLOAD_SIZE:-104857600}
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
       - REFRESH_TOKEN_EXPIRE_DAYS=${REFRESH_TOKEN_EXPIRE_DAYS:-7}
@@ -104,7 +109,7 @@ services:
       - /app/__pycache__
       - ./backups:/backups
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -113,7 +118,7 @@ services:
       # minio:
       #   condition: service_healthy
     command: >
-      sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+      sh -c "alembic upgrade head && if [ \"${ENVIRONMENT:-development}\" = \"production\" ]; then gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w ${BACKEND_WORKERS:-4} --bind 0.0.0.0:8000 --timeout 120 --graceful-timeout 30; else uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload; fi"
 
   # ==================== Next.js 前端 ====================
   frontend:

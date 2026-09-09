@@ -16,6 +16,15 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     MAX_UPLOAD_SIZE: int = 104857600
 
+    # 生产部署配置
+    BACKEND_WORKERS: int = 4
+    DB_POOL_SIZE: int = 20
+    DB_MAX_OVERFLOW: int = 10
+    DB_POOL_TIMEOUT: int = 30
+    DB_POOL_RECYCLE: int = 3600
+    SECURITY_HEADERS_ENABLED: bool = True
+    HTTPS_REDIRECT: bool = False
+
     LOGIN_RATE_LIMIT_MAX_ATTEMPTS: int = 5
     LOGIN_RATE_LIMIT_WINDOW_SECONDS: int = 300
     LOGIN_RATE_LIMIT_LOCK_SECONDS: int = 900
