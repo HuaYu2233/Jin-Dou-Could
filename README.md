@@ -40,7 +40,7 @@ JinDou-Cloud/
 │   │   │   └── api.py          # 路由聚合
 │   │   ├── core/               # config, security, storage, logging, redis, alerting
 │   │   ├── db/                 # 数据库引擎与会话
-│   │   ├── middleware/         # request_logging 中间件
+│   │   ├── middleware/         # request_logging, security_headers 中间件
 │   │   ├── models/             # SQLAlchemy 模型
 │   │   ├── schemas/            # Pydantic 模型
 │   │   ├── services/           # 业务逻辑层
@@ -140,17 +140,39 @@ docker compose logs -f backend
 | `ALERT_ENABLED`               | 启用日志告警               | false                 |
 | `ALERT_WEBHOOK_URL`           | 告警 Webhook 地址          | -                     |
 | `ALERT_EMAIL_ENABLED`         | 启用邮件告警               | false                 |
+| `BACKEND_WORKERS`             | Gunicorn worker 进程数     | 4                     |
+| `DB_POOL_SIZE`                | 数据库连接池大小           | 20                    |
+| `DB_MAX_OVERFLOW`             | 连接池溢出上限             | 10                    |
+| `DB_POOL_TIMEOUT`             | 获取连接超时（秒）         | 30                    |
+| `HTTPS_REDIRECT`              | 强制 HTTPS 重定向（生产）  | false                 |
+| `SECURITY_HEADERS_ENABLED`    | 启用安全响应头             | true                  |
 
 ### 迁移到生产环境
 
-```bash
-# 1. 修改 .env 中的配置
-#    - NEXT_PUBLIC_API_URL 改为实际域名（如 https://api.example.com）
-#    - CORS_ORIGINS 改为前端域名（如 https://cloud.example.com）
-#    - 修改所有密码和 SECRET_KEY
+生产环境部署要点：
 
-# 2. 重新构建并启动
+1. **环境变量**：`ENVIRONMENT=production`，后端自动切换为 Gunicorn 多 worker 模式
+2. **HTTPS**：挂载 SSL 证书到 nginx，取消 `nginx.conf` 中 443 server 块注释，设 `HTTPS_REDIRECT=true`
+3. **安全密钥**：修改所有密码和 `SECRET_KEY`（≥32 字符强随机值）
+4. **域名配置**：`NEXT_PUBLIC_API_URL` 和 `CORS_ORIGINS` 改为实际域名
+
+```bash
+# 1. 修改 .env
+#    ENVIRONMENT=production
+#    NEXT_PUBLIC_API_URL=https://api.example.com
+#    CORS_ORIGINS=https://cloud.example.com
+#    HTTPS_REDIRECT=true
+#    BACKEND_WORKERS=4
+
+# 2. 挂载 SSL 证书（可选，启用 HTTPS）
+#    将 fullchain.pem 和 privkey.pem 放入 nginx/ssl/
+
+# 3. 重新构建并启动
 docker compose up -d --build
+
+# 4. 验证生产模式
+docker compose logs backend | grep -i gunicorn
+curl -sI https://your-domain.com | grep -i strict-transport-security
 ```
 
 ## API 概览
@@ -258,6 +280,41 @@ curl http://localhost:8000/health
 - **自动备份**：PostgreSQL + MinIO 定时备份、GPG 加密
 - **日志告警**：ERROR 日志通过 Webhook/邮件通知
 - **健康检查**：检测 DB/MinIO/Redis 连通性与延迟
+
+## 安全与性能优化
+
+本项目已完成多阶段安全加固与性能优化：
+
+### 安全加固
+
+| 模块     | 措施                                                               |
+| -------- | ------------------------------------------------------------------ |
+| 基础设施 | Docker socket 移除、端口绑定 127.0.0.1、Redis 密码 + 禁用 FLUSHALL |
+| 认证     | JWT 增加 `type` 字段，防止 access/refresh token 混用               |
+| 缓存     | Redis 用户缓存脱敏（移除密码、密保问题/答案）                      |
+| 上传     | python-magic 真实 MIME 检测 + 白名单 + 文件名净化                  |
+| 限流     | 提取码 5 次失败锁定 15 分钟；登录按真实 IP（X-Forwarded-For）限流  |
+| 响应头   | CSP / HSTS / X-Frame-Options / nosniff / Referrer-Policy           |
+
+### 性能优化
+
+| 模块   | 措施                                                                     |
+| ------ | ------------------------------------------------------------------------ |
+| 上传   | 流式直传 MinIO，内存占用 O(1)（非 O(N×文件大小)）                        |
+| MinIO  | 异步包装（`run_in_threadpool`），不阻塞事件循环                          |
+| 部署   | Gunicorn 多 worker，充分利用多核，支持优雅关闭                           |
+| 压缩   | GZip 中间件（≥500B 自动压缩）                                            |
+| 数据库 | 连接池可配置（`pool_size`/`max_overflow`/`pool_timeout`/`pool_recycle`） |
+
+### 验证测试
+
+```bash
+cd backend
+uv run python -m tests.test_token_type              # Token 类型校验
+uv run python -m tests.test_user_cache_desensitize   # 用户缓存脱敏
+uv run python -m tests.test_upload_security          # 上传安全（MIME/文件名）
+uv run python -m tests.test_share_rate_limit         # 分享提取码防爆破
+```
 
 ## 常用命令
 

@@ -48,3 +48,39 @@ CloudDrive_开发计划.md
 
 # ===== 本地测试脚本 =====
 test/
+
+# ===== 运行时数据目录 =====
+backups/
+backend/logs/
+
+# ===== 日志归档（*.log 已覆盖，补充压缩归档）=====
+*.log.zip
+*.log.*.zip
+
+# ===== SSL 证书/密钥 =====
+*.pem
+*.key
+*.crt
+*.csr
+nginx/ssl/
+
+# ===== 测试覆盖率 =====
+.coverage
+.coverage.*
+htmlcov/
+
+# ===== 进程/临时文件 =====
+*.pid
+*.bak
+*.tmp
+
+# ===== Next.js 本地环境变量 =====
+.env.local
+.env.*.local
+
+# ===== Celery 调度文件 =====
+celerybeat-schedule*
+celerybeat.pid
+
+# ===== Docker 本地数据 =====
+.docker/
