@@ -61,7 +61,6 @@ export default {
   "profile.security.updated": "密保问题已设置",
   "profile.security.updateFailed": "设置失败",
   "common.saving": "保存中...",
-  "common.close": "关闭",
   "admin.nav.overview": "概览",
   "admin.nav.users": "用户管理",
   "admin.nav.backups": "备份管理",

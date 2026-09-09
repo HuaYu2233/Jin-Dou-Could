@@ -61,7 +61,6 @@ export default {
   "profile.security.updated": "Security question set",
   "profile.security.updateFailed": "Failed to set",
   "common.saving": "Saving...",
-  "common.close": "Close",
   "admin.nav.overview": "Overview",
   "admin.nav.users": "Users",
   "admin.nav.backups": "Backups",
