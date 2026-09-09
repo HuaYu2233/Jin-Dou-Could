@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useTranslation } from "@/lib/i18n";
 import styles from "./Modal.module.css";
 
 interface ModalProps {
@@ -20,12 +21,13 @@ export default function Modal({
   title,
   description,
   saving = false,
-  savingText = "保存中...",
-  confirmText = "保存",
+  savingText,
+  confirmText,
   onConfirm,
   onClose,
   children,
 }: ModalProps) {
+  const { t } = useTranslation();
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
@@ -45,10 +47,10 @@ export default function Modal({
         {children}
         <div className={styles.actions}>
           <button className={styles.cancelBtn} onClick={onClose} disabled={saving}>
-            取消
+            {t("common.cancel")}
           </button>
           <button className={styles.confirmBtn} onClick={onConfirm} disabled={saving}>
-            {saving ? savingText : confirmText}
+            {saving ? (savingText ?? t("common.saving")) : (confirmText ?? t("common.save"))}
           </button>
         </div>
       </div>

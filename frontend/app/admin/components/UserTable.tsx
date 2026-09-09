@@ -2,6 +2,7 @@
 
 import type { AdminUserItem } from "@/lib/api/admin";
 import { formatSize, formatDate } from "@/lib/utils/format";
+import { useTranslation } from "@/lib/i18n";
 import styles from "./UserTable.module.css";
 
 interface UserTableProps {
@@ -13,26 +14,27 @@ interface UserTableProps {
 }
 
 export default function UserTable({ users, loading, onToggle, onEditQuota, onDelete }: UserTableProps) {
+  const { t } = useTranslation();
   return (
     <div className={styles.wrapper}>
       <div className={styles.scroll}>
         <table className={styles.table}>
           <thead className={styles.head}>
             <tr>
-              <th className={styles.th}>用户</th>
-              <th className={styles.th}>邮箱</th>
-              <th className={styles.th}>存储用量</th>
-              <th className={`${styles.th} ${styles.thCenter}`}>状态</th>
-              <th className={`${styles.th} ${styles.thCenter}`}>管理员</th>
-              <th className={styles.th}>注册时间</th>
-              <th className={`${styles.th} ${styles.thRight}`}>操作</th>
+              <th className={styles.th}>{t("admin.users.col.user")}</th>
+              <th className={styles.th}>{t("admin.users.col.email")}</th>
+              <th className={styles.th}>{t("admin.users.col.storage")}</th>
+              <th className={`${styles.th} ${styles.thCenter}`}>{t("admin.users.col.status")}</th>
+              <th className={`${styles.th} ${styles.thCenter}`}>{t("admin.users.col.admin")}</th>
+              <th className={styles.th}>{t("admin.users.col.registeredAt")}</th>
+              <th className={`${styles.th} ${styles.thRight}`}>{t("admin.users.col.actions")}</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr className={styles.row}><td colSpan={7} className={styles.loading}>加载中...</td></tr>
+              <tr className={styles.row}><td colSpan={7} className={styles.loading}>{t("admin.overview.loading")}</td></tr>
             ) : users.length === 0 ? (
-              <tr className={styles.row}><td colSpan={7} className={styles.empty}>暂无用户</td></tr>
+              <tr className={styles.row}><td colSpan={7} className={styles.empty}>{t("admin.users.empty")}</td></tr>
             ) : (
               users.map((u) => {
                 const percent = u.storage_quota > 0 ? (u.used_storage / u.storage_quota) * 100 : 0;
@@ -57,7 +59,7 @@ export default function UserTable({ users, loading, onToggle, onEditQuota, onDel
                         className={`${styles.badge} ${u.is_active ? styles.badgeActive : styles.badgeInactive}`}
                         onClick={() => onToggle(u, "is_active")}
                       >
-                        {u.is_active ? "启用" : "禁用"}
+                        {u.is_active ? t("admin.users.status.active") : t("admin.users.status.inactive")}
                       </button>
                     </td>
                     <td className={`${styles.td} ${styles.tdCenter}`}>
@@ -65,16 +67,16 @@ export default function UserTable({ users, loading, onToggle, onEditQuota, onDel
                         className={`${styles.badge} ${u.is_admin ? styles.badgeAdmin : styles.badgeUser}`}
                         onClick={() => onToggle(u, "is_admin")}
                       >
-                        {u.is_admin ? "管理员" : "普通"}
+                        {u.is_admin ? t("admin.users.role.admin") : t("admin.users.role.user")}
                       </button>
                     </td>
                     <td className={`${styles.td} ${styles.date}`}>{formatDate(u.created_at)}</td>
                     <td className={`${styles.td} ${styles.tdRight}`}>
                       <button className={`${styles.actionBtn} ${styles.actionPrimary}`} onClick={() => onEditQuota(u)}>
-                        配额
+                        {t("admin.users.action.quota")}
                       </button>
                       <button className={`${styles.actionBtn} ${styles.actionDanger}`} onClick={() => onDelete(u)}>
-                        删除
+                        {t("admin.users.action.delete")}
                       </button>
                     </td>
                   </tr>

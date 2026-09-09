@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import type { AdminUserItem } from "@/lib/api/admin";
 import Modal from "./Modal";
+import { useTranslation } from "@/lib/i18n";
 import styles from "./QuotaDialog.module.css";
 
 interface QuotaDialogProps {
@@ -13,6 +14,7 @@ interface QuotaDialogProps {
 }
 
 export default function QuotaDialog({ user, saving, onSave, onClose }: QuotaDialogProps) {
+  const { t } = useTranslation();
   const [value, setValue] = useState("");
 
   useEffect(() => {
@@ -34,13 +36,13 @@ export default function QuotaDialog({ user, saving, onSave, onClose }: QuotaDial
   return (
     <Modal
       open={!!user}
-      title="修改存储配额"
-      description={user ? `用户：${user.username}（${user.email}）` : undefined}
+      title={t("admin.quota.title")}
+      description={user ? t("admin.quota.desc", { username: user.username, email: user.email }) : undefined}
       saving={saving}
       onConfirm={handleSubmit}
       onClose={onClose}
     >
-      <label className={styles.label}>配额大小（GB）</label>
+      <label className={styles.label}>{t("admin.quota.label")}</label>
       <input
         type="number"
         step="0.1"

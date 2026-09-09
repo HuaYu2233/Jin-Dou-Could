@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/stores/auth";
 import { API_BASE_URL } from "@/lib/config";
+import { useTranslation } from "@/lib/i18n";
 import Avatar from "./Avatar";
+import LanguageSwitcher from "./LanguageSwitcher";
 import styles from "./Header.module.css";
 
 interface HeaderProps {
@@ -14,6 +16,7 @@ interface HeaderProps {
 
 export default function Header({ extra }: HeaderProps) {
   const router = useRouter();
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const isLoading = useAuthStore((s) => s.isLoading);
   const error = useAuthStore((s) => s.error);
@@ -34,10 +37,11 @@ export default function Header({ extra }: HeaderProps) {
   return (
     <header className={styles.header}>
       <div className={styles.brand}>
-        <span className={styles.brandText}>JinDou Cloud</span>
+        <span className={styles.brandText}>{t("app.brand")}</span>
       </div>
       <div className={styles.headerRight}>
         {extra}
+        <LanguageSwitcher />
         {user && (
           <Link href="/profile" className={styles.userLink}>
             <Avatar
@@ -47,12 +51,12 @@ export default function Header({ extra }: HeaderProps) {
               size="sm"
             />
             <span className={styles.username}>
-              {error ? "获取用户失败" : isLoading && !user ? "加载中..." : user.username}
+              {error ? t("header.getUserFailed") : isLoading && !user ? t("header.loading") : user.username}
             </span>
           </Link>
         )}
         <button onClick={handleLogout} className={styles.logoutBtn}>
-          退出
+          {t("header.logout")}
         </button>
       </div>
     </header>

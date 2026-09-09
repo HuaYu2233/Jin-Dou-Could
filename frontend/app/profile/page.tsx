@@ -6,11 +6,13 @@ import Avatar from "../dashboard/components/Avatar";
 import AvatarEditor from "../dashboard/components/AvatarEditor";
 import PageHeader from "../admin/components/PageHeader";
 import { updateProfile, changePassword, uploadAvatar, setSecurityQuestion } from "@/lib/api/auth";
+import { useTranslation } from "@/lib/i18n";
 import styles from "./page.module.css";
 
 export default function ProfilePage() {
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
+  const { t } = useTranslation();
 
   const [username, setUsername] = useState(user?.username ?? "");
   const [secQuestion, setSecQuestion] = useState(user?.security_question ?? "");
@@ -42,9 +44,9 @@ export default function ProfilePage() {
     try {
       const updated = await updateProfile(username);
       setUser(updated);
-      setNameMsg({ ok: true, text: "用户名已更新" });
+      setNameMsg({ ok: true, text: t("profile.editUsername.updated") });
     } catch (err) {
-      setNameMsg({ ok: false, text: err instanceof Error ? err.message : "更新失败" });
+      setNameMsg({ ok: false, text: err instanceof Error ? err.message : t("profile.editUsername.updateFailed") });
     } finally {
       setSavingName(false);
     }
@@ -53,18 +55,18 @@ export default function ProfilePage() {
   async function handleChangePwd() {
     setPwdMsg(null);
     if (newPwd !== confirmPwd) {
-      setPwdMsg({ ok: false, text: "两次输入的新密码不一致" });
+      setPwdMsg({ ok: false, text: t("profile.editPassword.mismatch") });
       return;
     }
     setSavingPwd(true);
     try {
       await changePassword(oldPwd, newPwd);
-      setPwdMsg({ ok: true, text: "密码已更新" });
+      setPwdMsg({ ok: true, text: t("profile.editPassword.updated") });
       setOldPwd("");
       setNewPwd("");
       setConfirmPwd("");
     } catch (err) {
-      setPwdMsg({ ok: false, text: err instanceof Error ? err.message : "更新失败" });
+      setPwdMsg({ ok: false, text: err instanceof Error ? err.message : t("profile.editPassword.updateFailed") });
     } finally {
       setSavingPwd(false);
     }
@@ -77,9 +79,9 @@ export default function ProfilePage() {
       const updated = await setSecurityQuestion(secQuestion, secAnswer);
       setUser(updated);
       setSecAnswer("");
-      setSecMsg({ ok: true, text: "密保问题已设置" });
+      setSecMsg({ ok: true, text: t("profile.security.updated") });
     } catch (err) {
-      setSecMsg({ ok: false, text: err instanceof Error ? err.message : "设置失败" });
+      setSecMsg({ ok: false, text: err instanceof Error ? err.message : t("profile.security.updateFailed") });
     } finally {
       setSavingSec(false);
     }
@@ -99,7 +101,7 @@ export default function ProfilePage() {
       setUser(updated);
       setEditingFile(null);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "上传失败");
+      alert(err instanceof Error ? err.message : t("profile.uploadFailed"));
     } finally {
       setUploading(false);
     }
@@ -107,7 +109,7 @@ export default function ProfilePage() {
 
   return (
     <div className={styles.page}>
-      <PageHeader title="用户中心" subtitle="管理你的个人信息与安全设置" />
+      <PageHeader title={t("profile.title")} subtitle={t("profile.subtitle")} />
 
       <div className={styles.avatarSection}>
         <Avatar
@@ -132,7 +134,7 @@ export default function ProfilePage() {
           onClick={() => fileRef.current?.click()}
           disabled={uploading}
         >
-          {uploading ? "上传中..." : "更换头像"}
+          {uploading ? t("profile.uploading") : t("profile.changeAvatar")}
         </button>
       </div>
 
@@ -145,9 +147,9 @@ export default function ProfilePage() {
       )}
 
       <div className={styles.section}>
-        <h2 className={styles.sectionTitle}>修改用户名</h2>
+        <h2 className={styles.sectionTitle}>{t("profile.editUsername.title")}</h2>
         <div className={styles.field}>
-          <label className={styles.label}>用户名</label>
+          <label className={styles.label}>{t("profile.editUsername.label")}</label>
           <input
             type="text"
             value={username}
@@ -157,7 +159,7 @@ export default function ProfilePage() {
         </div>
         <div className={styles.actions}>
           <button className={styles.saveBtn} onClick={handleSaveName} disabled={savingName}>
-            {savingName ? "保存中..." : "保存"}
+            {savingName ? t("common.saving") : t("common.save")}
           </button>
         </div>
         {nameMsg && (
@@ -168,9 +170,9 @@ export default function ProfilePage() {
       </div>
 
       <div className={styles.section}>
-        <h2 className={styles.sectionTitle}>修改密码</h2>
+        <h2 className={styles.sectionTitle}>{t("profile.editPassword.title")}</h2>
         <div className={styles.field}>
-          <label className={styles.label}>原密码</label>
+          <label className={styles.label}>{t("profile.editPassword.oldLabel")}</label>
           <input
             type="password"
             value={oldPwd}
@@ -179,7 +181,7 @@ export default function ProfilePage() {
           />
         </div>
         <div className={styles.field}>
-          <label className={styles.label}>新密码</label>
+          <label className={styles.label}>{t("profile.editPassword.newLabel")}</label>
           <input
             type="password"
             value={newPwd}
@@ -188,7 +190,7 @@ export default function ProfilePage() {
           />
         </div>
         <div className={styles.field}>
-          <label className={styles.label}>确认新密码</label>
+          <label className={styles.label}>{t("profile.editPassword.confirmLabel")}</label>
           <input
             type="password"
             value={confirmPwd}
@@ -198,7 +200,7 @@ export default function ProfilePage() {
         </div>
         <div className={styles.actions}>
           <button className={styles.saveBtn} onClick={handleChangePwd} disabled={savingPwd}>
-            {savingPwd ? "保存中..." : "保存"}
+            {savingPwd ? t("common.saving") : t("common.save")}
           </button>
         </div>
         {pwdMsg && (
@@ -209,33 +211,33 @@ export default function ProfilePage() {
       </div>
 
       <div className={styles.section}>
-        <h2 className={styles.sectionTitle}>密保设置</h2>
+        <h2 className={styles.sectionTitle}>{t("profile.security.title")}</h2>
         <p className={styles.label} style={{ marginBottom: 12 }}>
-          设置密保问题后，忘记密码时可通过密保问题重置密码
+          {t("profile.security.desc")}
         </p>
         <div className={styles.field}>
-          <label className={styles.label}>密保问题</label>
+          <label className={styles.label}>{t("profile.security.questionLabel")}</label>
           <input
             type="text"
             value={secQuestion}
             onChange={(e) => setSecQuestion(e.target.value)}
             className={styles.input}
-            placeholder="如：你的小学叫什么名字？"
+            placeholder={t("profile.security.questionPlaceholder")}
           />
         </div>
         <div className={styles.field}>
-          <label className={styles.label}>密保答案</label>
+          <label className={styles.label}>{t("profile.security.answerLabel")}</label>
           <input
             type="text"
             value={secAnswer}
             onChange={(e) => setSecAnswer(e.target.value)}
             className={styles.input}
-            placeholder={user.security_question ? "输入新答案以更换密保" : "请输入答案"}
+            placeholder={user.security_question ? t("profile.security.answerPlaceholder.change") : t("profile.security.answerPlaceholder.set")}
           />
         </div>
         <div className={styles.actions}>
           <button className={styles.saveBtn} onClick={handleSaveSecurity} disabled={savingSec}>
-            {savingSec ? "保存中..." : "保存"}
+            {savingSec ? t("common.saving") : t("common.save")}
           </button>
         </div>
         {secMsg && (

@@ -2,6 +2,7 @@
 
 import type { BackupInfo } from "@/lib/api/admin";
 import { formatSize, formatDate } from "@/lib/utils/format";
+import { useTranslation } from "@/lib/i18n";
 import styles from "./BackupTable.module.css";
 
 interface BackupTableProps {
@@ -21,16 +22,17 @@ export default function BackupTable({
   onDownload,
   onDelete,
 }: BackupTableProps) {
+  const { t } = useTranslation();
   return (
     <div className={styles.wrapper}>
       <div className={styles.toolbar}>
-        <span className={styles.count}>共 {backups.length} 个备份</span>
+        <span className={styles.count}>{t("admin.backups.count", { count: backups.length })}</span>
         <button
           className={styles.triggerBtn}
           onClick={onTrigger}
           disabled={triggering}
         >
-          {triggering ? "备份中..." : "立即备份"}
+          {triggering ? t("admin.backups.triggering") : t("admin.backups.trigger")}
         </button>
       </div>
 
@@ -38,19 +40,19 @@ export default function BackupTable({
         <table className={styles.table}>
           <thead className={styles.head}>
             <tr>
-              <th className={styles.th}>备份时间</th>
-              <th className={styles.th}>状态</th>
-              <th className={styles.th}>加密</th>
-              <th className={styles.th}>大小</th>
-              <th className={styles.th}>包含文件</th>
-              <th className={`${styles.th} ${styles.thRight}`}>操作</th>
+              <th className={styles.th}>{t("admin.backups.col.time")}</th>
+              <th className={styles.th}>{t("admin.backups.col.status")}</th>
+              <th className={styles.th}>{t("admin.backups.col.encrypted")}</th>
+              <th className={styles.th}>{t("admin.backups.col.size")}</th>
+              <th className={styles.th}>{t("admin.backups.col.files")}</th>
+              <th className={`${styles.th} ${styles.thRight}`}>{t("admin.backups.col.actions")}</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className={styles.loading}>加载中...</td></tr>
+              <tr><td colSpan={6} className={styles.loading}>{t("admin.overview.loading")}</td></tr>
             ) : backups.length === 0 ? (
-              <tr><td colSpan={6} className={styles.empty}>暂无备份记录</td></tr>
+              <tr><td colSpan={6} className={styles.empty}>{t("admin.backups.empty")}</td></tr>
             ) : (
               backups.map((b) => {
                 const pgFile = b.files.find((f) => f.name.endsWith(".gz") || f.name.endsWith(".gpg"));
@@ -61,14 +63,14 @@ export default function BackupTable({
                     </td>
                     <td className={styles.td}>
                       <span className={`${styles.badge} ${b.status === "success" ? styles.badgeOk : styles.badgeWarn}`}>
-                        {b.status === "success" ? "成功" : b.status === "unknown" ? "未知" : b.status}
+                        {b.status === "success" ? t("admin.backups.status.success") : b.status === "unknown" ? t("admin.backups.status.unknown") : b.status}
                       </span>
                     </td>
                     <td className={styles.td}>
                       {b.encrypted ? (
-                        <span className={styles.badgeEncrypted}>已加密</span>
+                        <span className={styles.badgeEncrypted}>{t("admin.backups.encrypted.yes")}</span>
                       ) : (
-                        <span className={styles.muted}>未加密</span>
+                        <span className={styles.muted}>{t("admin.backups.encrypted.no")}</span>
                       )}
                     </td>
                     <td className={styles.td}>{formatSize(b.total_size)}</td>
@@ -81,18 +83,18 @@ export default function BackupTable({
                           className={`${styles.actionBtn} ${styles.actionPrimary}`}
                           onClick={() => onDownload(b.timestamp, pgFile.name)}
                         >
-                          下载
+                          {t("toolbar.download")}
                         </button>
                       )}
                       <button
                         className={`${styles.actionBtn} ${styles.actionDanger}`}
                         onClick={() => {
-                          if (confirm(`确定删除备份 ${b.timestamp} 吗？此操作不可恢复。`)) {
+                          if (confirm(t("admin.backups.deleteConfirm", { timestamp: b.timestamp }))) {
                             onDelete(b.timestamp);
                           }
                         }}
                       >
-                        删除
+                        {t("admin.users.action.delete")}
                       </button>
                     </td>
                   </tr>

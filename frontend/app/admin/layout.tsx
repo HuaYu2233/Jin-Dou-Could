@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/stores/auth";
+import { useTranslation, type TranslationKey } from "@/lib/i18n";
 import Header from "../dashboard/components/Header";
 import styles from "./layout.module.css";
 
@@ -13,6 +14,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isLoading = useAuthStore((s) => s.isLoading);
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (isLoading) return;
@@ -24,15 +26,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, [user, isAuthenticated, isLoading, router]);
 
   const navItems = [
-    { href: "/admin", label: "概览" },
-    { href: "/admin/users", label: "用户管理" },
-    { href: "/admin/backups", label: "备份管理" },
+    { href: "/admin", labelKey: "admin.nav.overview" as TranslationKey },
+    { href: "/admin/users", labelKey: "admin.nav.users" as TranslationKey },
+    { href: "/admin/backups", labelKey: "admin.nav.backups" as TranslationKey },
   ];
 
   return (
     <div className={styles.container}>
       <Header
-        extra={<Link href="/dashboard" className={styles.backLink}>返回网盘</Link>}
+        extra={<Link href="/dashboard" className={styles.backLink}>{t("admin.backToDrive")}</Link>}
       />
       <nav className={styles.subNav}>
         {navItems.map((item) => {
@@ -45,7 +47,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               href={item.href}
               className={`${styles.subNavItem} ${active ? styles.subNavItemActive : ""}`}
             >
-              {item.label}
+              {t(item.labelKey)}
             </Link>
           );
         })}
