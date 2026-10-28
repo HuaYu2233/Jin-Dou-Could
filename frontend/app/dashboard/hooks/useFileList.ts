@@ -32,6 +32,9 @@ export function useFileList(category: CategoryId) {
     if (!active) return;
     setLoading(true);
     setError("");
+    setFiles([]);
+    setFolders([]);
+    setTotal(0);
     try {
       if (debouncedKeyword) {
         const res = await searchFiles(debouncedKeyword, (page - 1) * PAGE_SIZE, PAGE_SIZE);
