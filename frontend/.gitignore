@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+test-results/
+playwright-report/
 
 # next.js
 /.next/
@@ -22,6 +24,7 @@
 
 # misc
 .DS_Store
+Thumbs.db
 *.pem
 
 # debug
@@ -32,6 +35,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -39,3 +43,24 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# vitest
+.vitest/
+
+# AI/编码助手
+.claude/
+.cursor/
+.trae/
+.aider*
+.copilot/
+.codeium/
+.windsurf/
+CLAUDE.md
+AGENTS.md
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

@@ -8,6 +8,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-clouduser}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cloudpass123}
       POSTGRES_DB: ${POSTGRES_DB:-clouddrive}
+    command: postgres -c max_connections=${DB_MAX_CONNECTIONS:-80}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -73,10 +74,10 @@ services:
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin123}
       - MINIO_BUCKET=cloud-drive
       - SECRET_KEY=${SECRET_KEY:?SECRET_KEY 必须在 .env 中设置}
-      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
       - BACKEND_WORKERS=${BACKEND_WORKERS:-4}
-      - DB_POOL_SIZE=${DB_POOL_SIZE:-20}
-      - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-10}
+      - DB_POOL_SIZE=${DB_POOL_SIZE:-5}
+      - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-5}
       - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT:-30}
       - HTTPS_REDIRECT=${HTTPS_REDIRECT:-false}
       - MAX_UPLOAD_SIZE=${MAX_UPLOAD_SIZE:-104857600}
@@ -86,6 +87,8 @@ services:
       - ADMIN_EMAIL=${ADMIN_EMAIL:-}
       - MAX_USERS=${MAX_USERS:-0}
       - DEFAULT_STORAGE_QUOTA=${DEFAULT_STORAGE_QUOTA:-1073741824}
+      - RATE_LIMIT_ENABLED=${RATE_LIMIT_ENABLED:-true}
+      - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-60}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - LOG_DIR=${LOG_DIR:-logs}
       - LOG_RETENTION_DAYS=${LOG_RETENTION_DAYS:-30}
@@ -105,35 +108,30 @@ services:
       - BACKUP_DIR=/backups
       - BACKUP_TRIGGER_CMD=${BACKUP_TRIGGER_CMD:-}
     volumes:
-      - ./backend:/app
-      - /app/__pycache__
       - ./backups:/backups
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
       db:
         condition: service_healthy
-      # redis:
-      #   condition: service_healthy
-      # minio:
-      #   condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
     command: >
-      sh -c "alembic upgrade head && if [ \"${ENVIRONMENT:-development}\" = \"production\" ]; then gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w ${BACKEND_WORKERS:-4} --bind 0.0.0.0:8000 --timeout 120 --graceful-timeout 30; else uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload; fi"
+      sh -c "alembic upgrade head && gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w ${BACKEND_WORKERS:-4} --bind 0.0.0.0:8000 --timeout 120 --graceful-timeout 30"
 
   # ==================== Next.js 前端 ====================
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      target: runner
     container_name: cloud-drive-frontend
     restart: unless-stopped
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
       - API_URL=http://backend:8000
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
     ports:
       - "3000:3000"
     depends_on:

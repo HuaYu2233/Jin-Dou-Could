@@ -7,11 +7,24 @@
 
 # ===== 系统/编辑器 =====
 .DS_Store
+Thumbs.db
+Desktop.ini
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+
+# ===== AI/编码助手 =====
+.claude/
+.cursor/
+.trae/
+.aider*
+.copilot/
+.codeium/
+.windsurf/
+**/CLAUDE.md
+**/AGENTS.md
 
 # ===== Python 后端 =====
 __pycache__/
@@ -28,6 +41,7 @@ backend/.venv/
 dist/
 build/
 backend/.python-version
+*.pyc
 
 # ===== Node.js 前端（根级保护，frontend/.gitignore 已覆盖） =====
 node_modules/
@@ -68,6 +82,7 @@ nginx/ssl/
 .coverage
 .coverage.*
 htmlcov/
+coverage/
 
 # ===== 进程/临时文件 =====
 *.pid
@@ -84,3 +99,36 @@ celerybeat.pid
 
 # ===== Docker 本地数据 =====
 .docker/
+
+# ===== 包管理器锁文件（可选，按团队约定决定）=====
+# backend/uv.lock
+# frontend/package-lock.json
+
+# ===== Vite/Vitest 缓存 =====
+.vitest/
+
+# ===== TypeScript 增量编译 =====
+*.tsbuildinfo
+
+# ===== Vercel =====
+.vercel/
+
+# ===== Playwright =====
+test-results/
+playwright-report/
+
+# ===== npm/pnpm/yarn 调试日志 =====
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ===== macOS Spotlight =====
+.Spotlight-V100
+.Trashes
+
+# ===== Linux =====
+.directory
+
+# ===== Docker Compose 本地覆盖 =====
+docker-compose.override.yml
