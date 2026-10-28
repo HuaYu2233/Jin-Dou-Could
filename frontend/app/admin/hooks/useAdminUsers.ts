@@ -1,64 +1,64 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
   listAdminUsers,
   updateAdminUser,
   deleteAdminUser,
   type AdminUserItem,
 } from "@/lib/api/admin";
+import { queryKeys } from "@/lib/query/keys";
 
 const PAGE_SIZE = 20;
 
 export function useAdminUsers() {
-  const [users, setUsers] = useState<AdminUserItem[]>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      setLoading(true);
-      try {
-        const skip = (page - 1) * PAGE_SIZE;
-        const data = await listAdminUsers(skip, PAGE_SIZE);
-        if (!active) return;
-        setUsers(data);
-        if (page === 1) setTotal(data.length);
-      } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : "加载用户失败");
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-    return () => { active = false; };
-  }, [page]);
-
-  const toggleField = useCallback(
-    async (user: AdminUserItem, field: "is_active" | "is_admin") => {
-      try {
-        const updated = await updateAdminUser(user.id, { [field]: !user[field] });
-        setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "操作失败");
-      }
+  const { data: users = [], isLoading: loading } = useQuery({
+    queryKey: queryKeys.admin.users(page),
+    queryFn: async () => {
+      const data = await listAdminUsers((page - 1) * PAGE_SIZE, PAGE_SIZE);
+      if (page === 1) setTotal(data.length);
+      return data;
     },
-    []
-  );
+  });
 
-  const updateQuota = useCallback(async (userId: string, bytes: number) => {
-    const updated = await updateAdminUser(userId, { storage_quota: bytes });
-    setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
-    return updated;
-  }, []);
+  const toggleMutation = useMutation({
+    mutationFn: ({ user, field }: { user: AdminUserItem; field: "is_active" | "is_admin" }) =>
+      updateAdminUser(user.id, { [field]: !user[field] }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(queryKeys.admin.users(page), (old: AdminUserItem[] | undefined) =>
+        old?.map((u) => (u.id === updated.id ? updated : u))
+      );
+    },
+    onError: (err) => setError(err instanceof Error ? err.message : "操作失败"),
+  });
 
-  const removeUser = useCallback(async (user: AdminUserItem) => {
-    await deleteAdminUser(user.id);
-    setUsers((prev) => prev.filter((u) => u.id !== user.id));
-    setTotal((t) => Math.max(0, t - 1));
-  }, []);
+  const quotaMutation = useMutation({
+    mutationFn: ({ userId, bytes }: { userId: string; bytes: number }) =>
+      updateAdminUser(userId, { storage_quota: bytes }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(queryKeys.admin.users(page), (old: AdminUserItem[] | undefined) =>
+        old?.map((u) => (u.id === updated.id ? updated : u))
+      );
+    },
+    onError: (err) => setError(err instanceof Error ? err.message : "操作失败"),
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (user: AdminUserItem) => deleteAdminUser(user.id),
+    onSuccess: (_data, user) => {
+      queryClient.setQueryData(queryKeys.admin.users(page), (old: AdminUserItem[] | undefined) =>
+        old?.filter((u) => u.id !== user.id)
+      );
+      setTotal((t) => Math.max(0, t - 1));
+    },
+    onError: (err) => setError(err instanceof Error ? err.message : "删除失败"),
+  });
 
   return {
     users,
@@ -69,8 +69,8 @@ export function useAdminUsers() {
     PAGE_SIZE,
     setPage,
     setError,
-    toggleField,
-    updateQuota,
-    removeUser,
+    toggleField: (user: AdminUserItem, field: "is_active" | "is_admin") => toggleMutation.mutate({ user, field }),
+    updateQuota: (userId: string, bytes: number) => quotaMutation.mutateAsync({ userId, bytes }),
+    removeUser: (user: AdminUserItem) => removeMutation.mutate(user),
   };
 }

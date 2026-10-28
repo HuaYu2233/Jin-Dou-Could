@@ -1,58 +1,51 @@
-// /Users/zero/project/JinDou-Cloud/frontend/app/share/[token]/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import {
   getShareInfo,
   verifyShare,
   downloadSharedFile,
   type ShareInfo,
 } from "@/lib/api/files";
+import { queryKeys } from "@/lib/query/keys";
 
 export default function SharePage() {
   const params = useParams();
   const token = params.token as string;
 
-  const [info, setInfo] = useState<ShareInfo | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [verified, setVerified] = useState(false);
   const [code, setCode] = useState("");
   const [downloading, setDownloading] = useState(false);
+  const [verifyError, setVerifyError] = useState("");
 
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const res = await getShareInfo(token);
-        if (active) setInfo(res);
-      } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : "分享不存在");
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-    return () => { active = false; };
-  }, [token]);
+  const { data: info, isLoading: loading, error: queryError } = useQuery<ShareInfo>({
+    queryKey: queryKeys.shares.info(token),
+    queryFn: () => getShareInfo(token),
+  });
+
+  const error = queryError
+    ? queryError instanceof Error ? queryError.message : "分享不存在"
+    : verifyError;
 
   async function handleVerify() {
-    setError("");
+    setVerifyError("");
     try {
       await verifyShare(token, code);
       setVerified(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "验证失败");
+      setVerifyError(err instanceof Error ? err.message : "验证失败");
     }
   }
 
   async function handleDownload() {
     setDownloading(true);
-    setError("");
+    setVerifyError("");
     try {
       await downloadSharedFile(token, code);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "下载失败");
+      setVerifyError(err instanceof Error ? err.message : "下载失败");
     } finally {
       setDownloading(false);
     }
@@ -73,7 +66,7 @@ export default function SharePage() {
     );
   }
 
-  if (error && !info) {
+  if (queryError && !info) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gray-50">
         <div className="text-5xl">😕</div>

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { listShares, deleteShare, type ShareItem } from "@/lib/api/files";
+import { queryKeys } from "@/lib/query/keys";
 
 interface SharesViewProps {
   page: number;
@@ -12,48 +13,28 @@ interface SharesViewProps {
 }
 
 export default function SharesView({ page, pageSize, onError, onTotalChange, reloadKey }: SharesViewProps) {
-  const [shares, setShares] = useState<ShareItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
 
-  const loadShares = useCallback(async () => {
-    setLoading(true);
-    try {
+  const { data: shares = [], isLoading: loading } = useQuery({
+    queryKey: [...queryKeys.shares.list(page, pageSize), reloadKey],
+    queryFn: async () => {
       const res = await listShares((page - 1) * pageSize, pageSize);
-      setShares(res.items);
       onTotalChange(res.total);
-    } catch (err) {
-      onError(err instanceof Error ? err.message : "加载分享失败");
-    } finally {
-      setLoading(false);
-    }
-  }, [page, pageSize, onError, onTotalChange]);
+      return res.items;
+    },
+  });
 
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      setLoading(true);
-      try {
-        const res = await listShares((page - 1) * pageSize, pageSize);
-        if (!active) return;
-        setShares(res.items);
-        onTotalChange(res.total);
-      } catch (err) {
-        if (!active) onError(err instanceof Error ? err.message : "加载分享失败");
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-    return () => { active = false; };
-  }, [page, pageSize, onError, onTotalChange, reloadKey]);
+  const cancelMutation = useMutation({
+    mutationFn: deleteShare,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.shares.all });
+    },
+    onError: (err) => onError(err instanceof Error ? err.message : "取消分享失败"),
+  });
 
-  async function handleCancelShare(shareId: string) {
+  function handleCancelShare(shareId: string) {
     if (!confirm("确定取消此分享吗？")) return;
-    try {
-      await deleteShare(shareId);
-      await loadShares();
-    } catch (err) {
-      onError(err instanceof Error ? err.message : "取消分享失败");
-    }
+    cancelMutation.mutate(shareId);
   }
 
   function copyShareLink(token: string) {

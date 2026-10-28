@@ -1,37 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import { getAdminStats, type AdminStats } from "@/lib/api/admin";
 import { useTranslation } from "@/lib/i18n";
+import { queryKeys } from "@/lib/query/keys";
 import StatCard from "./components/StatCard";
 import StorageBar from "./components/StorageBar";
 import PageHeader from "./components/PageHeader";
 import styles from "./page.module.css";
 
 export default function AdminDashboardPage() {
-  const [stats, setStats] = useState<AdminStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { t } = useTranslation();
 
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const data = await getAdminStats();
-        if (active) setStats(data);
-      } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : t("admin.overview.loadFailed"));
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-    return () => { active = false; };
-  }, []);
+  const { data: stats, isLoading: loading, error } = useQuery<AdminStats>({
+    queryKey: queryKeys.admin.stats(),
+    queryFn: getAdminStats,
+  });
+
+  const errorMsg = error ? (error instanceof Error ? error.message : t("admin.overview.loadFailed")) : null;
 
   if (loading) return <div className={styles.loading}>{t("admin.overview.loading")}</div>;
-  if (error) return <div className={styles.error}>{error}</div>;
+  if (errorMsg) return <div className={styles.error}>{errorMsg}</div>;
   if (!stats) return null;
 
   return (
@@ -47,7 +36,7 @@ export default function AdminDashboardPage() {
       <div className={styles.section}>
         <div className={styles.sectionHead}>
           <h2 className={styles.sectionTitle}>{t("admin.overview.storageUsage")}</h2>
-          <Link href="/admin/users" className={styles.link}>{t("admin.overview.manageQuotaLink")}</Link>
+          <a href="/admin/users" className={styles.link}>{t("admin.overview.manageQuotaLink")}</a>
         </div>
         <StorageBar used={stats.total_used} total={stats.total_quota} />
       </div>
@@ -55,7 +44,7 @@ export default function AdminDashboardPage() {
       <div className={styles.section}>
         <div className={styles.sectionHead}>
           <h2 className={styles.sectionTitle}>{t("admin.overview.userManagement")}</h2>
-          <Link href="/admin/users" className={styles.link}>{t("admin.overview.enterLink")}</Link>
+          <a href="/admin/users" className={styles.link}>{t("admin.overview.enterLink")}</a>
         </div>
         <p className={styles.sectionDesc}>
           {t("admin.overview.userManagementDesc")}
@@ -65,7 +54,7 @@ export default function AdminDashboardPage() {
       <div className={styles.section}>
         <div className={styles.sectionHead}>
           <h2 className={styles.sectionTitle}>{t("admin.overview.backupManagement")}</h2>
-          <Link href="/admin/backups" className={styles.link}>{t("admin.overview.enterLink")}</Link>
+          <a href="/admin/backups" className={styles.link}>{t("admin.overview.enterLink")}</a>
         </div>
         <p className={styles.sectionDesc}>
           {t("admin.overview.backupManagementDesc")}

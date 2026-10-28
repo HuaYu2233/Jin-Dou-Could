@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
   listAdminBackups,
   triggerAdminBackup,
@@ -8,69 +9,43 @@ import {
   downloadAdminBackup,
   type BackupInfo,
 } from "@/lib/api/admin";
+import { queryKeys } from "@/lib/query/keys";
 
 export function useAdminBackups() {
-  const [backups, setBackups] = useState<BackupInfo[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [triggering, setTriggering] = useState(false);
+  const queryClient = useQueryClient();
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await listAdminBackups();
-      setBackups(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "加载备份失败");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const { data: backups = [], isLoading: loading, refetch } = useQuery({
+    queryKey: queryKeys.admin.backups(),
+    queryFn: listAdminBackups,
+  });
 
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      setLoading(true);
-      try {
-        const data = await listAdminBackups();
-        if (active) setBackups(data);
-      } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : "加载备份失败");
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-    return () => { active = false; };
-  }, []);
+  const triggerMutation = useMutation({
+    mutationFn: triggerAdminBackup,
+    onMutate: () => setTriggering(true),
+    onSuccess: () => refetch(),
+    onSettled: () => setTriggering(false),
+    onError: (err) => setError(err instanceof Error ? err.message : "触发备份失败"),
+  });
 
-  const trigger = useCallback(async () => {
-    setTriggering(true);
-    try {
-      await triggerAdminBackup();
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "触发备份失败");
-    } finally {
-      setTriggering(false);
-    }
-  }, [load]);
+  const removeMutation = useMutation({
+    mutationFn: deleteAdminBackup,
+    onSuccess: (_data, timestamp) => {
+      queryClient.setQueryData(queryKeys.admin.backups(), (old: BackupInfo[] | undefined) =>
+        old?.filter((b) => b.timestamp !== timestamp)
+      );
+    },
+    onError: (err) => setError(err instanceof Error ? err.message : "删除备份失败"),
+  });
 
-  const remove = useCallback(async (timestamp: string) => {
-    try {
-      await deleteAdminBackup(timestamp);
-      setBackups((prev) => prev.filter((b) => b.timestamp !== timestamp));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "删除备份失败");
-    }
-  }, []);
-
-  const download = useCallback(async (timestamp: string, file: string) => {
+  const download = async (timestamp: string, file: string) => {
     try {
       await downloadAdminBackup(timestamp, file);
     } catch (err) {
       setError(err instanceof Error ? err.message : "下载失败");
     }
-  }, []);
+  };
 
   return {
     backups,
@@ -78,9 +53,9 @@ export function useAdminBackups() {
     error,
     triggering,
     setError,
-    reload: load,
-    trigger,
-    remove,
+    reload: refetch,
+    trigger: () => triggerMutation.mutate(),
+    remove: (timestamp: string) => removeMutation.mutate(timestamp),
     download,
   };
 }
