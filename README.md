@@ -25,19 +25,20 @@
 | python-jose  | 3.3+        | JWT 认证              |
 | bcrypt       | 4.2         | 密码哈希              |
 | MinIO        | 7.2+        | S3 兼容对象存储客户端 |
+| Celery       | 5.4+        | 异步任务队列          |
 | Loguru       | 0.7+        | 结构化日志            |
 | python-magic | 0.4+        | MIME 类型检测         |
 | Python       | 3.9+        | 运行时                |
 
 ### 基础设施
 
-| 组件           | 版本   | 用途                       |
-| -------------- | ------ | -------------------------- |
-| PostgreSQL     | 15     | 关系数据库                 |
-| Redis          | 7      | 缓存 / 限流 / Token 黑名单 |
-| MinIO          | latest | 对象存储                   |
-| Nginx          | -      | 反向代理（可选）           |
-| Docker Compose | 2.0+   | 容器编排                   |
+| 组件           | 版本   | 用途                                       |
+| -------------- | ------ | ------------------------------------------ |
+| PostgreSQL     | 15     | 关系数据库                                 |
+| Redis          | 7      | 缓存 / 限流 / Token 黑名单 / Celery Broker |
+| MinIO          | latest | 对象存储                                   |
+| Nginx          | -      | 反向代理（可选）                           |
+| Docker Compose | 2.0+   | 容器编排                                   |
 
 ## 项目结构
 
@@ -48,12 +49,13 @@ JinDou-Cloud/
 │   │   ├── api/v1/             # API 路由
 │   │   │   ├── endpoints/      # auth, files, folders, shares, users, admin, health
 │   │   │   └── api.py          # 路由聚合
-│   │   ├── core/               # config, security, storage, logging, redis, alerting
+│   │   ├── core/               # config, security, storage, logging, redis, alerting, celery_app
 │   │   ├── db/                 # 数据库引擎与会话
 │   │   ├── middleware/         # rate_limit, request_logging, security_headers
 │   │   ├── models/             # SQLAlchemy 模型（user, file, folder, share）
 │   │   ├── schemas/            # Pydantic 请求/响应模型
 │   │   ├── services/           # 业务逻辑层
+│   │   ├── tasks/              # Celery 异步任务（email, backup, thumbnail, alert）
 │   │   └── main.py             # 应用入口
 │   ├── alembic/                # 数据库迁移
 │   ├── tests/                  # 测试套件（162 个测试）
@@ -189,6 +191,15 @@ docker compose logs -f backend
 | `BACKUP_CRON`           | 备份 Cron 表达式           | `0 3 * * *` |
 | `BACKUP_ENCRYPT_KEY`    | 备份加密密钥（留空不加密） | -           |
 
+### Celery 异步任务队列
+
+| 配置项                      | 说明                                            | 默认值 |
+| --------------------------- | ----------------------------------------------- | ------ |
+| `CELERY_BROKER_URL`         | Broker URL（留空自动从 `REDIS_URL` 派生 DB1）   | -      |
+| `CELERY_RESULT_BACKEND_URL` | 结果后端 URL（留空自动从 `REDIS_URL` 派生 DB2） | -      |
+| `CELERY_TASK_ALWAYS_EAGER`  | Eager 模式（同步执行，仅开发/测试用）           | false  |
+| `CELERY_CONCURRENCY`        | Worker 并发数                                   | 4      |
+
 ### 性能与安全
 
 | 配置项                     | 说明                         | 默认值 |
@@ -242,15 +253,16 @@ curl -sI https://your-domain.com | grep -i strict-transport-security
 
 ## API 概览
 
-| 模块     | 路径前缀          | 主要功能                                   |
-| -------- | ----------------- | ------------------------------------------ |
-| 认证     | `/api/v1/auth`    | 登录、注册、刷新 Token、忘记密码、密保问题 |
-| 用户     | `/api/v1/users`   | 用户信息、修改资料、修改密码、存储统计     |
-| 文件     | `/api/v1/files`   | 上传、下载、删除、预览、搜索、移动、回收站 |
-| 文件夹   | `/api/v1/folders` | 创建、重命名、删除、列表                   |
-| 分享     | `/api/v1/shares`  | 创建分享、提取码验证、公开访问             |
-| 管理     | `/api/v1/admin`   | 系统统计、用户管理、备份管理               |
-| 健康检查 | `/health`         | 各组件状态与延迟探测                       |
+| 模块     | 路径前缀              | 主要功能                                         |
+| -------- | --------------------- | ------------------------------------------------ |
+| 认证     | `/api/v1/auth`        | 登录、注册、刷新 Token、忘记密码、密保问题       |
+| 用户     | `/api/v1/users`       | 用户信息、修改资料、修改密码、存储统计           |
+| 文件     | `/api/v1/files`       | 上传、下载、删除、预览、搜索、移动、回收站       |
+| 文件夹   | `/api/v1/folders`     | 创建、重命名、删除、列表、回收站、恢复、彻底删除 |
+| 分享     | `/api/v1/shares`      | 创建分享、提取码验证、公开访问                   |
+| 管理     | `/api/v1/admin`       | 系统统计、用户管理、备份管理                     |
+| 任务     | `/api/v1/admin/tasks` | 任务状态查询、活跃任务列表                       |
+| 健康检查 | `/health`             | 各组件状态与延迟探测                             |
 
 完整 API 文档：http://localhost:8000/docs
 
@@ -261,6 +273,7 @@ curl -sI https://your-domain.com | grep -i strict-transport-security
 - **系统统计**：用户数、存储使用量、文件数
 - **用户管理**：查看/搜索用户、调整存储配额、启用/禁用账号
 - **备份管理**：查看备份列表、手动触发备份、下载备份文件
+- **任务管理**：查询异步任务状态、查看活跃任务列表
 
 > 若注册时未生效，检查 `ADMIN_EMAIL` 环境变量是否已传入 backend 容器：
 > `docker compose exec backend env | grep ADMIN_EMAIL`
@@ -355,7 +368,7 @@ ALERT_WEBHOOK_TYPE=dingtalk  # dingtalk/feishu/wechat/generic
 
 - **去重冷却**：同一错误在 `ALERT_COOLDOWN_SECONDS` 内不重复告警
 - **邮件通知**：配置 `ALERT_EMAIL_*` 系列 SMTP 参数
-- **异步发送**：不阻塞请求和日志主流程
+- **异步发送**：通过 Celery Worker 异步执行，不阻塞请求和日志主流程；Worker 不可用时自动降级为同步发送
 
 ## 健康检查
 
@@ -387,13 +400,14 @@ curl http://localhost:8000/health
 - **文件分享**：生成分享链接和提取码，支持一键复制
 - **传输管理**：上传/下载进度追踪，侧边栏红点提示
 - **存储统计**：侧边栏显示已用容量
-- **回收站**：文件恢复、彻底删除
+- **回收站**：文件和文件夹恢复、彻底删除（级联软删除一致性）
 - **响应式设计**：适配平板和手机屏幕
 - **管理后台**：系统统计、用户管理、配额调整、备份管理
 - **用户中心**：头像上传/裁剪、修改用户名/密码
 - **国际化**：简体中文、繁体中文、英文
 - **结构化日志**：JSON 格式、轮转、敏感数据脱敏
 - **自动备份**：PostgreSQL + MinIO 定时备份、GPG 加密
+- **异步任务队列**：Celery + Redis，邮件发送、备份触发、缩略图生成、告警通知异步执行
 - **日志告警**：ERROR 日志通过 Webhook/邮件通知
 - **健康检查**：检测 DB/MinIO/Redis 连通性与延迟
 
@@ -420,6 +434,8 @@ curl http://localhost:8000/health
 | 压缩   | GZip 中间件（≥500B 自动压缩）                                            |
 | 数据库 | 连接池可配置（`pool_size`/`max_overflow`/`pool_timeout`/`pool_recycle`） |
 | 限流   | Redis 滑动窗口限流，按 IP + 路径粒度控制                                 |
+| 任务   | Celery 异步队列，邮件/备份/缩略图/告警不阻塞请求                         |
+| 缩略图 | 图片上传后自动异步生成 256×256 缩略图                                    |
 
 ## 常用命令
 
@@ -446,6 +462,11 @@ docker compose exec backup /scripts/backup.sh                       # 手动备�
 docker compose exec -it backup /scripts/restore.sh <备份目录名>      # 恢复
 ls -la backups/                                                    # 查看备份列表
 
+# ---- Celery Worker ----
+docker compose logs -f celery-worker                               # Worker 日志
+docker compose exec celery-worker celery -A app.core.celery_app:celery_app inspect active  # 活跃任务
+docker compose exec celery-worker celery -A app.core.celery_app:celery_app inspect reserved # 等待任务
+
 # ---- 容器调试 ----
 docker compose exec backend bash
 docker compose exec frontend sh
@@ -458,10 +479,10 @@ curl http://localhost:8000/health
 
 项目使用 Docker Compose 的 **override 机制**区分开发与生产：
 
-| 场景 | 命令                                      | 配置文件                                             | 特点                                        |
-| ---- | ----------------------------------------- | ---------------------------------------------------- | ------------------------------------------- |
-| 开发 | `docker compose up`                       | `docker-compose.yml` + `docker-compose.override.yml` | volume 挂载、热重载、dev 构建目标           |
-| 生产 | `docker compose -f docker-compose.yml up` | 仅 `docker-compose.yml`                              | 构建产物运行、Gunicorn 多 worker、无 volume |
+| 场景 | 命令                                      | 配置文件                                             | 特点                                                      |
+| ---- | ----------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------- |
+| 开发 | `docker compose up`                       | `docker-compose.yml` + `docker-compose.override.yml` | volume 挂载、热重载、dev 构建目标、Celery Eager 模式      |
+| 生产 | `docker compose -f docker-compose.yml up` | 仅 `docker-compose.yml`                              | 构建产物运行、Gunicorn 多 worker、独立 Celery Worker 容器 |
 
 ### 前端开发
 

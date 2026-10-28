@@ -1,9 +1,9 @@
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from threading import Thread
 from loguru import logger
 from app.core.config import settings
+
 
 def _resolve_smtp():
     host = settings.RESET_PASSWORD_SMTP_HOST or settings.ALERT_EMAIL_SMTP_HOST
@@ -13,6 +13,7 @@ def _resolve_smtp():
     from_email = settings.RESET_PASSWORD_FROM_EMAIL or settings.ALERT_EMAIL_FROM
     use_tls = settings.ALERT_EMAIL_USE_TLS
     return host, port, user, password, from_email, use_tls
+
 
 def send_verification_code(to_email: str, code: str) -> None:
     host, port, user, password, from_email, use_tls = _resolve_smtp()
@@ -50,11 +51,7 @@ def send_verification_code(to_email: str, code: str) -> None:
     finally:
         server.quit()
 
-def send_verification_code_async(to_email: str, code: str) -> None:
-    Thread(target=_safe_send, args=(to_email, code), daemon=True).start()
 
-def _safe_send(to_email: str, code: str) -> None:
-    try:
-        send_verification_code(to_email, code)
-    except Exception as e:
-        logger.bind(log_type="email").error(f"发送验证码邮件失败: {e}")
+def send_verification_code_async(to_email: str, code: str) -> None:
+    from app.tasks.email_tasks import send_verification_email
+    send_verification_email.delay(to_email, code)

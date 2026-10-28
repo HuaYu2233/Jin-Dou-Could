@@ -107,6 +107,9 @@ services:
       - ALERT_EMAIL_USE_TLS=${ALERT_EMAIL_USE_TLS:-true}
       - BACKUP_DIR=/backups
       - BACKUP_TRIGGER_CMD=${BACKUP_TRIGGER_CMD:-}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-}
+      - CELERY_RESULT_BACKEND_URL=${CELERY_RESULT_BACKEND_URL:-}
+      - CELERY_TASK_ALWAYS_EAGER=${CELERY_TASK_ALWAYS_EAGER:-false}
     volumes:
       - ./backups:/backups
     ports:
@@ -120,6 +123,60 @@ services:
         condition: service_healthy
     command: >
       sh -c "alembic upgrade head && gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w ${BACKEND_WORKERS:-4} --bind 0.0.0.0:8000 --timeout 120 --graceful-timeout 30"
+
+  # ==================== Celery Worker ====================
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cloud-drive-celery-worker
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-clouduser}:${POSTGRES_PASSWORD:-cloudpass123}@db:5432/${POSTGRES_DB:-clouddrive}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redispass123}@redis:6379/0
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_PUBLIC_ENDPOINT=localhost:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin123}
+      - MINIO_BUCKET=cloud-drive
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY 必须在 .env 中设置}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - BACKUP_DIR=/backups
+      - BACKUP_TRIGGER_CMD=${BACKUP_TRIGGER_CMD:-}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-}
+      - CELERY_RESULT_BACKEND_URL=${CELERY_RESULT_BACKEND_URL:-}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_DIR=${LOG_DIR:-logs}
+      - ALERT_ENABLED=${ALERT_ENABLED:-false}
+      - ALERT_MIN_LEVEL=${ALERT_MIN_LEVEL:-ERROR}
+      - ALERT_COOLDOWN_SECONDS=${ALERT_COOLDOWN_SECONDS:-300}
+      - ALERT_WEBHOOK_URL=${ALERT_WEBHOOK_URL:-}
+      - ALERT_WEBHOOK_TYPE=${ALERT_WEBHOOK_TYPE:-generic}
+      - ALERT_EMAIL_ENABLED=${ALERT_EMAIL_ENABLED:-false}
+      - ALERT_EMAIL_SMTP_HOST=${ALERT_EMAIL_SMTP_HOST:-}
+      - ALERT_EMAIL_SMTP_PORT=${ALERT_EMAIL_SMTP_PORT:-587}
+      - ALERT_EMAIL_SMTP_USER=${ALERT_EMAIL_SMTP_USER:-}
+      - ALERT_EMAIL_SMTP_PASSWORD=${ALERT_EMAIL_SMTP_PASSWORD:-}
+      - ALERT_EMAIL_FROM=${ALERT_EMAIL_FROM:-}
+      - ALERT_EMAIL_TO=${ALERT_EMAIL_TO:-}
+      - ALERT_EMAIL_USE_TLS=${ALERT_EMAIL_USE_TLS:-true}
+      - RESET_PASSWORD_SMTP_HOST=${RESET_PASSWORD_SMTP_HOST:-}
+      - RESET_PASSWORD_SMTP_PORT=${RESET_PASSWORD_SMTP_PORT:-465}
+      - RESET_PASSWORD_SMTP_USER=${RESET_PASSWORD_SMTP_USER:-}
+      - RESET_PASSWORD_SMTP_PASSWORD=${RESET_PASSWORD_SMTP_PASSWORD:-}
+      - RESET_PASSWORD_FROM_EMAIL=${RESET_PASSWORD_FROM_EMAIL:-}
+      - RESET_PASSWORD_FROM_NAME=${RESET_PASSWORD_FROM_NAME:-金斗云盘}
+    volumes:
+      - ./backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    command: >
+      celery -A app.core.celery_app:celery_app worker --loglevel=${LOG_LEVEL:-INFO} --concurrency=${CELERY_CONCURRENCY:-4} --without-heartbeat
 
   # ==================== Next.js 前端 ====================
   frontend:

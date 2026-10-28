@@ -80,6 +80,11 @@ class Settings(BaseSettings):
     ALERT_EMAIL_TO: str = ""
     ALERT_EMAIL_USE_TLS: bool = True
 
+    # Celery
+    CELERY_BROKER_URL: str = ""
+    CELERY_RESULT_BACKEND_URL: str = ""
+    CELERY_TASK_ALWAYS_EAGER: bool = False
+
     @field_validator("SECRET_KEY")
     @classmethod
     def _validate_secret_key(cls, v: str) -> str:

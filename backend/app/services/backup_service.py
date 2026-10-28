@@ -1,7 +1,5 @@
-import asyncio
 import json
 import shutil
-import time
 from pathlib import Path
 from app.core.config import settings
 from app.schemas.backup import BackupInfo, BackupFile, BackupManifest
@@ -95,20 +93,8 @@ def get_backup_file_path(timestamp: str, filename: str) -> Path | None:
     return file_path
 
 async def trigger_backup() -> str:
-    if settings.BACKUP_TRIGGER_CMD:
-        proc = await asyncio.create_subprocess_shell(
-            settings.BACKUP_TRIGGER_CMD,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        await proc.communicate()
-        if proc.returncode != 0:
-            raise RuntimeError(f"备份命令执行失败 (exit={proc.returncode})")
-        return "backup triggered"
-
-    trigger_dir = _backup_root()
-    trigger_file = trigger_dir / f".trigger_{int(time.time())}"
-    trigger_file.write_text("trigger")
+    from app.tasks.backup_tasks import trigger_backup as celery_trigger_backup
+    celery_trigger_backup.delay()
     return "backup triggered"
 
 def delete_backup(timestamp: str) -> bool:

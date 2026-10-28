@@ -159,6 +159,14 @@ async def create_file(
     db.add(file)
     await db.commit()
     await db.refresh(file)
+
+    if file.file_type == "image":
+        try:
+            from app.tasks.thumbnail_tasks import generate_thumbnail
+            generate_thumbnail.delay(storage_key, str(file_id))
+        except Exception:
+            pass
+
     return file
 
 async def get_file(
