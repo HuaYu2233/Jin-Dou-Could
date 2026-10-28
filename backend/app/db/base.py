@@ -1,4 +1,6 @@
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy import create_engine as _create_engine
+from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 from app.db.base_class import Base
 
@@ -19,6 +21,13 @@ engine = create_async_engine(
     pool_recycle=settings.DB_POOL_RECYCLE,
 )
 AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+_sync_url = settings.DATABASE_URL.replace("+asyncpg", "+psycopg2").replace("+asyncpg", "")
+try:
+    sync_engine = _create_engine(_sync_url, pool_size=3, max_overflow=2, pool_pre_ping=True)
+    sync_session_factory = sessionmaker(bind=sync_engine, expire_on_commit=False)
+except Exception:
+    sync_session_factory = None
 
 async def get_db():
     async with AsyncSessionLocal() as session:

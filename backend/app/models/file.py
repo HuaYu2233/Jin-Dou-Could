@@ -24,6 +24,7 @@ class File(Base):
     mime_type: Mapped[str] = mapped_column(String(255))
     file_type: Mapped[str] = mapped_column(String(50))
     status: Mapped[str] = mapped_column(String(20), default="ready")
+    thumbnail_key: Mapped[str | None] = mapped_column(String(512), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

@@ -50,6 +50,9 @@ def generate_thumbnail(self, storage_key: str, file_id: str) -> str | None:
             content_type="image/jpeg",
         )
         logger.bind(log_type="thumbnail").info(f"缩略图已生成: {thumb_key}")
+
+        _update_thumbnail_key(file_id, thumb_key)
+
         return thumb_key
 
     except ImportError:
@@ -61,3 +64,19 @@ def generate_thumbnail(self, storage_key: str, file_id: str) -> str | None:
             raise self.retry(exc=exc)
         except self.MaxRetriesExceededError:
             return None
+
+
+def _update_thumbnail_key(file_id: str, thumb_key: str) -> None:
+    try:
+        import asyncio
+        from app.db.base import sync_session_factory
+        from app.models.file import File
+        from sqlalchemy import update
+
+        with sync_session_factory() as session:
+            stmt = update(File).where(File.id == file_id).values(thumbnail_key=thumb_key)
+            session.execute(stmt)
+            session.commit()
+        logger.bind(log_type="thumbnail").info(f"已更新 thumbnail_key: file_id={file_id}")
+    except Exception as exc:
+        logger.bind(log_type="thumbnail").warning(f"更新 thumbnail_key 失败: {exc}")

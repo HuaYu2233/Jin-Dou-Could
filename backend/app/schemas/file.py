@@ -9,6 +9,7 @@ class FileResponse(BaseModel):
     mime_type: str
     file_type: str
     status: str
+    thumbnail_key: str | None = None
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None = None

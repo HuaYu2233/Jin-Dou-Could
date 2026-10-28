@@ -122,6 +122,22 @@ async def preview_file(
     return {"url": url}
 
 
+@router.get("/{file_id}/thumbnail")
+async def get_thumbnail(
+    file_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    file = await file_service.get_file(db, file_id, current_user.id)
+    if not file:
+        raise HTTPException(status_code=404, detail="文件不存在")
+    if file.thumbnail_key:
+        url = await file_service.get_thumbnail_url(file.thumbnail_key)
+        return {"url": url, "has_thumbnail": True}
+    url = await file_service.get_preview_url(file)
+    return {"url": url, "has_thumbnail": False}
+
+
 @router.get("/{file_id}/download")
 async def download_file(
     file_id: UUID,

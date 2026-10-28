@@ -8,6 +8,7 @@ export interface FileItem {
   mime_type: string;
   file_type: string;
   status: string;
+  thumbnail_key: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -94,6 +95,10 @@ export async function getFileDownloadUrl(id: string): Promise<string> {
 export async function getFilePreviewUrl(id: string): Promise<string> {
   const { url } = await client<{ url: string }>(`/api/v1/files/${id}/preview`);
   return url;
+}
+
+export async function getFileThumbnailUrl(id: string): Promise<{ url: string; has_thumbnail: boolean }> {
+  return client<{ url: string; has_thumbnail: boolean }>(`/api/v1/files/${id}/thumbnail`);
 }
 
 export async function downloadFile(id: string): Promise<void> {

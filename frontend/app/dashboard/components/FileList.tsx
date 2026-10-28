@@ -1,10 +1,10 @@
 // /Users/zero/project/JinDou-Cloud/frontend/app/dashboard/components/FileList.tsx
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { VirtuosoGrid, TableVirtuoso } from "react-virtuoso";
 import type { FileItem, FolderItem, FolderTrashItem } from "@/lib/api/files";
-import { getFilePreviewUrl } from "@/lib/api/files";
+import { getFileThumbnailUrl, getFilePreviewUrl } from "@/lib/api/files";
 import type { ViewMode } from "../types";
 import styles from "./FileList.module.css";
 
@@ -59,32 +59,63 @@ function getFileIcon(fileType: string, mimeType: string): string {
 }
 
 function Thumbnail({ file, variant = "grid" }: { file: FileItem; variant?: "grid" | "list" }) {
-  const [url, setUrl] = useState<string | null>(null);
+  const [thumbUrl, setThumbUrl] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   const isList = variant === "list";
+  const imgRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
     if (file.file_type !== "image" || failed) return;
     let active = true;
-    getFilePreviewUrl(file.id)
-      .then((previewUrl) => {
-        if (active) setUrl(previewUrl);
-      })
-      .catch(() => {
-        if (active) setFailed(true);
-      });
-    return () => {
-      active = false;
-    };
-  }, [file.id, file.file_type, failed]);
+
+    if (file.thumbnail_key) {
+      getFileThumbnailUrl(file.id)
+        .then(({ url }) => {
+          if (active) setThumbUrl(url);
+        })
+        .catch(() => {
+          if (active) setFailed(true);
+        });
+    } else {
+      getFilePreviewUrl(file.id)
+        .then((url) => {
+          if (active) setThumbUrl(url);
+        })
+        .catch(() => {
+          if (active) setFailed(true);
+        });
+    }
+
+    return () => { active = false; };
+  }, [file.id, file.file_type, file.thumbnail_key, failed]);
+
+  const handleLoad = useCallback(() => setLoaded(true), []);
 
   if (file.file_type !== "image" || failed) {
     return <span className={isList ? styles.fileIcon : styles.gridIcon}>{getFileIcon(file.file_type, file.mime_type)}</span>;
   }
-  if (!url) {
-    return <span className={isList ? styles.fileIcon : styles.gridIcon}>⏳</span>;
+
+  if (!thumbUrl) {
+    return (
+      <div className={isList ? styles.listThumbSkeleton : styles.gridThumbSkeleton}>
+        <div className={styles.shimmer} />
+      </div>
+    );
   }
-  return <img className={isList ? styles.listThumbnail : styles.gridThumbnail} src={url} alt={file.filename} loading="lazy" />;
+
+  return (
+    <div className={isList ? styles.listThumbWrap : styles.gridThumbWrap}>
+      <img
+        ref={imgRef}
+        className={`${isList ? styles.listThumbnail : styles.gridThumbnail} ${loaded ? styles.thumbLoaded : styles.thumbBlur}`}
+        src={thumbUrl}
+        alt={file.filename}
+        loading="lazy"
+        onLoad={handleLoad}
+      />
+    </div>
+  );
 }
 
 export default function FileList({

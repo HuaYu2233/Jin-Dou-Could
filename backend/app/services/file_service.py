@@ -503,6 +503,12 @@ async def get_preview_url(file: File) -> str:
     )
 
 
+async def get_thumbnail_url(thumbnail_key: str) -> str:
+    return await get_presigned_preview_url(
+        thumbnail_key, "image/jpeg", "thumbnail.jpg", settings.MINIO_DOWNLOAD_EXPIRES
+    )
+
+
 async def get_download_url(file: File) -> str:
     return await get_presigned_download_url(
         file.storage_key, settings.MINIO_DOWNLOAD_EXPIRES, file.filename
