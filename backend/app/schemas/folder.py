@@ -22,6 +22,18 @@ class FolderResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class FolderTrashResponse(BaseModel):
+    id: UUID
+    owner_id: UUID
+    parent_id: UUID | None
+    name: str
+    deleted_at: datetime
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
 class FolderBreadcrumbItem(BaseModel):
     id: str | None = None
     name: str
@@ -32,3 +44,7 @@ class FolderListResponse(BaseModel):
     files: list[FileResponse]
     breadcrumbs: list[FolderBreadcrumbItem]
     total_files: int
+
+class FolderTrashListResponse(BaseModel):
+    items: list[FolderTrashResponse]
+    total: int

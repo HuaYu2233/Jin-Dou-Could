@@ -1,9 +1,8 @@
-
 # /Users/zero/project/JinDou-Cloud/backend/app/api/v1/endpoints/folders.py
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, invalidate_user_cache
 from app.db.base import get_db
 from app.models.user import User
 from app.services import folder_service
@@ -12,6 +11,8 @@ from app.schemas.folder import (
     FolderRenameRequest,
     FolderResponse,
     FolderListResponse,
+    FolderTrashListResponse,
+    FolderTrashResponse,
 )
 from app.schemas.file import FileResponse
 
@@ -70,4 +71,44 @@ async def delete_folder(
     deleted = await folder_service.delete_folder(db, folder_id, current_user.id)
     if not deleted:
         raise HTTPException(status_code=404, detail="文件夹不存在")
-    return {"message": "文件夹已删除"}
+    await invalidate_user_cache(current_user.id)
+    return {"message": "文件夹已移入回收站"}
+
+@router.get("/trash", response_model=FolderTrashListResponse)
+async def list_trash_folders(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    folders, total = await folder_service.list_trash_folders(
+        db, current_user.id, skip, limit
+    )
+    return {
+        "items": [FolderTrashResponse.model_validate(f) for f in folders],
+        "total": total,
+    }
+
+@router.post("/{folder_id}/restore")
+async def restore_folder(
+    folder_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    restored = await folder_service.restore_folder(db, folder_id, current_user.id)
+    if not restored:
+        raise HTTPException(status_code=404, detail="文件夹不存在或不在回收站")
+    await invalidate_user_cache(current_user.id)
+    return {"message": "文件夹已恢复"}
+
+@router.delete("/{folder_id}/purge")
+async def purge_folder(
+    folder_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    purged = await folder_service.purge_folder(db, folder_id, current_user.id)
+    if not purged:
+        raise HTTPException(status_code=404, detail="文件夹不存在或不在回收站")
+    await invalidate_user_cache(current_user.id)
+    return {"message": "文件夹已彻底删除"}

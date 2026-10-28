@@ -1,11 +1,14 @@
-
 # /Users/zero/project/JinDou-Cloud/backend/app/services/folder_service.py
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
+from sqlalchemy.orm import selectinload
 from app.models.folder import Folder
 from app.models.file import File
+from app.models.user import User
+from app.core.storage import delete_file as s3_delete_file
+
 
 async def create_folder(
     db: AsyncSession,
@@ -40,6 +43,7 @@ async def create_folder(
     await db.refresh(folder)
     return folder
 
+
 async def _get_folder(
     db: AsyncSession, folder_id: uuid.UUID, owner_id: uuid.UUID
 ) -> Folder | None:
@@ -51,6 +55,39 @@ async def _get_folder(
         )
     )
     return result.scalar_one_or_none()
+
+
+async def _get_trashed_folder(
+    db: AsyncSession, folder_id: uuid.UUID, owner_id: uuid.UUID
+) -> Folder | None:
+    result = await db.execute(
+        select(Folder).where(
+            Folder.id == folder_id,
+            Folder.owner_id == owner_id,
+            Folder.deleted_at.is_not(None),
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def _collect_subfolder_ids(
+    db: AsyncSession, folder_id: uuid.UUID, owner_id: uuid.UUID
+) -> list[uuid.UUID]:
+    ids = []
+    stack = [folder_id]
+    while stack:
+        current = stack.pop()
+        ids.append(current)
+        result = await db.execute(
+            select(Folder.id).where(
+                Folder.parent_id == current,
+                Folder.owner_id == owner_id,
+            )
+        )
+        child_ids = [row[0] for row in result.all()]
+        stack.extend(child_ids)
+    return ids
+
 
 async def rename_folder(
     db: AsyncSession,
@@ -66,15 +103,140 @@ async def rename_folder(
     await db.refresh(folder)
     return folder
 
+
 async def delete_folder(
     db: AsyncSession, folder_id: uuid.UUID, owner_id: uuid.UUID
 ) -> bool:
     folder = await _get_folder(db, folder_id, owner_id)
     if not folder:
         return False
-    folder.deleted_at = datetime.now(timezone.utc)
+
+    now = datetime.now(timezone.utc)
+    all_folder_ids = await _collect_subfolder_ids(db, folder_id, owner_id)
+
+    await db.execute(
+        update(Folder)
+        .where(Folder.id.in_(all_folder_ids), Folder.deleted_at.is_(None))
+        .values(deleted_at=now)
+    )
+    await db.execute(
+        update(File)
+        .where(File.folder_id.in_(all_folder_ids), File.deleted_at.is_(None))
+        .values(deleted_at=now)
+    )
+
     await db.commit()
     return True
+
+
+async def list_trash_folders(
+    db: AsyncSession,
+    owner_id: uuid.UUID,
+    skip: int = 0,
+    limit: int = 20,
+) -> tuple[list[Folder], int]:
+    count_result = await db.execute(
+        select(func.count()).select_from(Folder).where(
+            Folder.owner_id == owner_id,
+            Folder.deleted_at.is_not(None),
+        )
+    )
+    total = count_result.scalar_one()
+
+    result = await db.execute(
+        select(Folder)
+        .where(Folder.owner_id == owner_id, Folder.deleted_at.is_not(None))
+        .order_by(Folder.deleted_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    folders = list(result.scalars().all())
+    return folders, total
+
+
+async def restore_folder(
+    db: AsyncSession, folder_id: uuid.UUID, owner_id: uuid.UUID
+) -> bool:
+    folder = await _get_trashed_folder(db, folder_id, owner_id)
+    if not folder:
+        return False
+
+    if folder.parent_id is not None:
+        parent_result = await db.execute(
+            select(Folder).where(
+                Folder.id == folder.parent_id,
+                Folder.owner_id == owner_id,
+                Folder.deleted_at.is_(None),
+            )
+        )
+        if parent_result.scalar_one_or_none() is None:
+            return False
+
+    all_folder_ids = await _collect_subfolder_ids(db, folder_id, owner_id)
+
+    await db.execute(
+        update(Folder)
+        .where(Folder.id.in_(all_folder_ids), Folder.deleted_at.is_not(None))
+        .values(deleted_at=None)
+    )
+    await db.execute(
+        update(File)
+        .where(File.folder_id.in_(all_folder_ids), File.deleted_at.is_not(None))
+        .values(deleted_at=None)
+    )
+
+    await db.commit()
+    return True
+
+
+async def purge_folder(
+    db: AsyncSession, folder_id: uuid.UUID, owner_id: uuid.UUID
+) -> bool:
+    folder = await _get_trashed_folder(db, folder_id, owner_id)
+    if not folder:
+        return False
+
+    all_folder_ids = await _collect_subfolder_ids(db, folder_id, owner_id)
+
+    files_result = await db.execute(
+        select(File).where(
+            File.folder_id.in_(all_folder_ids),
+            File.deleted_at.is_not(None),
+        )
+    )
+    files_to_purge = list(files_result.scalars().all())
+
+    total_size = 0
+    for file in files_to_purge:
+        try:
+            await s3_delete_file(file.storage_key)
+        except Exception:
+            pass
+        total_size += file.size
+
+    for file in files_to_purge:
+        await db.delete(file)
+
+    subfolders_result = await db.execute(
+        select(Folder).where(
+            Folder.id.in_(all_folder_ids),
+            Folder.id != folder_id,
+        )
+    )
+    for subfolder in subfolders_result.scalars().all():
+        await db.delete(subfolder)
+
+    await db.delete(folder)
+
+    if total_size > 0:
+        owner_result = await db.execute(select(User).where(User.id == owner_id))
+        owner = owner_result.scalar_one_or_none()
+        if owner:
+            owner.used_storage = max(0, owner.used_storage - total_size)
+
+    await db.commit()
+    return True
+
 
 async def list_folder_contents(
     db: AsyncSession,
@@ -119,6 +281,7 @@ async def list_folder_contents(
         "total_files": total_files,
     }
 
+
 async def _get_breadcrumbs(
     db: AsyncSession, folder_id: uuid.UUID | None, owner_id: uuid.UUID
 ) -> list:
@@ -142,6 +305,7 @@ async def _get_breadcrumbs(
     for folder in chain:
         breadcrumbs.append({"id": str(folder.id), "name": folder.name, "path": f"/folder/{folder.id}"})
     return breadcrumbs
+
 
 async def get_folder_path(
     db: AsyncSession, folder_id: uuid.UUID | None, owner_id: uuid.UUID

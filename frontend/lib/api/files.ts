@@ -233,6 +233,34 @@ export async function deleteFolder(folderId: string): Promise<void> {
   return client<void>(`/api/v1/folders/${folderId}`, { method: "DELETE" });
 }
 
+export interface FolderTrashItem {
+  id: string;
+  owner_id: string;
+  parent_id: string | null;
+  name: string;
+  deleted_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FolderTrashListResponse {
+  items: FolderTrashItem[];
+  total: number;
+}
+
+export async function listTrashFolders(skip = 0, limit = 20): Promise<FolderTrashListResponse> {
+  const params = new URLSearchParams({ skip: String(skip), limit: String(limit) });
+  return client<FolderTrashListResponse>(`/api/v1/folders/trash?${params}`);
+}
+
+export async function restoreFolder(folderId: string): Promise<void> {
+  return client<void>(`/api/v1/folders/${folderId}/restore`, { method: "POST" });
+}
+
+export async function purgeFolder(folderId: string): Promise<void> {
+  return client<void>(`/api/v1/folders/${folderId}/purge`, { method: "DELETE" });
+}
+
 export interface ShareCreateResponse {
   id: string;
   share_token: string;

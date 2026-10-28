@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { FileItem, FolderItem } from "@/lib/api/files";
+import type { FileItem, FolderItem, FolderTrashItem } from "@/lib/api/files";
 import { getFilePreviewUrl } from "@/lib/api/files";
 import type { ViewMode } from "../types";
 import styles from "./FileList.module.css";
@@ -10,6 +10,7 @@ import styles from "./FileList.module.css";
 interface FileListProps {
   files: FileItem[];
   folders?: FolderItem[];
+  trashedFolders?: FolderTrashItem[];
   viewMode: ViewMode;
   loading: boolean;
   selectedIds: Set<string>;
@@ -20,6 +21,8 @@ interface FileListProps {
   onRenameFolder?: (folder: FolderItem) => void;
   onDeleteFolder?: (folder: FolderItem) => void;
   onMoveToFolder?: (fileIds: string[], folderId: string | null) => void;
+  onRestoreFolder?: (folder: FolderTrashItem) => void;
+  onPurgeFolder?: (folder: FolderTrashItem) => void;
 }
 
 function formatSize(bytes: number): string {
@@ -81,6 +84,7 @@ function Thumbnail({ file, variant = "grid" }: { file: FileItem; variant?: "grid
 export default function FileList({
   files,
   folders,
+  trashedFolders,
   viewMode,
   loading,
   selectedIds,
@@ -91,6 +95,8 @@ export default function FileList({
   onRenameFolder,
   onDeleteFolder,
   onMoveToFolder,
+  onRestoreFolder,
+  onPurgeFolder,
 }: FileListProps) {
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
 
@@ -123,7 +129,7 @@ export default function FileList({
     );
   }
 
-  if (files.length === 0 && (!folders || folders.length === 0)) {
+  if (files.length === 0 && (!folders || folders.length === 0) && (!trashedFolders || trashedFolders.length === 0)) {
     return (
       <div className={styles.emptyState}>
         <div className={styles.emptyIcon}>📁</div>
@@ -145,6 +151,16 @@ export default function FileList({
             onDragOver={(e) => handleFolderDragOver(e, folder.id)}
             onDragLeave={() => setDragOverFolderId(null)}
             onDrop={(e) => handleFolderDrop(e, folder.id)}
+          >
+            <div className={styles.gridIcon}>📁</div>
+            <div className={styles.gridName} title={folder.name}>{folder.name}</div>
+            <div className={styles.gridSize}>文件夹</div>
+          </div>
+        ))}
+        {trashedFolders?.map((folder) => (
+          <div
+            key={`trashed-folder-${folder.id}`}
+            className={styles.gridItem}
           >
             <div className={styles.gridIcon}>📁</div>
             <div className={styles.gridName} title={folder.name}>{folder.name}</div>
@@ -207,6 +223,31 @@ export default function FileList({
               </button>
               <button className={styles.rowActionBtn} onClick={(e) => { e.stopPropagation(); onDeleteFolder?.(folder); }}>
                 删除
+              </button>
+            </td>
+          </tr>
+        ))}
+        {trashedFolders?.map((folder) => (
+          <tr
+            key={`trashed-folder-${folder.id}`}
+            className={styles.tableRow}
+          >
+            <td className={styles.checkboxCol}></td>
+            <td className={styles.nameCol}>
+              <div className={styles.fileNameCell}>
+                <span className={styles.fileIcon}>📁</span>
+                <span className={styles.fileName} title={folder.name}>{folder.name}</span>
+              </div>
+            </td>
+            <td className={styles.sizeCol}>—</td>
+            <td className={styles.typeCol}>文件夹</td>
+            <td className={styles.dateCol}>{formatDate(folder.deleted_at)}</td>
+            <td className={styles.actionCol}>
+              <button className={styles.rowActionBtn} onClick={(e) => { e.stopPropagation(); onRestoreFolder?.(folder); }}>
+                恢复
+              </button>
+              <button className={styles.rowActionBtn} onClick={(e) => { e.stopPropagation(); onPurgeFolder?.(folder); }}>
+                彻底删除
               </button>
             </td>
           </tr>

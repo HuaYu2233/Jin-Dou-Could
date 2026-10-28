@@ -42,7 +42,7 @@ export default function DashboardPage() {
   };
 
   const {
-    files, folders, total, page, loading, error, breadcrumbs,
+    files, folders, trashedFolders, total, page, loading, error, breadcrumbs,
     keyword, currentFolderId,
     PAGE_SIZE,
     setPage, setKeyword, setError, setCurrentFolderId, setTotal,
@@ -61,6 +61,8 @@ export default function DashboardPage() {
     handleMoveToFolder,
     handleFolderDialogSubmit,
     handleDeleteFolder,
+    handleRestoreFolder,
+    handlePurgeFolder,
   } = useFileOperations({
     selectedIds,
     currentFolderId,
@@ -175,12 +177,15 @@ export default function DashboardPage() {
           {category === "trash" ? (
             <FileList
               files={files}
+              trashedFolders={trashedFolders}
               viewMode={viewMode}
               loading={loading}
               selectedIds={selectedIds}
               onToggleSelect={toggleSelect}
               onDownload={() => {}}
               onPreview={() => {}}
+              onRestoreFolder={handleRestoreFolder}
+              onPurgeFolder={handlePurgeFolder}
             />
           ) : category === "shares" ? (
             <div className="p-6">

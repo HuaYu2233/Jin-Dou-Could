@@ -12,8 +12,11 @@ import {
   createFolder,
   renameFolder,
   deleteFolder,
+  restoreFolder,
+  purgeFolder,
   type FileItem,
   type FolderItem,
+  type FolderTrashItem,
   type ShareCreateResponse,
 } from "@/lib/api/files";
 import { useTransferStore } from "@/stores/transfers";
@@ -200,13 +203,36 @@ export function useFileOperations({
   }
 
   async function handleDeleteFolder(folder: FolderItem) {
-    if (!confirm(`确定删除文件夹「${folder.name}」吗？文件夹内所有内容将被永久删除，此操作不可恢复！`)) return;
+    if (!confirm(`确定将文件夹「${folder.name}」移入回收站吗？文件夹内所有内容将一并移入回收站。`)) return;
     setError("");
     try {
       await deleteFolder(folder.id);
       await loadFiles();
     } catch (err) {
       setError(err instanceof Error ? err.message : "删除文件夹失败");
+    }
+  }
+
+  async function handleRestoreFolder(folder: FolderTrashItem) {
+    setError("");
+    try {
+      await restoreFolder(folder.id);
+      await loadFiles();
+      fetchMe();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "恢复文件夹失败");
+    }
+  }
+
+  async function handlePurgeFolder(folder: FolderTrashItem) {
+    if (!confirm(`确定彻底删除文件夹「${folder.name}」吗？文件夹内所有内容将被永久删除，此操作不可恢复！`)) return;
+    setError("");
+    try {
+      await purgeFolder(folder.id);
+      await loadFiles();
+      fetchMe();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "彻底删除文件夹失败");
     }
   }
 
@@ -223,5 +249,7 @@ export function useFileOperations({
     handleMoveToFolder,
     handleFolderDialogSubmit,
     handleDeleteFolder,
+    handleRestoreFolder,
+    handlePurgeFolder,
   };
 }

@@ -4,10 +4,12 @@ import { useState, useEffect, useCallback } from "react";
 import {
   listFiles,
   listTrashFiles,
+  listTrashFolders,
   searchFiles,
   listFolderContents,
   type FileItem,
   type FolderItem,
+  type FolderTrashItem,
 } from "@/lib/api/files";
 import type { CategoryId, BreadcrumbItem } from "../types";
 
@@ -20,6 +22,7 @@ export function useFileList(category: CategoryId) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [folders, setFolders] = useState<FolderItem[]>([]);
+  const [trashedFolders, setTrashedFolders] = useState<FolderTrashItem[]>([]);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [keyword, setKeyword] = useState("");
   const [debouncedKeyword, setDebouncedKeyword] = useState("");
@@ -34,6 +37,7 @@ export function useFileList(category: CategoryId) {
     setError("");
     setFiles([]);
     setFolders([]);
+    setTrashedFolders([]);
     setTotal(0);
     try {
       if (debouncedKeyword) {
@@ -50,10 +54,14 @@ export function useFileList(category: CategoryId) {
         setBreadcrumbs(res.breadcrumbs.map((b) => ({ ...b, id: b.id ?? "root" })));
         setTotal(res.total_files);
       } else if (category === "trash") {
-        const res = await listTrashFiles((page - 1) * PAGE_SIZE, PAGE_SIZE);
+        const [fileRes, folderRes] = await Promise.all([
+          listTrashFiles((page - 1) * PAGE_SIZE, PAGE_SIZE),
+          listTrashFolders((page - 1) * PAGE_SIZE, PAGE_SIZE),
+        ]);
         if (!active) return;
-        setFiles(res.items);
-        setTotal(res.total);
+        setFiles(fileRes.items);
+        setTrashedFolders(folderRes.items);
+        setTotal(fileRes.total + folderRes.total);
         setFolders([]);
       } else {
         const res = await listFiles((page - 1) * PAGE_SIZE, PAGE_SIZE, category);
@@ -83,7 +91,7 @@ export function useFileList(category: CategoryId) {
   }, [category, page, currentFolderId, debouncedKeyword, loadFiles]);
 
   return {
-    files, folders, total, page, loading, error, breadcrumbs,
+    files, folders, trashedFolders, total, page, loading, error, breadcrumbs,
     keyword, currentFolderId,
     PAGE_SIZE,
     setPage, setKeyword, setError, setCurrentFolderId, setTotal,
