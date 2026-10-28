@@ -510,4 +510,63 @@ docker compose exec backend alembic upgrade head                       # 执行�
 docker compose exec backend pytest tests/ -v                           # 运行测试
 ```
 
+## CI/CD
+
+项目使用 GitHub Actions 实现自动化流水线，配置文件位于 `.github/workflows/ci.yml`。
+
+### 流水线阶段
+
+```
+┌─────────────┐  ┌─────────────┐  ┌──────────────┐
+│ Backend Lint │  │ Backend TC  │  │ Backend Test │
+│   (ruff)     │  │  (pyright)  │  │   (pytest)   │
+└──────┬───────┘  └──────┬──────┘  └──────┬───────┘
+       │                 │                 │
+┌──────┴───────┐  ┌──────┴──────┐  ┌──────┴───────┐
+│ Frontend Lint│  │ Frontend TC │  │ Frontend Test│
+│  (eslint)    │  │  (tsc)      │  │  (vitest)    │
+└──────┬───────┘  └──────┬──────┘  └──────┬───────┘
+       │                 │                 │
+       └────────┬───────┴────────┬───────┘
+                │                │
+         ┌──────┴──────┐  ┌─────┴──────┐
+         │ Docker Build│  │   Deploy   │
+         │ (3 images)  │→ │ (master)   │
+         └─────────────┘  └────────────┘
+```
+
+| 阶段               | 触发条件         | 内容                                      |
+| ------------------ | ---------------- | ----------------------------------------- |
+| Backend Lint       | push/PR          | `ruff check` + `ruff format --check`      |
+| Backend TypeCheck  | push/PR          | `pyright` 类型检查                        |
+| Backend Test       | push/PR          | `pytest` 162 个测试                       |
+| Frontend Lint      | push/PR          | `next lint` (ESLint)                      |
+| Frontend TypeCheck | push/PR          | `tsc --noEmit`                            |
+| Frontend Test      | push/PR          | `vitest run` 28 个测试                    |
+| Docker Build       | Lint+Test 通过   | 构建 backend / frontend / backup 三个镜像 |
+| Deploy             | master/main 分支 | 推送镜像到 Docker Hub + SSH 部署          |
+
+### 配置 Secrets
+
+在 GitHub 仓库 Settings → Secrets and variables → Actions 中添加：
+
+| Secret               | 说明                    |
+| -------------------- | ----------------------- |
+| `DOCKERHUB_USERNAME` | Docker Hub 用户名       |
+| `DOCKERHUB_TOKEN`    | Docker Hub Access Token |
+| `DEPLOY_HOST`        | 部署服务器 IP/域名      |
+| `DEPLOY_USER`        | SSH 登录用户名          |
+| `DEPLOY_SSH_KEY`     | SSH 私钥                |
+| `DEPLOY_PATH`        | 服务器上项目路径        |
+
+### 并发控制
+
+同一分支的多次推送会自动取消前序运行中的流水线（`concurrency: cancel-in-progress`），避免重复构建浪费资源。
+
+### 缓存策略
+
+- **uv 缓存**：后端依赖通过 `setup-uv` 的 `enable-cache` 缓存
+- **npm 缓存**：前端依赖通过 `setup-node` 的 `cache: npm` 缓存
+- **Docker 缓存**：构建层通过 GitHub Actions Cache（`type=gha`）缓存，跨运行复用
+
 ## License
