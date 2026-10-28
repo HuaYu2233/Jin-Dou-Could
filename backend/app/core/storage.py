@@ -4,6 +4,7 @@ from app.core.config import settings
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from urllib.parse import quote
+from loguru import logger
 import io
 import asyncio
 
@@ -14,31 +15,66 @@ _s3_config = Config(
 
 _session = aiobotocore.session.get_session()
 
+_s3_client = None
+_s3_client_ctx = None
+_presigned_client = None
+_presigned_client_ctx = None
+_init_lock = asyncio.Lock()
+
+
+async def init_s3_clients():
+    global _s3_client, _s3_client_ctx, _presigned_client, _presigned_client_ctx
+    async with _init_lock:
+        if _s3_client is not None:
+            return
+        _s3_client_ctx = _session.create_client(
+            "s3",
+            endpoint_url=f"http://{settings.MINIO_ENDPOINT}",
+            aws_access_key_id=settings.MINIO_ACCESS_KEY,
+            aws_secret_access_key=settings.MINIO_SECRET_KEY,
+            region_name="us-east-1",
+            config=_s3_config,
+        )
+        _s3_client = await _s3_client_ctx.__aenter__()
+
+        _presigned_client_ctx = _session.create_client(
+            "s3",
+            endpoint_url=f"http://{settings.MINIO_PUBLIC_ENDPOINT}",
+            aws_access_key_id=settings.MINIO_ACCESS_KEY,
+            aws_secret_access_key=settings.MINIO_SECRET_KEY,
+            region_name="us-east-1",
+            config=_s3_config,
+        )
+        _presigned_client = await _presigned_client_ctx.__aenter__()
+        logger.info("S3 clients initialized (pooled)")
+
+
+async def close_s3_clients():
+    global _s3_client, _s3_client_ctx, _presigned_client, _presigned_client_ctx
+    async with _init_lock:
+        if _s3_client_ctx is not None:
+            await _s3_client_ctx.__aexit__(None, None, None)
+            _s3_client_ctx = None
+            _s3_client = None
+        if _presigned_client_ctx is not None:
+            await _presigned_client_ctx.__aexit__(None, None, None)
+            _presigned_client_ctx = None
+            _presigned_client = None
+        logger.info("S3 clients closed")
+
 
 @asynccontextmanager
 async def get_s3_client():
-    async with _session.create_client(
-        "s3",
-        endpoint_url=f"http://{settings.MINIO_ENDPOINT}",
-        aws_access_key_id=settings.MINIO_ACCESS_KEY,
-        aws_secret_access_key=settings.MINIO_SECRET_KEY,
-        region_name="us-east-1",
-        config=_s3_config,
-    ) as client:
-        yield client
+    if _s3_client is None:
+        await init_s3_clients()
+    yield _s3_client
 
 
 @asynccontextmanager
 async def get_presigned_s3_client():
-    async with _session.create_client(
-        "s3",
-        endpoint_url=f"http://{settings.MINIO_PUBLIC_ENDPOINT}",
-        aws_access_key_id=settings.MINIO_ACCESS_KEY,
-        aws_secret_access_key=settings.MINIO_SECRET_KEY,
-        region_name="us-east-1",
-        config=_s3_config,
-    ) as client:
-        yield client
+    if _presigned_client is None:
+        await init_s3_clients()
+    yield _presigned_client
 
 
 from minio import Minio

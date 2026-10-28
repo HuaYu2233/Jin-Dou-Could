@@ -179,8 +179,11 @@ class TestUsersEndpoints:
 
 class TestHealthEndpoint:
     def test_health_endpoint(self):
+        mock_s3_client = AsyncMock()
+        mock_s3_client.list_buckets = AsyncMock(return_value=[])
         with patch("app.services.health_service.engine") as mock_engine, \
-             patch("app.services.health_service.get_s3_client") as mock_s3, \
+             patch("app.core.storage._s3_client", mock_s3_client), \
+             patch("app.core.storage._presigned_client", AsyncMock()), \
              patch("app.services.health_service.ping_redis") as mock_ping:
             mock_ping.return_value = True
             mock_engine.connect = AsyncMock()

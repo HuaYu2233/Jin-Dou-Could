@@ -5,7 +5,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 from app.api.v1.api import api_router
 from app.api.v1.endpoints import health
-from app.core.storage import ensure_bucket
+from app.core.storage import ensure_bucket, close_s3_clients
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.middleware.request_logging import RequestLoggingMiddleware
@@ -17,6 +17,7 @@ async def lifespan(app: FastAPI):
     setup_logging()
     await ensure_bucket()
     yield
+    await close_s3_clients()
 
 app = FastAPI(title="Cloud Drive API", lifespan=lifespan)
 
