@@ -245,32 +245,37 @@ async def list_folder_contents(
     skip: int = 0,
     limit: int = 50,
 ) -> dict:
+    folder_filter = (
+        Folder.parent_id == folder_id if folder_id is not None else Folder.parent_id.is_(None)
+    )
+    file_filter = (
+        File.folder_id == folder_id if folder_id is not None else File.folder_id.is_(None)
+    )
+
     folders_result = await db.execute(
         select(Folder).where(
             Folder.owner_id == owner_id,
-            Folder.parent_id == folder_id if folder_id is not None else Folder.parent_id.is_(None),
+            folder_filter,
             Folder.deleted_at.is_(None),
         ).order_by(Folder.name.asc())
     )
     folders = folders_result.scalars().all()
 
-    files_result = await db.execute(
-        select(File).where(
+    files_query = (
+        select(File, func.count().over().label("total"))
+        .where(
             File.owner_id == owner_id,
-            File.folder_id == folder_id if folder_id is not None else File.folder_id.is_(None),
-            File.deleted_at.is_(None),
-        ).order_by(File.created_at.desc()).offset(skip).limit(limit)
-    )
-    files = files_result.scalars().all()
-
-    count_result = await db.execute(
-        select(func.count()).select_from(File).where(
-            File.owner_id == owner_id,
-            File.folder_id == folder_id if folder_id is not None else File.folder_id.is_(None),
+            file_filter,
             File.deleted_at.is_(None),
         )
+        .order_by(File.created_at.desc())
+        .offset(skip)
+        .limit(limit)
     )
-    total_files = count_result.scalar_one()
+    files_result = await db.execute(files_query)
+    rows = files_result.all()
+    total_files = rows[0].total if rows else 0
+    files = [row[0] for row in rows]
 
     breadcrumbs = await _get_breadcrumbs(db, folder_id, owner_id)
 

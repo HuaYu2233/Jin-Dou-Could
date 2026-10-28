@@ -5,6 +5,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base_class import Base
 
+
 class File(Base):
     __tablename__ = "files"
 
@@ -39,4 +40,6 @@ class File(Base):
         Index("ix_files_owner_folder_created", "owner_id", "folder_id", "created_at"),
         Index("ix_files_owner_deleted_at", "owner_id", "deleted_at"),
         Index("ix_files_owner_type_created", "owner_id", "file_type", "created_at"),
+        Index("ix_files_owner_deleted_filename", "owner_id", "deleted_at", "filename"),
+        Index("ix_files_filename_trgm", "filename", postgresql_using="gin", postgresql_ops={"filename": "gin_trgm_ops"}),
     )

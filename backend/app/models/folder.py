@@ -31,4 +31,6 @@ class Folder(Base):
 
     __table_args__ = (
         Index("ix_folders_owner_deleted_at", "owner_id", "deleted_at"),
+        Index("ix_folders_owner_parent_name", "owner_id", "parent_id", "name"),
+        Index("ix_folders_parent_id", "parent_id"),
     )

@@ -194,26 +194,20 @@ async def list_files(
     else:
         filters.append(File.folder_id.is_(None))
 
-    count_result = await db.execute(
-        select(func.count()).select_from(File).where(*filters)
-    )
-    total = count_result.scalar_one()
-
     next_cursor = None
 
     if cursor:
         try:
             cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=timezone.utc)
-            cursor_filter = and_(File.created_at < cursor_dt)
             query = (
-                select(File)
-                .where(*filters, cursor_filter)
+                select(File, func.count().over().label("total"))
+                .where(*filters, File.created_at < cursor_dt)
                 .order_by(File.created_at.desc())
                 .limit(limit)
             )
         except (ValueError, TypeError):
             query = (
-                select(File)
+                select(File, func.count().over().label("total"))
                 .where(*filters)
                 .order_by(File.created_at.desc())
                 .offset(skip)
@@ -221,7 +215,7 @@ async def list_files(
             )
     else:
         query = (
-            select(File)
+            select(File, func.count().over().label("total"))
             .where(*filters)
             .order_by(File.created_at.desc())
             .offset(skip)
@@ -229,7 +223,9 @@ async def list_files(
         )
 
     result = await db.execute(query)
-    files = list(result.scalars().all())
+    rows = result.all()
+    total = rows[0].total if rows else 0
+    files = [row[0] for row in rows]
 
     if files:
         last_created = files[-1].created_at
@@ -246,17 +242,18 @@ async def search_files(
     limit: int = 20,
     cursor: str | None = None,
 ) -> tuple[list[File], int, str | None]:
-    safe_keyword = keyword.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-    filters = [
-        File.owner_id == owner_id,
-        File.deleted_at.is_(None),
-        File.filename.ilike(f"%{safe_keyword}%", escape="\\"),
-    ]
+    base_filters = [File.owner_id == owner_id, File.deleted_at.is_(None)]
 
-    count_result = await db.execute(
-        select(func.count()).select_from(File).where(*filters)
-    )
-    total = count_result.scalar_one()
+    try:
+        similarity_expr = func.similarity(File.filename, keyword)
+        search_filter = similarity_expr > 0.1
+        order_cols = [similarity_expr.desc(), File.created_at.desc()]
+    except Exception:
+        safe_keyword = keyword.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        search_filter = File.filename.ilike(f"%{safe_keyword}%", escape="\\")
+        order_cols = [File.created_at.desc()]
+
+    filters = base_filters + [search_filter]
 
     next_cursor = None
 
@@ -264,30 +261,32 @@ async def search_files(
         try:
             cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=timezone.utc)
             query = (
-                select(File)
+                select(File, func.count().over().label("total"))
                 .where(*filters, File.created_at < cursor_dt)
-                .order_by(File.created_at.desc())
+                .order_by(*order_cols)
                 .limit(limit)
             )
         except (ValueError, TypeError):
             query = (
-                select(File)
+                select(File, func.count().over().label("total"))
                 .where(*filters)
-                .order_by(File.created_at.desc())
+                .order_by(*order_cols)
                 .offset(skip)
                 .limit(limit)
             )
     else:
         query = (
-            select(File)
+            select(File, func.count().over().label("total"))
             .where(*filters)
-            .order_by(File.created_at.desc())
+            .order_by(*order_cols)
             .offset(skip)
             .limit(limit)
         )
 
     result = await db.execute(query)
-    files = list(result.scalars().all())
+    rows = result.all()
+    total = rows[0].total if rows else 0
+    files = [row[0] for row in rows]
 
     if files:
         last_created = files[-1].created_at
@@ -324,25 +323,20 @@ async def list_trash_files(
 ) -> tuple[list[File], int, str | None]:
     filters = [File.owner_id == owner_id, File.deleted_at.is_not(None)]
 
-    count_result = await db.execute(
-        select(func.count()).select_from(File).where(*filters)
-    )
-    total = count_result.scalar_one()
-
     next_cursor = None
 
     if cursor:
         try:
             cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=timezone.utc)
             query = (
-                select(File)
+                select(File, func.count().over().label("total"))
                 .where(*filters, File.deleted_at < cursor_dt)
                 .order_by(File.deleted_at.desc())
                 .limit(limit)
             )
         except (ValueError, TypeError):
             query = (
-                select(File)
+                select(File, func.count().over().label("total"))
                 .where(*filters)
                 .order_by(File.deleted_at.desc())
                 .offset(skip)
@@ -350,7 +344,7 @@ async def list_trash_files(
             )
     else:
         query = (
-            select(File)
+            select(File, func.count().over().label("total"))
             .where(*filters)
             .order_by(File.deleted_at.desc())
             .offset(skip)
@@ -358,7 +352,9 @@ async def list_trash_files(
         )
 
     result = await db.execute(query)
-    files = list(result.scalars().all())
+    rows = result.all()
+    total = rows[0].total if rows else 0
+    files = [row[0] for row in rows]
 
     if files:
         last_deleted = files[-1].deleted_at

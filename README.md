@@ -436,6 +436,9 @@ curl http://localhost:8000/health
 | 限流   | Redis 滑动窗口限流，按 IP + 路径粒度控制                                 |
 | 任务   | Celery 异步队列，邮件/备份/缩略图/告警不阻塞请求                         |
 | 缩略图 | 图片上传后自动异步生成 256×256 缩略图                                    |
+| 分页   | 窗口函数 `count() over()` 合并数据+总数为单次查询，消除 N+1 count 问题   |
+| 搜索   | pg_trgm `similarity()` 三元组相似度搜索 + GIN 索引，替代低效 `ilike`     |
+| 文件夹 | `list_folder_contents` 文件查询与 count 合并，3 次查询→2 次              |
 
 ## 常用命令
 
