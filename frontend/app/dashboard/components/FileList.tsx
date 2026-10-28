@@ -1,11 +1,17 @@
 // /Users/zero/project/JinDou-Cloud/frontend/app/dashboard/components/FileList.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { VirtuosoGrid, TableVirtuoso } from "react-virtuoso";
 import type { FileItem, FolderItem, FolderTrashItem } from "@/lib/api/files";
 import { getFilePreviewUrl } from "@/lib/api/files";
 import type { ViewMode } from "../types";
 import styles from "./FileList.module.css";
+
+type UnifiedItem =
+  | { type: "folder"; data: FolderItem }
+  | { type: "trashedFolder"; data: FolderTrashItem }
+  | { type: "file"; data: FileItem };
 
 interface FileListProps {
   files: FileItem[];
@@ -100,6 +106,18 @@ export default function FileList({
 }: FileListProps) {
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
 
+  const unifiedItems = useMemo<UnifiedItem[]>(() => {
+    const items: UnifiedItem[] = [];
+    if (folders) {
+      for (const folder of folders) items.push({ type: "folder", data: folder });
+    }
+    if (trashedFolders) {
+      for (const folder of trashedFolders) items.push({ type: "trashedFolder", data: folder });
+    }
+    for (const file of files) items.push({ type: "file", data: file });
+    return items;
+  }, [files, folders, trashedFolders]);
+
   function handleFileDragStart(e: React.DragEvent, fileId: string) {
     e.dataTransfer.setData("text/plain", fileId);
     e.dataTransfer.effectAllowed = "move";
@@ -129,7 +147,7 @@ export default function FileList({
     );
   }
 
-  if (files.length === 0 && (!folders || folders.length === 0) && (!trashedFolders || trashedFolders.length === 0)) {
+  if (unifiedItems.length === 0) {
     return (
       <div className={styles.emptyState}>
         <div className={styles.emptyIcon}>📁</div>
@@ -141,125 +159,156 @@ export default function FileList({
 
   if (viewMode === "grid") {
     return (
-      <div className={styles.gridContainer}>
-        {folders?.map((folder) => (
-          <div
-            key={`folder-${folder.id}`}
-            className={`${styles.gridItem} ${dragOverFolderId === folder.id ? styles.gridItemDropTarget : ""}`}
-            onClick={() => onOpenFolder?.(folder)}
-            onDoubleClick={() => onOpenFolder?.(folder)}
-            onDragOver={(e) => handleFolderDragOver(e, folder.id)}
-            onDragLeave={() => setDragOverFolderId(null)}
-            onDrop={(e) => handleFolderDrop(e, folder.id)}
-          >
-            <div className={styles.gridIcon}>📁</div>
-            <div className={styles.gridName} title={folder.name}>{folder.name}</div>
-            <div className={styles.gridSize}>文件夹</div>
-          </div>
-        ))}
-        {trashedFolders?.map((folder) => (
-          <div
-            key={`trashed-folder-${folder.id}`}
-            className={styles.gridItem}
-          >
-            <div className={styles.gridIcon}>📁</div>
-            <div className={styles.gridName} title={folder.name}>{folder.name}</div>
-            <div className={styles.gridSize}>文件夹</div>
-          </div>
-        ))}
-        {files.map((file) => (
-          <div
-            key={file.id}
-            className={`${styles.gridItem} ${selectedIds.has(file.id) ? styles.gridItemSelected : ""}`}
-            onClick={() => onToggleSelect(file.id)}
-            onDoubleClick={() => onPreview(file)}
-            draggable
-            onDragStart={(e) => handleFileDragStart(e, file.id)}
-          >
-            <Thumbnail file={file} />
-            <div className={styles.gridName} title={file.filename}>{file.filename}</div>
-            <div className={styles.gridSize}>{formatSize(file.size)}</div>
-          </div>
-        ))}
-      </div>
+      <VirtuosoGrid
+        data={unifiedItems}
+        listClassName={styles.gridContainer}
+        itemClassName={styles.gridItem}
+        itemContent={(index, item) => {
+          if (item.type === "folder") {
+            const folder = item.data;
+            return (
+              <>
+                <div className={styles.gridIcon}>📁</div>
+                <div className={styles.gridName} title={folder.name}>{folder.name}</div>
+                <div className={styles.gridSize}>文件夹</div>
+              </>
+            );
+          }
+          if (item.type === "trashedFolder") {
+            const folder = item.data;
+            return (
+              <>
+                <div className={styles.gridIcon}>📁</div>
+                <div className={styles.gridName} title={folder.name}>{folder.name}</div>
+                <div className={styles.gridSize}>文件夹</div>
+              </>
+            );
+          }
+          const file = item.data;
+          return (
+            <>
+              <Thumbnail file={file} />
+              <div className={styles.gridName} title={file.filename}>{file.filename}</div>
+              <div className={styles.gridSize}>{formatSize(file.size)}</div>
+            </>
+          );
+        }}
+        components={{
+          Item: ({ children, ...props }) => {
+            const item = unifiedItems[props["data-index"]];
+            let className = styles.gridItem;
+            if (item) {
+              if (item.type === "folder" && dragOverFolderId === item.data.id) {
+                className += ` ${styles.gridItemDropTarget}`;
+              } else if (item.type === "file" && selectedIds.has(item.data.id)) {
+                className += ` ${styles.gridItemSelected}`;
+              }
+            }
+            return (
+              <div {...props} className={className}>
+                {children}
+              </div>
+            );
+          },
+        }}
+      />
     );
   }
 
   return (
-    <table className={styles.table}>
-      <thead>
-        <tr className={styles.tableHeader}>
-          <th className={styles.checkboxCol}></th>
-          <th className={styles.nameCol}>文件名</th>
-          <th className={styles.sizeCol}>大小</th>
-          <th className={styles.typeCol}>类型</th>
-          <th className={styles.dateCol}>修改时间</th>
-          <th className={styles.actionCol}>操作</th>
-        </tr>
-      </thead>
-      <tbody>
-        {folders?.map((folder) => (
-          <tr
-            key={`folder-${folder.id}`}
-            className={`${styles.tableRow} ${dragOverFolderId === folder.id ? styles.tableRowDropTarget : ""}`}
-            onClick={() => onOpenFolder?.(folder)}
-            onDragOver={(e) => handleFolderDragOver(e, folder.id)}
-            onDragLeave={() => setDragOverFolderId(null)}
-            onDrop={(e) => handleFolderDrop(e, folder.id)}
-          >
-            <td className={styles.checkboxCol}></td>
-            <td className={styles.nameCol}>
-              <div className={styles.fileNameCell}>
-                <span className={styles.fileIcon}>📁</span>
-                <span className={styles.fileName} title={folder.name}>{folder.name}</span>
-              </div>
-            </td>
-            <td className={styles.sizeCol}>—</td>
-            <td className={styles.typeCol}>文件夹</td>
-            <td className={styles.dateCol}>{formatDate(folder.created_at)}</td>
-            <td className={styles.actionCol}>
-              <button className={styles.rowActionBtn} onClick={(e) => { e.stopPropagation(); onRenameFolder?.(folder); }}>
-                重命名
-              </button>
-              <button className={styles.rowActionBtn} onClick={(e) => { e.stopPropagation(); onDeleteFolder?.(folder); }}>
-                删除
-              </button>
-            </td>
-          </tr>
-        ))}
-        {trashedFolders?.map((folder) => (
-          <tr
-            key={`trashed-folder-${folder.id}`}
-            className={styles.tableRow}
-          >
-            <td className={styles.checkboxCol}></td>
-            <td className={styles.nameCol}>
-              <div className={styles.fileNameCell}>
-                <span className={styles.fileIcon}>📁</span>
-                <span className={styles.fileName} title={folder.name}>{folder.name}</span>
-              </div>
-            </td>
-            <td className={styles.sizeCol}>—</td>
-            <td className={styles.typeCol}>文件夹</td>
-            <td className={styles.dateCol}>{formatDate(folder.deleted_at)}</td>
-            <td className={styles.actionCol}>
-              <button className={styles.rowActionBtn} onClick={(e) => { e.stopPropagation(); onRestoreFolder?.(folder); }}>
-                恢复
-              </button>
-              <button className={styles.rowActionBtn} onClick={(e) => { e.stopPropagation(); onPurgeFolder?.(folder); }}>
-                彻底删除
-              </button>
-            </td>
-          </tr>
-        ))}
-        {files.map((file) => (
-          <tr
-            key={file.id}
-            className={`${styles.tableRow} ${selectedIds.has(file.id) ? styles.tableRowSelected : ""}`}
-            onClick={() => onToggleSelect(file.id)}
-            draggable
-            onDragStart={(e) => handleFileDragStart(e, file.id)}
-          >
+    <TableVirtuoso
+      data={unifiedItems}
+      fixedItemHeight={48}
+      className={styles.table}
+      components={{
+        Table: ({ children, style }: { children?: React.ReactNode; style?: React.CSSProperties }) => (
+          <table className={styles.table} style={style}>
+            {children}
+          </table>
+        ),
+        TableHead: ({ ...props }) => (
+          <thead {...props}>
+            <tr className={styles.tableHeader}>
+              <th className={styles.checkboxCol}></th>
+              <th className={styles.nameCol}>文件名</th>
+              <th className={styles.sizeCol}>大小</th>
+              <th className={styles.typeCol}>类型</th>
+              <th className={styles.dateCol}>修改时间</th>
+              <th className={styles.actionCol}>操作</th>
+            </tr>
+          </thead>
+        ),
+        TableRow: ({ children, ...props }) => {
+          const item = unifiedItems[props["data-index"]];
+          let className = styles.tableRow;
+          if (item) {
+            if (item.type === "folder" && dragOverFolderId === item.data.id) {
+              className += ` ${styles.tableRowDropTarget}`;
+            } else if (item.type === "file" && selectedIds.has(item.data.id)) {
+              className += ` ${styles.tableRowSelected}`;
+            }
+          }
+          return (
+            <tr {...props} className={className}>
+              {children}
+            </tr>
+          );
+        },
+      }}
+      itemContent={(index, item) => {
+        if (item.type === "folder") {
+          const folder = item.data;
+          return (
+            <>
+              <td className={styles.checkboxCol}></td>
+              <td className={styles.nameCol}>
+                <div className={styles.fileNameCell}>
+                  <span className={styles.fileIcon}>📁</span>
+                  <span className={styles.fileName} title={folder.name}>{folder.name}</span>
+                </div>
+              </td>
+              <td className={styles.sizeCol}>—</td>
+              <td className={styles.typeCol}>文件夹</td>
+              <td className={styles.dateCol}>{formatDate(folder.created_at)}</td>
+              <td className={styles.actionCol}>
+                <button className={styles.rowActionBtn} onClick={(e) => { e.stopPropagation(); onRenameFolder?.(folder); }}>
+                  重命名
+                </button>
+                <button className={styles.rowActionBtn} onClick={(e) => { e.stopPropagation(); onDeleteFolder?.(folder); }}>
+                  删除
+                </button>
+              </td>
+            </>
+          );
+        }
+        if (item.type === "trashedFolder") {
+          const folder = item.data;
+          return (
+            <>
+              <td className={styles.checkboxCol}></td>
+              <td className={styles.nameCol}>
+                <div className={styles.fileNameCell}>
+                  <span className={styles.fileIcon}>📁</span>
+                  <span className={styles.fileName} title={folder.name}>{folder.name}</span>
+                </div>
+              </td>
+              <td className={styles.sizeCol}>—</td>
+              <td className={styles.typeCol}>文件夹</td>
+              <td className={styles.dateCol}>{formatDate(folder.deleted_at)}</td>
+              <td className={styles.actionCol}>
+                <button className={styles.rowActionBtn} onClick={(e) => { e.stopPropagation(); onRestoreFolder?.(folder); }}>
+                  恢复
+                </button>
+                <button className={styles.rowActionBtn} onClick={(e) => { e.stopPropagation(); onPurgeFolder?.(folder); }}>
+                  彻底删除
+                </button>
+              </td>
+            </>
+          );
+        }
+        const file = item.data;
+        return (
+          <>
             <td className={styles.checkboxCol}>
               <input
                 type="checkbox"
@@ -285,9 +334,9 @@ export default function FileList({
                 下载
               </button>
             </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+          </>
+        );
+      }}
+    />
   );
 }

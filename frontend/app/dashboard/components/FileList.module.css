@@ -50,6 +50,8 @@
 .table {
   width: 100%;
   border-collapse: collapse;
+  overflow-y: auto;
+  max-height: calc(100vh - 200px);
 }
 
 .tableHeader th {
