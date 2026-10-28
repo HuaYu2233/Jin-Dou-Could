@@ -58,7 +58,7 @@ class SecurityHeadersMiddleware:
                     f"style-src 'self' 'nonce-{nonce}'; "
                     f"img-src 'self' data: blob: http: https:; "
                     f"font-src 'self' data:; "
-                    f"connect-src 'self' http://localhost:8000 http://localhost:9000; "
+                    f"connect-src 'self' ws: wss: http://localhost:8000 http://localhost:9000; "
                     f"frame-ancestors 'none'; "
                     f"base-uri 'self'; "
                     f"form-action 'self'"

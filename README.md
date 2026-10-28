@@ -13,6 +13,7 @@
 | Zustand        | 5               | 状态管理       |
 | TanStack Query | 5               | 请求缓存       |
 | react-virtuoso | 4               | 虚拟滚动       |
+| WebSocket      | 原生            | 实时通知       |
 | Tailwind CSS   | 4 + CSS Modules | 样式方案       |
 | TypeScript     | 5               | 类型安全       |
 | Vitest         | 5               | 单元测试       |
@@ -428,22 +429,23 @@ curl http://localhost:8000/health
 
 ### 性能优化
 
-| 模块     | 措施                                                                                                          |
-| -------- | ------------------------------------------------------------------------------------------------------------- |
-| 上传     | 流式直传 MinIO，内存占用 O(1)（非 O(N×文件大小)）                                                             |
-| MinIO    | 异步包装（`run_in_threadpool`），不阻塞事件循环                                                               |
-| 部署     | Gunicorn 多 worker，充分利用多核，支持优雅关闭                                                                |
-| 压缩     | GZip 中间件（≥500B 自动压缩）                                                                                 |
-| 数据库   | 连接池可配置（`pool_size`/`max_overflow`/`pool_timeout`/`pool_recycle`）                                      |
-| 限流     | Redis 滑动窗口限流，按 IP + 路径粒度控制                                                                      |
-| 任务     | Celery 异步队列，邮件/备份/缩略图/告警不阻塞请求                                                              |
-| 缩略图   | 图片上传后自动异步生成 256×256 缩略图，前端渐进加载（shimmer → blur → sharp），列表优先请求缩略图而非原图     |
-| 分页     | 窗口函数 `count() over()` 合并数据+总数为单次查询，消除 N+1 count 问题                                        |
-| 搜索     | pg_trgm `similarity()` 三元组相似度搜索 + GIN 索引，替代低效 `ilike`                                          |
-| 文件夹   | `list_folder_contents` 文件查询与 count 合并，3 次查询→2 次                                                   |
-| Docker   | 多阶段构建：backend 315MB / frontend 216MB，生产无 `--reload`，非 root 运行，HEALTHCHECK                      |
-| 虚拟滚动 | react-virtuoso（TableVirtuoso + VirtuosoGrid），文件列表仅渲染可视区域 DOM，万级文件无卡顿                    |
-| 请求缓存 | TanStack Query（useQuery + useMutation），自动去重/缓存/stale-while-revalidate，mutation 后乐观更新或精准失效 |
+| 模块     | 措施                                                                                                            |
+| -------- | --------------------------------------------------------------------------------------------------------------- |
+| 上传     | 流式直传 MinIO，内存占用 O(1)（非 O(N×文件大小)）                                                               |
+| MinIO    | 异步包装（`run_in_threadpool`），不阻塞事件循环                                                                 |
+| 部署     | Gunicorn 多 worker，充分利用多核，支持优雅关闭                                                                  |
+| 压缩     | GZip 中间件（≥500B 自动压缩）                                                                                   |
+| 数据库   | 连接池可配置（`pool_size`/`max_overflow`/`pool_timeout`/`pool_recycle`）                                        |
+| 限流     | Redis 滑动窗口限流，按 IP + 路径粒度控制                                                                        |
+| 任务     | Celery 异步队列，邮件/备份/缩略图/告警不阻塞请求                                                                |
+| 缩略图   | 图片上传后自动异步生成 256×256 缩略图，前端渐进加载（shimmer → blur → sharp），列表优先请求缩略图而非原图       |
+| 分页     | 窗口函数 `count() over()` 合并数据+总数为单次查询，消除 N+1 count 问题                                          |
+| 搜索     | pg_trgm `similarity()` 三元组相似度搜索 + GIN 索引，替代低效 `ilike`                                            |
+| 文件夹   | `list_folder_contents` 文件查询与 count 合并，3 次查询→2 次                                                     |
+| Docker   | 多阶段构建：backend 315MB / frontend 216MB，生产无 `--reload`，非 root 运行，HEALTHCHECK                        |
+| 虚拟滚动 | react-virtuoso（TableVirtuoso + VirtuosoGrid），文件列表仅渲染可视区域 DOM，万级文件无卡顿                      |
+| 请求缓存 | TanStack Query（useQuery + useMutation），自动去重/缓存/stale-while-revalidate，mutation 后乐观更新或精准失效   |
+| 实时通知 | WebSocket 长连接，上传完成/分享创建/存储变更即时推送，前端自动 invalidate 对应缓存，指数退避重连（1→2→4→8→16s） |
 
 ## 常用命令
 

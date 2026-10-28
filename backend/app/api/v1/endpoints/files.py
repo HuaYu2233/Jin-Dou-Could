@@ -11,6 +11,7 @@ from app.schemas.file import (
     FileUploadResponse,
     FileMoveRequest,
 )
+from app.core.ws_manager import ws_manager
 
 router = APIRouter()
 
@@ -45,6 +46,18 @@ async def upload_file(
             raise HTTPException(status_code=413, detail=msg)
         raise HTTPException(status_code=400, detail=msg)
     await invalidate_user_cache(current_user.id)
+
+    await ws_manager.send_to_user(str(current_user.id), "upload:complete", {
+        "file_id": str(file_record.id),
+        "filename": file_record.filename,
+        "size": file_record.size,
+        "file_type": file_record.file_type,
+    })
+    await ws_manager.send_to_user(str(current_user.id), "storage:changed", {
+        "used_storage": current_user.used_storage + file_record.size,
+        "storage_quota": current_user.storage_quota,
+    })
+
     return file_record
 
 
@@ -161,6 +174,12 @@ async def delete_file(
     if not deleted:
         raise HTTPException(status_code=404, detail="文件不存在")
     await invalidate_user_cache(current_user.id)
+
+    await ws_manager.send_to_user(str(current_user.id), "storage:changed", {
+        "used_storage": current_user.used_storage,
+        "storage_quota": current_user.storage_quota,
+    })
+
     return {"message": "已移入回收站"}
 
 

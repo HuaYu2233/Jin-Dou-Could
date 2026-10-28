@@ -13,6 +13,7 @@ from app.schemas.share import (
     ShareVerifyRequest,
     ShareVerifyResponse,
 )
+from app.core.ws_manager import ws_manager
 
 router = APIRouter()
 
@@ -30,6 +31,14 @@ async def create_share(
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+    await ws_manager.send_to_user(str(current_user.id), "share:created", {
+        "share_id": str(share.id),
+        "file_id": str(file_id),
+        "share_token": share.share_token,
+        "extract_code": share.extract_code,
+    })
+
     return share
 
 
