@@ -1,9 +1,7 @@
 FROM alpine:3.18
 
-# 换阿里云镜像源加速 apk
 RUN sed -i 's#dl-cdn.alpinelinux.org#mirrors.aliyun.com#g' /etc/apk/repositories
 
-# apk 层独立，可被缓存复用
 RUN apk add --no-cache \
     postgresql-client \
     postgresql-dev \
@@ -12,7 +10,6 @@ RUN apk add --no-cache \
     busybox-suid \
     gnupg
 
-# mc 下载独立一层，多源回退提升国内可用性
 RUN (curl -fsSL --connect-timeout 15 --retry 2 \
     https://dl.min.io/client/mc/release/linux-amd64/mc \
     -o /usr/local/bin/mc \
@@ -26,12 +23,17 @@ RUN (curl -fsSL --connect-timeout 15 --retry 2 \
     -o /usr/local/bin/mc \
     && chmod +x /usr/local/bin/mc)
 
+RUN addgroup -S backupgrp && adduser -S backupusr -G backupgrp
+
 COPY --chmod=755 backup.sh /scripts/backup.sh
 COPY --chmod=755 restore.sh /scripts/restore.sh
 COPY --chmod=755 backup-entrypoint.sh /scripts/backup-entrypoint.sh
 COPY --chmod=755 backup-trigger-watcher.sh /scripts/backup-trigger-watcher.sh
 
-RUN mkdir -p /backups /var/log
+RUN mkdir -p /backups /var/log \
+    && chown -R backupusr:backupgrp /backups /var/log /scripts
+
+USER backupusr
 
 WORKDIR /scripts
 

@@ -24,3 +24,4 @@ logs/
 Dockerfile
 .python-version
 uv.lock
+README.md
