@@ -5,6 +5,10 @@ from starlette.requests import Request
 from starlette.responses import Response
 from loguru import logger
 from app.core.security import decode_token
+from app.core.config import settings
+
+SLOW_REQUEST_THRESHOLD_MS = 3000
+
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -40,7 +44,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             raise
 
         duration_ms = round((time.perf_counter() - start) * 1000, 2)
-        logger.bind(
+        bind_data = dict(
             log_type="access",
             request_id=request_id,
             method=request.method,
@@ -49,9 +53,16 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             duration_ms=duration_ms,
             user_id=user_id,
             client_ip=request.client.host if request.client else None,
-        ).info(
-            f"{request.method} {request.url.path} {response.status_code} {duration_ms}ms"
         )
+
+        if duration_ms > SLOW_REQUEST_THRESHOLD_MS:
+            logger.bind(**bind_data).warning(
+                f"SLOW {request.method} {request.url.path} {response.status_code} {duration_ms}ms"
+            )
+        else:
+            logger.bind(**bind_data).info(
+                f"{request.method} {request.url.path} {response.status_code} {duration_ms}ms"
+            )
 
         response.headers["X-Request-ID"] = request_id
         return response

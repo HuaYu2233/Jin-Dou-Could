@@ -23,6 +23,7 @@ async def create_folder(
             Folder.owner_id == owner_id,
             Folder.parent_id == parent_id if parent_id is not None else Folder.parent_id.is_(None),
             Folder.name == name,
+            Folder.deleted_at.is_(None),
         )
     )
     if existing.scalar_one_or_none():
@@ -46,6 +47,7 @@ async def _get_folder(
         select(Folder).where(
             Folder.id == folder_id,
             Folder.owner_id == owner_id,
+            Folder.deleted_at.is_(None),
         )
     )
     return result.scalar_one_or_none()
@@ -70,7 +72,7 @@ async def delete_folder(
     folder = await _get_folder(db, folder_id, owner_id)
     if not folder:
         return False
-    await db.delete(folder)
+    folder.deleted_at = datetime.now(timezone.utc)
     await db.commit()
     return True
 
@@ -85,6 +87,7 @@ async def list_folder_contents(
         select(Folder).where(
             Folder.owner_id == owner_id,
             Folder.parent_id == folder_id if folder_id is not None else Folder.parent_id.is_(None),
+            Folder.deleted_at.is_(None),
         ).order_by(Folder.name.asc())
     )
     folders = folders_result.scalars().all()
@@ -127,7 +130,7 @@ async def _get_breadcrumbs(
     chain = []
     while current_id is not None:
         result = await db.execute(
-            select(Folder).where(Folder.id == current_id, Folder.owner_id == owner_id)
+            select(Folder).where(Folder.id == current_id, Folder.owner_id == owner_id, Folder.deleted_at.is_(None))
         )
         folder = result.scalar_one_or_none()
         if not folder:

@@ -1,9 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Response, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from app.db.base import get_db
-from app.models.user import User
-from app.core.redis import redis_client
 from app.schemas.user import UserCreate, UserLogin, UserResponse
 from app.schemas.token import LoginResponse
 from app.schemas.reset_password import (
@@ -13,21 +10,10 @@ from app.schemas.reset_password import (
     SecurityResetRequest,
 )
 from app.services.user_service import create_user
-from app.services import reset_password_service
-from app.core.security import verify_password, create_access_token, create_refresh_token, decode_token, revoke_token
-from app.core.config import settings
+from app.services import auth_service, reset_password_service
 
 router = APIRouter()
 
-
-def get_client_ip(request: Request) -> str:
-    xff = request.headers.get("x-forwarded-for")
-    if xff:
-        return xff.split(",")[0].strip()
-    x_real_ip = request.headers.get("x-real-ip")
-    if x_real_ip:
-        return x_real_ip.strip()
-    return request.client.host if request.client else "unknown"
 
 @router.post("/register", response_model=UserResponse)
 async def register(data: UserCreate, db: AsyncSession = Depends(get_db)):
@@ -37,6 +23,7 @@ async def register(data: UserCreate, db: AsyncSession = Depends(get_db)):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+
 @router.post("/login", response_model=LoginResponse)
 async def login(
     request: Request,
@@ -44,56 +31,20 @@ async def login(
     data: UserLogin,
     db: AsyncSession = Depends(get_db),
 ):
-    client_ip = get_client_ip(request)
-    rl_key = f"login_rl:{client_ip}:{data.email}"
-    lock_key = f"login_lock:{client_ip}:{data.email}"
+    client_ip = auth_service.get_client_ip(request)
 
-    if await redis_client.exists(lock_key):
-        ttl = await redis_client.ttl(lock_key)
-        raise HTTPException(
-            status_code=429,
-            detail=f"登录尝试过于频繁，请 {max(ttl, 1)} 秒后再试",
-        )
+    try:
+        await auth_service.check_login_rate_limit(client_ip, data.email)
+    except ValueError as e:
+        raise HTTPException(status_code=429, detail=str(e))
 
-    result = await db.execute(select(User).where(User.email == data.email))
-    user = result.scalar_one_or_none()
-
-    if not user or not verify_password(data.password, user.hashed_password):
-        attempts = await redis_client.incr(rl_key)
-        if attempts == 1:
-            await redis_client.expire(rl_key, settings.LOGIN_RATE_LIMIT_WINDOW_SECONDS)
-        if attempts >= settings.LOGIN_RATE_LIMIT_MAX_ATTEMPTS:
-            await redis_client.setex(
-                lock_key,
-                settings.LOGIN_RATE_LIMIT_LOCK_SECONDS,
-                "1",
-            )
-            await redis_client.delete(rl_key)
+    user = await auth_service.authenticate_user(db, data.email, data.password)
+    if not user:
+        await auth_service.record_login_failure(client_ip, data.email)
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    await redis_client.delete(rl_key)
-
-    access_token = create_access_token({"sub": str(user.id)})
-    refresh_token = create_refresh_token({"sub": str(user.id)})
-
-    secure = settings.ENVIRONMENT == "production"
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        samesite="lax",
-        secure=secure,
-    )
-    response.set_cookie(
-        key="refresh_token",
-        value=refresh_token,
-        httponly=True,
-        max_age=7 * 24 * 3600,
-        samesite="lax",
-        secure=secure,
-    )
-
+    await auth_service.clear_login_rate_limit(client_ip, data.email)
+    auth_service.set_auth_cookies(response, user)
     return LoginResponse()
 
 
@@ -148,35 +99,14 @@ async def reset_password_by_security(
 
 @router.post("/logout")
 async def logout(request: Request, response: Response):
-    for name in ("access_token", "refresh_token"):
-        token = request.cookies.get(name)
-        if token:
-            await revoke_token(token)
-    response.delete_cookie("access_token")
-    response.delete_cookie("refresh_token")
+    await auth_service.logout(request, response)
     return {"detail": "已退出登录"}
+
 
 @router.post("/refresh")
 async def refresh_token(request: Request, response: Response):
-    refresh = request.cookies.get("refresh_token")
-    if not refresh:
-        raise HTTPException(status_code=401, detail="无 refresh token")
-    payload = decode_token(refresh)
-    if not payload or not payload.get("sub"):
-        raise HTTPException(status_code=401, detail="Invalid refresh token")
-    if payload.get("type") != "refresh":
-        raise HTTPException(status_code=401, detail="Token 类型错误，请使用 refresh token")
-    jti = payload.get("jti")
-    if jti and await redis_client.exists(f"token_blacklist:{jti}"):
-        raise HTTPException(status_code=401, detail="Refresh token 已失效")
-    access_token = create_access_token({"sub": payload["sub"]})
-    secure = settings.ENVIRONMENT == "production"
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        samesite="lax",
-        secure=secure,
-    )
+    try:
+        await auth_service.refresh_access_token(request, response)
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
     return {"detail": "Token 已刷新"}

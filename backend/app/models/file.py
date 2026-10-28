@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, BigInteger, DateTime, ForeignKey, func
+from sqlalchemy import String, BigInteger, DateTime, ForeignKey, func, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base_class import Base
@@ -34,3 +34,9 @@ class File(Base):
     )
 
     folder = relationship("Folder", back_populates="files")
+
+    __table_args__ = (
+        Index("ix_files_owner_folder_created", "owner_id", "folder_id", "created_at"),
+        Index("ix_files_owner_deleted_at", "owner_id", "deleted_at"),
+        Index("ix_files_owner_type_created", "owner_id", "file_type", "created_at"),
+    )

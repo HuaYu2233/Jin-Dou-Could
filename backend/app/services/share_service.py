@@ -8,6 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.models.share import Share
 from app.models.file import File
+from app.core.redis import redis_client
+from app.core.storage import get_presigned_download_url
+from app.core.config import settings
+
+SHARE_VERIFY_MAX_ATTEMPTS = 5
+SHARE_VERIFY_LOCK_SECONDS = 900
 
 def _generate_token() -> str:
     return secrets.token_urlsafe(24)[:32]
@@ -166,3 +172,60 @@ async def verify_share(
         "mime_type": mime_type,
         "storage_key": storage_key,
     }
+
+
+async def check_share_rate_limit(token: str) -> None:
+    lock_key = f"share_lock:{token}"
+    if await redis_client.exists(lock_key):
+        ttl = await redis_client.ttl(lock_key)
+        raise ValueError(f"提取码错误次数过多，请 {max(ttl, 1)} 秒后再试")
+
+
+async def record_share_verify_failure(token: str) -> None:
+    attempts_key = f"share_verify:{token}"
+    lock_key = f"share_lock:{token}"
+    attempts = await redis_client.incr(attempts_key)
+    if attempts == 1:
+        await redis_client.expire(attempts_key, SHARE_VERIFY_LOCK_SECONDS)
+    if attempts >= SHARE_VERIFY_MAX_ATTEMPTS:
+        await redis_client.setex(lock_key, SHARE_VERIFY_LOCK_SECONDS, "1")
+        await redis_client.delete(attempts_key)
+
+
+async def clear_share_verify_attempts(token: str) -> None:
+    await redis_client.delete(f"share_verify:{token}")
+
+
+async def verify_share_with_rate_limit(
+    db: AsyncSession, token: str, extract_code: str
+) -> dict:
+    await check_share_rate_limit(token)
+    info = await verify_share(db, token, extract_code)
+    if not info:
+        await record_share_verify_failure(token)
+        raise ValueError("提取码错误或分享已过期")
+    await clear_share_verify_attempts(token)
+    return info
+
+
+async def download_shared_file(
+    db: AsyncSession, token: str, extract_code: str
+) -> str:
+    await check_share_rate_limit(token)
+    info = await verify_share(db, token, extract_code)
+    if not info:
+        await record_share_verify_failure(token)
+        raise ValueError("提取码错误或分享已过期")
+    await clear_share_verify_attempts(token)
+
+    file_result = await db.execute(
+        select(File).where(File.storage_key == info["storage_key"])
+    )
+    file = file_result.scalar_one_or_none()
+    if not file:
+        raise ValueError("文件不存在")
+
+    url = await get_presigned_download_url(
+        file.storage_key, settings.MINIO_DOWNLOAD_EXPIRES, file.filename
+    )
+    return url

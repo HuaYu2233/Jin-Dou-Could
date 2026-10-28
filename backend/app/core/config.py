@@ -16,10 +16,9 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     MAX_UPLOAD_SIZE: int = 104857600
 
-    # 生产部署配置
     BACKEND_WORKERS: int = 4
-    DB_POOL_SIZE: int = 20
-    DB_MAX_OVERFLOW: int = 10
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 5
     DB_POOL_TIMEOUT: int = 30
     DB_POOL_RECYCLE: int = 3600
     SECURITY_HEADERS_ENABLED: bool = True
@@ -29,12 +28,17 @@ class Settings(BaseSettings):
     LOGIN_RATE_LIMIT_WINDOW_SECONDS: int = 300
     LOGIN_RATE_LIMIT_LOCK_SECONDS: int = 900
 
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_PER_MINUTE: int = 60
+
     MINIO_ENDPOINT: str = "minio:9000"
     MINIO_PUBLIC_ENDPOINT: str = "localhost:9000"
     MINIO_ACCESS_KEY: str = "minioadmin"
     MINIO_SECRET_KEY: str = "minioadmin123"
     MINIO_BUCKET: str = "cloud-drive"
     MINIO_DOWNLOAD_EXPIRES: int = 3600
+    UPLOAD_CHUNK_SIZE: int = 8 * 1024 * 1024
+    MULTIPART_THRESHOLD: int = 16 * 1024 * 1024
 
     CORS_ORIGINS: str = "http://localhost:3000"
 

@@ -1,11 +1,19 @@
 import re
 import uuid
-from fastapi.concurrency import run_in_threadpool
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, and_
 from app.models.file import File
 from app.models.user import User
-from app.core.storage import upload_fileobj, delete_file, get_object_stream
+from app.core.storage import (
+    upload_fileobj,
+    upload_stream_multipart,
+    delete_file,
+    get_object_stream,
+    get_presigned_download_url,
+    get_presigned_preview_url,
+)
+from app.core.config import settings
 
 _FILENAME_MAX_LEN = 255
 _CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]")
@@ -37,26 +45,23 @@ def sanitize_filename(name: str) -> str:
     return name[:_FILENAME_MAX_LEN]
 
 
-def detect_real_mime_type(fileobj, declared: str) -> str:
+async def detect_real_mime_type(fileobj, declared: str) -> str:
     try:
         import magic
-        current_pos = None
-        if hasattr(fileobj, "seek"):
-            try:
-                current_pos = fileobj.tell()
-                fileobj.seek(0)
-            except Exception:
-                current_pos = None
         try:
-            detected = magic.from_buffer(fileobj.read(2048), mime=True)
-        finally:
-            if current_pos is not None and hasattr(fileobj, "seek"):
-                try:
-                    fileobj.seek(current_pos)
-                except Exception:
-                    pass
-        if detected and detected in ALLOWED_MIME_TYPES:
-            return detected
+            if hasattr(fileobj, "seek"):
+                await fileobj.seek(0) if hasattr(fileobj.seek, "__await__") else fileobj.seek(0)
+            head = await fileobj.read(2048) if hasattr(fileobj.read, "__await__") else fileobj.read(2048)
+            if hasattr(fileobj, "seek"):
+                await fileobj.seek(0) if hasattr(fileobj.seek, "__await__") else fileobj.seek(0)
+        except Exception:
+            head = None
+        if head:
+            if isinstance(head, str):
+                head = head.encode("utf-8")
+            detected = magic.from_buffer(head, mime=True)
+            if detected and detected in ALLOWED_MIME_TYPES:
+                return detected
     except Exception:
         pass
     return declared
@@ -113,10 +118,10 @@ async def create_file(
     filename: str,
     fileobj,
     mime_type: str,
-    size: int,
+    size: int | None,
     folder_id: uuid.UUID | None = None,
 ) -> File:
-    if owner.used_storage + size > owner.storage_quota:
+    if size is not None and owner.used_storage + size > owner.storage_quota:
         raise ValueError("存储空间不足")
 
     filename = sanitize_filename(filename)
@@ -125,18 +130,30 @@ async def create_file(
     mime_type = real_mime
 
     file_id = uuid.uuid4()
+    storage_key = f"{owner.id}/{file_id}"
+
+    if size is None:
+        actual_size = await stream_upload_unknown_size(storage_key, fileobj, mime_type)
+        if owner.used_storage + actual_size > owner.storage_quota:
+            from app.core.storage import delete_file as _delete
+            await _delete(storage_key)
+            raise ValueError("存储空间不足")
+        size = actual_size
+    elif size >= settings.MULTIPART_THRESHOLD:
+        await upload_stream_multipart(storage_key, fileobj, mime_type, size)
+    else:
+        await upload_fileobj(storage_key, fileobj, mime_type, size)
+
     file = File(
         id=file_id,
         owner_id=owner.id,
         folder_id=folder_id,
         filename=filename,
-        storage_key=f"{owner.id}/{file_id}",
+        storage_key=storage_key,
         size=size,
         mime_type=mime_type,
         file_type=categorize_file_type(mime_type),
     )
-
-    await run_in_threadpool(upload_fileobj, file.storage_key, fileobj, mime_type, size)
 
     owner.used_storage += size
     db.add(file)
@@ -159,7 +176,8 @@ async def list_files(
     limit: int = 20,
     file_type: str | None = None,
     folder_id: uuid.UUID | None = None,
-) -> tuple[list[File], int]:
+    cursor: str | None = None,
+) -> tuple[list[File], int, str | None]:
     filters = [File.owner_id == owner_id, File.deleted_at.is_(None)]
     if file_type:
         filters.append(File.file_type == file_type)
@@ -168,20 +186,49 @@ async def list_files(
     else:
         filters.append(File.folder_id.is_(None))
 
-    result = await db.execute(
-        select(File)
-        .where(*filters)
-        .order_by(File.created_at.desc())
-        .offset(skip)
-        .limit(limit)
-    )
-    files = list(result.scalars().all())
-
     count_result = await db.execute(
         select(func.count()).select_from(File).where(*filters)
     )
     total = count_result.scalar_one()
-    return files, total
+
+    next_cursor = None
+
+    if cursor:
+        try:
+            cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=timezone.utc)
+            cursor_filter = and_(File.created_at < cursor_dt)
+            query = (
+                select(File)
+                .where(*filters, cursor_filter)
+                .order_by(File.created_at.desc())
+                .limit(limit)
+            )
+        except (ValueError, TypeError):
+            query = (
+                select(File)
+                .where(*filters)
+                .order_by(File.created_at.desc())
+                .offset(skip)
+                .limit(limit)
+            )
+    else:
+        query = (
+            select(File)
+            .where(*filters)
+            .order_by(File.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+
+    result = await db.execute(query)
+    files = list(result.scalars().all())
+
+    if files:
+        last_created = files[-1].created_at
+        if total > skip + len(files):
+            next_cursor = last_created.isoformat()
+
+    return files, total, next_cursor
 
 async def search_files(
     db: AsyncSession,
@@ -189,25 +236,57 @@ async def search_files(
     keyword: str,
     skip: int = 0,
     limit: int = 20,
-) -> tuple[list[File], int]:
+    cursor: str | None = None,
+) -> tuple[list[File], int, str | None]:
+    safe_keyword = keyword.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     filters = [
         File.owner_id == owner_id,
         File.deleted_at.is_(None),
-        File.filename.ilike(f"%{keyword}%"),
+        File.filename.ilike(f"%{safe_keyword}%", escape="\\"),
     ]
-    result = await db.execute(
-        select(File)
-        .where(*filters)
-        .order_by(File.created_at.desc())
-        .offset(skip)
-        .limit(limit)
-    )
-    files = list(result.scalars().all())
+
     count_result = await db.execute(
         select(func.count()).select_from(File).where(*filters)
     )
     total = count_result.scalar_one()
-    return files, total
+
+    next_cursor = None
+
+    if cursor:
+        try:
+            cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=timezone.utc)
+            query = (
+                select(File)
+                .where(*filters, File.created_at < cursor_dt)
+                .order_by(File.created_at.desc())
+                .limit(limit)
+            )
+        except (ValueError, TypeError):
+            query = (
+                select(File)
+                .where(*filters)
+                .order_by(File.created_at.desc())
+                .offset(skip)
+                .limit(limit)
+            )
+    else:
+        query = (
+            select(File)
+            .where(*filters)
+            .order_by(File.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+
+    result = await db.execute(query)
+    files = list(result.scalars().all())
+
+    if files:
+        last_created = files[-1].created_at
+        if total > skip + len(files):
+            next_cursor = last_created.isoformat()
+
+    return files, total, next_cursor
 
 async def move_files(
     db: AsyncSession,
@@ -233,23 +312,52 @@ async def list_trash_files(
     owner_id: uuid.UUID,
     skip: int = 0,
     limit: int = 20,
-) -> tuple[list[File], int]:
+    cursor: str | None = None,
+) -> tuple[list[File], int, str | None]:
     filters = [File.owner_id == owner_id, File.deleted_at.is_not(None)]
-
-    result = await db.execute(
-        select(File)
-        .where(*filters)
-        .order_by(File.deleted_at.desc())
-        .offset(skip)
-        .limit(limit)
-    )
-    files = list(result.scalars().all())
 
     count_result = await db.execute(
         select(func.count()).select_from(File).where(*filters)
     )
     total = count_result.scalar_one()
-    return files, total
+
+    next_cursor = None
+
+    if cursor:
+        try:
+            cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=timezone.utc)
+            query = (
+                select(File)
+                .where(*filters, File.deleted_at < cursor_dt)
+                .order_by(File.deleted_at.desc())
+                .limit(limit)
+            )
+        except (ValueError, TypeError):
+            query = (
+                select(File)
+                .where(*filters)
+                .order_by(File.deleted_at.desc())
+                .offset(skip)
+                .limit(limit)
+            )
+    else:
+        query = (
+            select(File)
+            .where(*filters)
+            .order_by(File.deleted_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+
+    result = await db.execute(query)
+    files = list(result.scalars().all())
+
+    if files:
+        last_deleted = files[-1].deleted_at
+        if last_deleted and total > skip + len(files):
+            next_cursor = last_deleted.isoformat()
+
+    return files, total, next_cursor
 
 async def soft_delete_file(
     db: AsyncSession, file_id: uuid.UUID, owner_id: uuid.UUID
@@ -292,7 +400,7 @@ async def purge_file(
     if not file:
         return False
 
-    await run_in_threadpool(delete_file, file.storage_key)
+    await delete_file(file.storage_key)
 
     owner_result = await db.execute(select(User).where(User.id == owner_id))
     owner = owner_result.scalar_one()
@@ -302,7 +410,7 @@ async def purge_file(
     await db.commit()
     return True
 
-def get_download_stream(file: File):
+async def get_download_stream(file: File):
     from app.core.storage import stream_object
     return {
         "stream": stream_object(file.storage_key),
@@ -310,3 +418,88 @@ def get_download_stream(file: File):
         "filename": file.filename,
         "size": file.size,
     }
+
+
+async def prepare_upload(
+    user: User, file_size: int, declared_mime: str, filename: str
+) -> None:
+    if file_size > settings.MAX_UPLOAD_SIZE:
+        raise ValueError("文件过大，单文件上限 100MB")
+    if user.used_storage + file_size > user.storage_quota:
+        raise ValueError("存储空间不足，请联系管理员扩容")
+
+
+async def stream_upload_unknown_size(
+    storage_key: str, file_obj, mime_type: str
+) -> int:
+    from app.core.storage import get_s3_client
+    total = 0
+    async with get_s3_client() as client:
+        resp = await client.create_multipart_upload(
+            Bucket=settings.MINIO_BUCKET,
+            Key=storage_key,
+            ContentType=mime_type,
+        )
+        upload_id = resp["UploadId"]
+        parts = []
+        part_number = 1
+        try:
+            while True:
+                chunk = await file_obj.read(settings.UPLOAD_CHUNK_SIZE)
+                if not chunk:
+                    break
+                if isinstance(chunk, str):
+                    chunk = chunk.encode("utf-8")
+                total += len(chunk)
+                if total > settings.MAX_UPLOAD_SIZE:
+                    raise ValueError("文件过大，单文件上限 100MB")
+                part_resp = await client.upload_part(
+                    Bucket=settings.MINIO_BUCKET,
+                    Key=storage_key,
+                    UploadId=upload_id,
+                    PartNumber=part_number,
+                    Body=chunk,
+                )
+                parts.append({
+                    "PartNumber": part_number,
+                    "ETag": part_resp["ETag"],
+                })
+                part_number += 1
+
+            if not parts:
+                await client.put_object(
+                    Bucket=settings.MINIO_BUCKET,
+                    Key=storage_key,
+                    Body=b"",
+                    ContentType=mime_type,
+                )
+            else:
+                await client.complete_multipart_upload(
+                    Bucket=settings.MINIO_BUCKET,
+                    Key=storage_key,
+                    UploadId=upload_id,
+                    MultipartUpload={"Parts": parts},
+                )
+        except Exception:
+            try:
+                await client.abort_multipart_upload(
+                    Bucket=settings.MINIO_BUCKET,
+                    Key=storage_key,
+                    UploadId=upload_id,
+                )
+            except Exception:
+                pass
+            raise
+    return total
+
+
+async def get_preview_url(file: File) -> str:
+    return await get_presigned_preview_url(
+        file.storage_key, file.mime_type, file.filename, settings.MINIO_DOWNLOAD_EXPIRES
+    )
+
+
+async def get_download_url(file: File) -> str:
+    return await get_presigned_download_url(
+        file.storage_key, settings.MINIO_DOWNLOAD_EXPIRES, file.filename
+    )

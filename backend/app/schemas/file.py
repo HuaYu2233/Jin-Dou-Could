@@ -19,6 +19,7 @@ class FileResponse(BaseModel):
 class FileListResponse(BaseModel):
     items: list[FileResponse]
     total: int
+    next_cursor: str | None = None
 
 class FileUploadResponse(BaseModel):
     id: UUID
