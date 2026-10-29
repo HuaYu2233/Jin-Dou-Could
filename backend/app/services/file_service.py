@@ -14,6 +14,7 @@ from app.core.storage import (
     get_presigned_preview_url,
 )
 from app.core.config import settings
+from app.core.redis import redis_client
 
 _FILENAME_MAX_LEN = 255
 _CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]")
@@ -194,18 +195,27 @@ async def list_files(
 
     next_cursor = None
 
+    cache_key = f"file_count:{owner_id}:{file_type or ''}:{folder_id or 'root'}"
+    cached_total = await redis_client.get(cache_key)
+    if cached_total is not None:
+        total = int(cached_total)
+    else:
+        count_result = await db.execute(select(func.count()).select_from(File).where(*filters))
+        total = count_result.scalar_one()
+        await redis_client.setex(cache_key, 5, str(total))
+
     if cursor:
         try:
             cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=timezone.utc)
             query = (
-                select(File, func.count().over().label("total"))
+                select(File)
                 .where(*filters, File.created_at < cursor_dt)
                 .order_by(File.created_at.desc())
                 .limit(limit)
             )
         except (ValueError, TypeError):
             query = (
-                select(File, func.count().over().label("total"))
+                select(File)
                 .where(*filters)
                 .order_by(File.created_at.desc())
                 .offset(skip)
@@ -213,7 +223,7 @@ async def list_files(
             )
     else:
         query = (
-            select(File, func.count().over().label("total"))
+            select(File)
             .where(*filters)
             .order_by(File.created_at.desc())
             .offset(skip)
@@ -221,9 +231,7 @@ async def list_files(
         )
 
     result = await db.execute(query)
-    rows = result.all()
-    total = rows[0].total if rows else 0
-    files = [row[0] for row in rows]
+    files = list(result.scalars().all())
 
     if files:
         last_created = files[-1].created_at
@@ -255,18 +263,27 @@ async def search_files(
 
     next_cursor = None
 
+    cache_key = f"search_count:{owner_id}:{keyword}"
+    cached_total = await redis_client.get(cache_key)
+    if cached_total is not None:
+        total = int(cached_total)
+    else:
+        count_result = await db.execute(select(func.count()).select_from(File).where(*filters))
+        total = count_result.scalar_one()
+        await redis_client.setex(cache_key, 5, str(total))
+
     if cursor:
         try:
             cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=timezone.utc)
             query = (
-                select(File, func.count().over().label("total"))
+                select(File)
                 .where(*filters, File.created_at < cursor_dt)
                 .order_by(*order_cols)
                 .limit(limit)
             )
         except (ValueError, TypeError):
             query = (
-                select(File, func.count().over().label("total"))
+                select(File)
                 .where(*filters)
                 .order_by(*order_cols)
                 .offset(skip)
@@ -274,7 +291,7 @@ async def search_files(
             )
     else:
         query = (
-            select(File, func.count().over().label("total"))
+            select(File)
             .where(*filters)
             .order_by(*order_cols)
             .offset(skip)
@@ -282,9 +299,7 @@ async def search_files(
         )
 
     result = await db.execute(query)
-    rows = result.all()
-    total = rows[0].total if rows else 0
-    files = [row[0] for row in rows]
+    files = list(result.scalars().all())
 
     if files:
         last_created = files[-1].created_at
@@ -323,18 +338,27 @@ async def list_trash_files(
 
     next_cursor = None
 
+    cache_key = f"trash_count:{owner_id}"
+    cached_total = await redis_client.get(cache_key)
+    if cached_total is not None:
+        total = int(cached_total)
+    else:
+        count_result = await db.execute(select(func.count()).select_from(File).where(*filters))
+        total = count_result.scalar_one()
+        await redis_client.setex(cache_key, 5, str(total))
+
     if cursor:
         try:
             cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=timezone.utc)
             query = (
-                select(File, func.count().over().label("total"))
+                select(File)
                 .where(*filters, File.deleted_at < cursor_dt)
                 .order_by(File.deleted_at.desc())
                 .limit(limit)
             )
         except (ValueError, TypeError):
             query = (
-                select(File, func.count().over().label("total"))
+                select(File)
                 .where(*filters)
                 .order_by(File.deleted_at.desc())
                 .offset(skip)
@@ -342,7 +366,7 @@ async def list_trash_files(
             )
     else:
         query = (
-            select(File, func.count().over().label("total"))
+            select(File)
             .where(*filters)
             .order_by(File.deleted_at.desc())
             .offset(skip)
@@ -350,9 +374,7 @@ async def list_trash_files(
         )
 
     result = await db.execute(query)
-    rows = result.all()
-    total = rows[0].total if rows else 0
-    files = [row[0] for row in rows]
+    files = list(result.scalars().all())
 
     if files:
         last_deleted = files[-1].deleted_at
