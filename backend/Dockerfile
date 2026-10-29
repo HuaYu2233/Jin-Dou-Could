@@ -1,9 +1,12 @@
+# syntax=docker/dockerfile:1
+
 # ==================== 阶段1: 依赖构建 ====================
 FROM python:3.12-slim-bookworm AS builder
 
 WORKDIR /app
 
-RUN apt-get update \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    apt-get update \
     && apt-get install -y --no-install-recommends \
        gcc \
        libpq-dev \
@@ -15,14 +18,16 @@ ENV UV_SYSTEM_PYTHON=1
 
 COPY pyproject.toml .
 COPY uv.lock* ./
-RUN uv pip install --system --no-cache .
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system .
 
 # ==================== 阶段2: 生产运行 ====================
 FROM python:3.12-slim-bookworm AS runtime
 
 WORKDIR /app
 
-RUN apt-get update \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    apt-get update \
     && apt-get install -y --no-install-recommends \
        libpq5 \
        libmagic1 \

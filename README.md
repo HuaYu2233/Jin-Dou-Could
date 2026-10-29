@@ -113,11 +113,14 @@ cd JinDou-Cloud
 cp .env.example .env
 # 编辑 .env，修改密码和密钥
 
-# 3. 启动所有服务（开发模式，自动加载 docker-compose.override.yml）
-docker compose up -d --build
+# 3. 首次构建镜像（约 5 分钟，后续无需重复）
+make prod-build
 
-# 4. 查看启动日志
-docker compose logs -f backend
+# 4. 开发模式启动（~2 秒，热重载）
+make dev
+
+# 5. 查看启动日志
+make logs
 ```
 
 启动完成后访问：
@@ -464,10 +467,18 @@ curl http://localhost:8000/health
 ## 常用命令
 
 ```bash
-# ---- 服务管理 ----
-docker compose up -d                          # 启动（开发模式）
-docker compose up -d --build                  # 重新构建
-docker compose -f docker-compose.yml up -d --build  # 生产模式
+# ---- 服务管理（Makefile 快捷命令）----
+make dev                                     # 开发模式启动（~2秒）
+make dev-restart                             # 重启 backend + frontend
+make prod-build                              # 生产构建镜像
+make prod                                    # 生产模式启动
+make hot-reload                              # 热更新后端代码
+make logs                                    # 查看日志
+make down                                    # 停止所有服务
+
+# ---- 原始 Docker Compose 命令 ----
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d  # 开发模式
+docker compose -f docker-compose.yml up -d --build                    # 生产模式
 docker compose down                           # 停止
 docker compose down -v                        # 停止并删除数据卷（⚠️ 清空所有数据）
 docker compose restart frontend               # 重启单个服务

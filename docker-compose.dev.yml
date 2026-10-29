@@ -1,0 +1,81 @@
+services:
+  backend:
+    image: jindou-cloud-backend:latest
+    container_name: cloud-drive-backend
+    restart: unless-stopped
+    working_dir: /app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "localhost:host-gateway"
+    entrypoint: []
+    command: >
+      sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    environment:
+      - ENVIRONMENT=development
+      - CELERY_TASK_ALWAYS_EAGER=true
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-clouduser}:${POSTGRES_PASSWORD:-cloudpass123}@db:5432/${POSTGRES_DB:-clouddrive}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redispass123}@redis:6379/0
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_PUBLIC_ENDPOINT=localhost:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin123}
+      - MINIO_BUCKET=cloud-drive
+      - MINIO_SECURE=${MINIO_SECURE:-false}
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-prod}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
+      - CSRF_ENABLED=${CSRF_ENABLED:-true}
+      - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
+      - WS_PUBSUB_ENABLED=${WS_PUBSUB_ENABLED:-true}
+      - PROMETHEUS_ENABLED=${PROMETHEUS_ENABLED:-false}
+      - DEFAULT_STORAGE_QUOTA=${DEFAULT_STORAGE_QUOTA:-1073741824}
+      - RATE_LIMIT_ENABLED=${RATE_LIMIT_ENABLED:-true}
+      - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-60}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      - REFRESH_TOKEN_EXPIRE_DAYS=${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      - MAX_UPLOAD_SIZE=${MAX_UPLOAD_SIZE:-104857600}
+      - BACKUP_DIR=/backups
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/alembic:/app/alembic
+      - ./backend/alembic.ini:/app/alembic.ini
+      - ./backups:/backups
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+  frontend:
+    image: jindou-cloud-frontend:latest
+    container_name: cloud-drive-frontend
+    restart: unless-stopped
+    working_dir: /app
+    entrypoint: []
+    command: sh -c "npm install --legacy-peer-deps 2>/dev/null; npm run dev"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+      - frontend_next_cache:/app/.next
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      - API_URL=http://backend:8000
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  frontend_node_modules:
+  frontend_next_cache:
