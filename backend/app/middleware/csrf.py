@@ -62,7 +62,7 @@ class CSRFMiddleware:
                 headers = dict(message.get("headers", []))
                 cookie = (
                     f"{_CSRF_COOKIE_NAME}={token}; "
-                    f"Path=/; SameSite=Lax; HttpOnly"
+                    f"Path=/; SameSite=Lax"
                 )
                 if settings.ENVIRONMENT == "production":
                     cookie += "; Secure"
