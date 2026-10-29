@@ -73,20 +73,18 @@ async def _get_trashed_folder(
 async def _collect_subfolder_ids(
     db: AsyncSession, folder_id: uuid.UUID, owner_id: uuid.UUID
 ) -> list[uuid.UUID]:
-    ids = []
-    stack = [folder_id]
-    while stack:
-        current = stack.pop()
-        ids.append(current)
-        result = await db.execute(
-            select(Folder.id).where(
-                Folder.parent_id == current,
-                Folder.owner_id == owner_id,
-            )
-        )
-        child_ids = [row[0] for row in result.all()]
-        stack.extend(child_ids)
-    return ids
+    cte = (
+        select(Folder.id, Folder.parent_id)
+        .where(Folder.id == folder_id, Folder.owner_id == owner_id)
+        .cte(name="subfolder_tree", recursive=True)
+    )
+    children = (
+        select(Folder.id, Folder.parent_id)
+        .where(Folder.parent_id == cte.c.id, Folder.owner_id == owner_id)
+    )
+    cte = cte.union_all(children)
+    result = await db.execute(select(cte.c.id))
+    return [row[0] for row in result.all()]
 
 
 async def rename_folder(

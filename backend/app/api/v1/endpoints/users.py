@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.deps import get_current_user, invalidate_user_cache
+from app.api.deps import get_current_user, get_full_user, invalidate_user_cache
 from app.db.base import get_db
 from app.models.user import User
 from app.schemas.user import UserResponse, ProfileUpdate, PasswordChange, SecurityQuestionUpdate
@@ -56,7 +56,7 @@ async def update_profile(
 async def change_password(
     request: Request,
     data: PasswordChange,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_full_user),
     db: AsyncSession = Depends(get_db),
 ):
     access_token = request.cookies.get("access_token")
@@ -73,7 +73,7 @@ async def change_password(
 @router.patch("/me/security-question", response_model=UserResponse)
 async def update_security_question(
     data: SecurityQuestionUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_full_user),
     db: AsyncSession = Depends(get_db),
 ):
     try:

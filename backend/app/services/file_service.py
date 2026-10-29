@@ -49,11 +49,9 @@ async def detect_real_mime_type(fileobj, declared: str) -> str:
     try:
         import magic
         try:
-            if hasattr(fileobj, "seek"):
-                await fileobj.seek(0) if hasattr(fileobj.seek, "__await__") else fileobj.seek(0)
-            head = await fileobj.read(2048) if hasattr(fileobj.read, "__await__") else fileobj.read(2048)
-            if hasattr(fileobj, "seek"):
-                await fileobj.seek(0) if hasattr(fileobj.seek, "__await__") else fileobj.seek(0)
+            await fileobj.seek(0)
+            head = await fileobj.read(2048)
+            await fileobj.seek(0)
         except Exception:
             head = None
         if head:

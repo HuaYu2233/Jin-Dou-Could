@@ -44,6 +44,7 @@ def _deserialize_user(data: str) -> User:
     user.used_storage = d["used_storage"]
     user.created_at = datetime.fromisoformat(d["created_at"]) if d["created_at"] else None
     user.updated_at = datetime.fromisoformat(d["updated_at"]) if d["updated_at"] else None
+    user._from_cache = True
     return user
 
 async def invalidate_user_cache(user_id: UUID | str) -> None:
@@ -90,6 +91,19 @@ async def get_current_user(
     if request.method == "GET":
         await redis_client.setex(cache_key, USER_CACHE_TTL, _serialize_user(user))
     
+    return user
+
+
+async def get_full_user(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    if getattr(user, "_from_cache", False):
+        result = await db.execute(select(User).where(User.id == user.id))
+        full_user = result.scalar_one_or_none()
+        if not full_user:
+            raise HTTPException(status_code=401, detail="User not found")
+        return full_user
     return user
 
 async def get_current_admin(
