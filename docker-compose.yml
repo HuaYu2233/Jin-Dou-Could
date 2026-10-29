@@ -73,6 +73,7 @@ services:
       - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin123}
       - MINIO_BUCKET=cloud-drive
+      - MINIO_SECURE=${MINIO_SECURE:-false}
       - SECRET_KEY=${SECRET_KEY:?SECRET_KEY 必须在 .env 中设置}
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - BACKEND_WORKERS=${BACKEND_WORKERS:-4}
@@ -110,6 +111,8 @@ services:
       - CELERY_BROKER_URL=${CELERY_BROKER_URL:-}
       - CELERY_RESULT_BACKEND_URL=${CELERY_RESULT_BACKEND_URL:-}
       - CELERY_TASK_ALWAYS_EAGER=${CELERY_TASK_ALWAYS_EAGER:-false}
+      - WS_PUBSUB_ENABLED=${WS_PUBSUB_ENABLED:-true}
+      - PROMETHEUS_ENABLED=${PROMETHEUS_ENABLED:-false}
     volumes:
       - ./backups:/backups
     ports:

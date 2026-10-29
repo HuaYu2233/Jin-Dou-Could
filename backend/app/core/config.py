@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     MINIO_ACCESS_KEY: str = "minioadmin"
     MINIO_SECRET_KEY: str = "minioadmin123"
     MINIO_BUCKET: str = "cloud-drive"
+    MINIO_SECURE: bool = False
     MINIO_DOWNLOAD_EXPIRES: int = 3600
     UPLOAD_CHUNK_SIZE: int = 8 * 1024 * 1024
     MULTIPART_THRESHOLD: int = 16 * 1024 * 1024
@@ -84,6 +85,12 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = ""
     CELERY_RESULT_BACKEND_URL: str = ""
     CELERY_TASK_ALWAYS_EAGER: bool = False
+
+    # WebSocket
+    WS_PUBSUB_ENABLED: bool = True
+
+    # Prometheus
+    PROMETHEUS_ENABLED: bool = False
 
     @field_validator("SECRET_KEY")
     @classmethod

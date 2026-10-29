@@ -21,7 +21,7 @@ def generate_thumbnail(self, storage_key: str, file_id: str) -> str | None:
             settings.MINIO_ENDPOINT,
             access_key=settings.MINIO_ACCESS_KEY,
             secret_key=settings.MINIO_SECRET_KEY,
-            secure=False,
+            secure=settings.MINIO_SECURE,
         )
 
         response = minio_client.get_object(settings.MINIO_BUCKET, storage_key)

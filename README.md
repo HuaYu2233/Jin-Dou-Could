@@ -31,17 +31,19 @@
 | Celery       | 5.4+        | 异步任务队列          |
 | Loguru       | 0.7+        | 结构化日志            |
 | python-magic | 0.4+        | MIME 类型检测         |
+| Prometheus   | 6.1+        | 指标采集与可观测性    |
 | Python       | 3.9+        | 运行时                |
 
 ### 基础设施
 
-| 组件           | 版本   | 用途                                       |
-| -------------- | ------ | ------------------------------------------ |
-| PostgreSQL     | 15     | 关系数据库                                 |
-| Redis          | 7      | 缓存 / 限流 / Token 黑名单 / Celery Broker |
-| MinIO          | latest | 对象存储                                   |
-| Nginx          | -      | 反向代理（可选）                           |
-| Docker Compose | 2.0+   | 容器编排                                   |
+| 组件           | 版本   | 用途                                                    |
+| -------------- | ------ | ------------------------------------------------------- |
+| PostgreSQL     | 15     | 关系数据库                                              |
+| Redis          | 7      | 缓存 / 限流 / Token 黑名单 / Celery Broker / WS Pub/Sub |
+| MinIO          | latest | 对象存储                                                |
+| Nginx          | -      | 反向代理（可选）                                        |
+| Prometheus     | 可选   | 指标采集（`PROMETHEUS_ENABLED=true`）                   |
+| Docker Compose | 2.0+   | 容器编排                                                |
 
 ## 项目结构
 
@@ -141,14 +143,15 @@ docker compose logs -f backend
 
 ### 数据库与存储
 
-| 配置项                | 说明         | 默认值     |
-| --------------------- | ------------ | ---------- |
-| `POSTGRES_USER`       | 数据库用户名 | clouduser  |
-| `POSTGRES_PASSWORD`   | 数据库密码   | -          |
-| `POSTGRES_DB`         | 数据库名     | clouddrive |
-| `REDIS_PASSWORD`      | Redis 密码   | -          |
-| `MINIO_ROOT_USER`     | MinIO 用户名 | minioadmin |
-| `MINIO_ROOT_PASSWORD` | MinIO 密码   | -          |
+| 配置项                | 说明           | 默认值     |
+| --------------------- | -------------- | ---------- |
+| `POSTGRES_USER`       | 数据库用户名   | clouduser  |
+| `POSTGRES_PASSWORD`   | 数据库密码     | -          |
+| `POSTGRES_DB`         | 数据库名       | clouddrive |
+| `REDIS_PASSWORD`      | Redis 密码     | -          |
+| `MINIO_ROOT_USER`     | MinIO 用户名   | minioadmin |
+| `MINIO_ROOT_PASSWORD` | MinIO 密码     | -          |
+| `MINIO_SECURE`        | MinIO TLS 连接 | false      |
 
 ### JWT 与认证
 
@@ -216,6 +219,13 @@ docker compose logs -f backend
 | `SECURITY_HEADERS_ENABLED` | 启用安全响应头               | true   |
 | `RATE_LIMIT_ENABLED`       | 启用全局限流                 | true   |
 | `RATE_LIMIT_PER_MINUTE`    | 每分钟每 IP 每路径最大请求数 | 60     |
+
+### WebSocket 与可观测性
+
+| 配置项               | 说明                                       | 默认值 |
+| -------------------- | ------------------------------------------ | ------ |
+| `WS_PUBSUB_ENABLED`  | WebSocket Redis Pub/Sub 多 Worker 消息广播 | true   |
+| `PROMETHEUS_ENABLED` | 启用 Prometheus 指标（`/metrics` 端点）    | false  |
 
 ### 密码找回
 
@@ -429,23 +439,26 @@ curl http://localhost:8000/health
 
 ### 性能优化
 
-| 模块     | 措施                                                                                                            |
-| -------- | --------------------------------------------------------------------------------------------------------------- |
-| 上传     | 流式直传 MinIO，内存占用 O(1)（非 O(N×文件大小)）                                                               |
-| MinIO    | 异步包装（`run_in_threadpool`），不阻塞事件循环                                                                 |
-| 部署     | Gunicorn 多 worker，充分利用多核，支持优雅关闭                                                                  |
-| 压缩     | GZip 中间件（≥500B 自动压缩）                                                                                   |
-| 数据库   | 连接池可配置（`pool_size`/`max_overflow`/`pool_timeout`/`pool_recycle`）                                        |
-| 限流     | Redis 滑动窗口限流，按 IP + 路径粒度控制                                                                        |
-| 任务     | Celery 异步队列，邮件/备份/缩略图/告警不阻塞请求                                                                |
-| 缩略图   | 图片上传后自动异步生成 256×256 缩略图，前端渐进加载（shimmer → blur → sharp），列表优先请求缩略图而非原图       |
-| 分页     | 窗口函数 `count() over()` 合并数据+总数为单次查询，消除 N+1 count 问题                                          |
-| 搜索     | pg_trgm `similarity()` 三元组相似度搜索 + GIN 索引，替代低效 `ilike`                                            |
-| 文件夹   | `list_folder_contents` 文件查询与 count 合并，3 次查询→2 次                                                     |
-| Docker   | 多阶段构建：backend 315MB / frontend 216MB，生产无 `--reload`，非 root 运行，HEALTHCHECK                        |
-| 虚拟滚动 | react-virtuoso（TableVirtuoso + VirtuosoGrid），文件列表仅渲染可视区域 DOM，万级文件无卡顿                      |
-| 请求缓存 | TanStack Query（useQuery + useMutation），自动去重/缓存/stale-while-revalidate，mutation 后乐观更新或精准失效   |
-| 实时通知 | WebSocket 长连接，上传完成/分享创建/存储变更即时推送，前端自动 invalidate 对应缓存，指数退避重连（1→2→4→8→16s） |
+| 模块         | 措施                                                                                                            |
+| ------------ | --------------------------------------------------------------------------------------------------------------- |
+| 上传         | 流式直传 MinIO，内存占用 O(1)（非 O(N×文件大小)）                                                               |
+| MinIO        | 异步包装（`run_in_threadpool`），不阻塞事件循环                                                                 |
+| 部署         | Gunicorn 多 worker，充分利用多核，支持优雅关闭                                                                  |
+| 压缩         | GZip 中间件（≥500B 自动压缩）                                                                                   |
+| 数据库       | 连接池可配置（`pool_size`/`max_overflow`/`pool_timeout`/`pool_recycle`）                                        |
+| 限流         | Redis 滑动窗口限流，按 IP + 路径粒度控制                                                                        |
+| 任务         | Celery 异步队列，邮件/备份/缩略图/告警不阻塞请求                                                                |
+| 缩略图       | 图片上传后自动异步生成 256×256 缩略图，前端渐进加载（shimmer → blur → sharp），列表优先请求缩略图而非原图       |
+| 分页         | 窗口函数 `count() over()` 合并数据+总数为单次查询，消除 N+1 count 问题                                          |
+| 搜索         | pg_trgm `similarity()` 三元组相似度搜索 + GIN 索引，替代低效 `ilike`                                            |
+| 文件夹       | `list_folder_contents` 文件查询与 count 合并，3 次查询→2 次                                                     |
+| Docker       | 多阶段构建：backend 315MB / frontend 216MB，生产无 `--reload`，非 root 运行，HEALTHCHECK                        |
+| 虚拟滚动     | react-virtuoso（TableVirtuoso + VirtuosoGrid），文件列表仅渲染可视区域 DOM，万级文件无卡顿                      |
+| 请求缓存     | TanStack Query（useQuery + useMutation），自动去重/缓存/stale-while-revalidate，mutation 后乐观更新或精准失效   |
+| 实时通知     | WebSocket 长连接，上传完成/分享创建/存储变更即时推送，前端自动 invalidate 对应缓存，指数退避重连（1→2→4→8→16s） |
+| WS 多 Worker | Redis Pub/Sub 消息总线，多 Gunicorn Worker 下 WebSocket 消息跨进程广播，`WS_PUBSUB_ENABLED` 可配置              |
+| 可观测性     | Prometheus 指标（`PROMETHEUS_ENABLED=true`），暴露 `/metrics` 端点，采集请求量/延迟/错误率/在途请求             |
+| 生命周期管理 | FastAPI lifespan 统一管理 S3 客户端、Redis 连接、数据库引擎、WebSocket Pub/Sub 的初始化与优雅关闭               |
 
 ## 常用命令
 

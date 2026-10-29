@@ -1,5 +1,6 @@
 from celery import Celery
 from app.core.config import settings
+from loguru import logger
 
 
 def _build_celery_url(base_url: str, db: int) -> str:
@@ -11,10 +12,20 @@ def _build_celery_url(base_url: str, db: int) -> str:
     return f"{url}/{db}"
 
 
+_broker_url = _build_celery_url(settings.CELERY_BROKER_URL, 1)
+_backend_url = _build_celery_url(settings.CELERY_RESULT_BACKEND_URL, 2)
+
+if not settings.CELERY_BROKER_URL and not settings.CELERY_TASK_ALWAYS_EAGER:
+    logger.warning(
+        "CELERY_BROKER_URL 为空且 CELERY_TASK_ALWAYS_EAGER=False，"
+        "Celery Worker 将无法连接 Broker。自动回退为 eager 模式（同步执行）。"
+    )
+    settings.CELERY_TASK_ALWAYS_EAGER = True
+
 celery_app = Celery(
     "jindou_cloud",
-    broker=_build_celery_url(settings.CELERY_BROKER_URL, 1),
-    backend=_build_celery_url(settings.CELERY_RESULT_BACKEND_URL, 2),
+    broker=_broker_url,
+    backend=_backend_url,
 )
 
 celery_app.conf.update(

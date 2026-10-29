@@ -6,7 +6,6 @@ from datetime import timedelta
 from urllib.parse import quote
 from loguru import logger
 import io
-import asyncio
 
 _s3_config = Config(
     signature_version="s3v4",
@@ -19,48 +18,49 @@ _s3_client = None
 _s3_client_ctx = None
 _presigned_client = None
 _presigned_client_ctx = None
-_init_lock = asyncio.Lock()
+
+_ENDPOINT_SCHEME = "https" if settings.MINIO_SECURE else "http"
 
 
 async def init_s3_clients():
     global _s3_client, _s3_client_ctx, _presigned_client, _presigned_client_ctx
-    async with _init_lock:
-        if _s3_client is not None:
-            return
-        _s3_client_ctx = _session.create_client(
-            "s3",
-            endpoint_url=f"http://{settings.MINIO_ENDPOINT}",
-            aws_access_key_id=settings.MINIO_ACCESS_KEY,
-            aws_secret_access_key=settings.MINIO_SECRET_KEY,
-            region_name="us-east-1",
-            config=_s3_config,
-        )
-        _s3_client = await _s3_client_ctx.__aenter__()
+    if _s3_client is not None:
+        return
+    _s3_client_ctx = _session.create_client(
+        "s3",
+        endpoint_url=f"{_ENDPOINT_SCHEME}://{settings.MINIO_ENDPOINT}",
+        aws_access_key_id=settings.MINIO_ACCESS_KEY,
+        aws_secret_access_key=settings.MINIO_SECRET_KEY,
+        region_name="us-east-1",
+        config=_s3_config,
+        use_ssl=settings.MINIO_SECURE,
+    )
+    _s3_client = await _s3_client_ctx.__aenter__()
 
-        _presigned_client_ctx = _session.create_client(
-            "s3",
-            endpoint_url=f"http://{settings.MINIO_PUBLIC_ENDPOINT}",
-            aws_access_key_id=settings.MINIO_ACCESS_KEY,
-            aws_secret_access_key=settings.MINIO_SECRET_KEY,
-            region_name="us-east-1",
-            config=_s3_config,
-        )
-        _presigned_client = await _presigned_client_ctx.__aenter__()
-        logger.info("S3 clients initialized (pooled)")
+    _presigned_client_ctx = _session.create_client(
+        "s3",
+        endpoint_url=f"{_ENDPOINT_SCHEME}://{settings.MINIO_PUBLIC_ENDPOINT}",
+        aws_access_key_id=settings.MINIO_ACCESS_KEY,
+        aws_secret_access_key=settings.MINIO_SECRET_KEY,
+        region_name="us-east-1",
+        config=_s3_config,
+        use_ssl=settings.MINIO_SECURE,
+    )
+    _presigned_client = await _presigned_client_ctx.__aenter__()
+    logger.info(f"S3 clients initialized (secure={settings.MINIO_SECURE})")
 
 
 async def close_s3_clients():
     global _s3_client, _s3_client_ctx, _presigned_client, _presigned_client_ctx
-    async with _init_lock:
-        if _s3_client_ctx is not None:
-            await _s3_client_ctx.__aexit__(None, None, None)
-            _s3_client_ctx = None
-            _s3_client = None
-        if _presigned_client_ctx is not None:
-            await _presigned_client_ctx.__aexit__(None, None, None)
-            _presigned_client_ctx = None
-            _presigned_client = None
-        logger.info("S3 clients closed")
+    if _s3_client_ctx is not None:
+        await _s3_client_ctx.__aexit__(None, None, None)
+        _s3_client_ctx = None
+        _s3_client = None
+    if _presigned_client_ctx is not None:
+        await _presigned_client_ctx.__aexit__(None, None, None)
+        _presigned_client_ctx = None
+        _presigned_client = None
+    logger.info("S3 clients closed")
 
 
 @asynccontextmanager
@@ -75,17 +75,6 @@ async def get_presigned_s3_client():
     if _presigned_client is None:
         await init_s3_clients()
     yield _presigned_client
-
-
-from minio import Minio
-from minio.error import S3Error
-
-minio_client = Minio(
-    settings.MINIO_ENDPOINT,
-    access_key=settings.MINIO_ACCESS_KEY,
-    secret_key=settings.MINIO_SECRET_KEY,
-    secure=False,
-)
 
 
 async def ensure_bucket() -> None:
@@ -124,14 +113,6 @@ async def ensure_bucket() -> None:
             )
     except Exception:
         pass
-
-
-def ensure_bucket_sync() -> None:
-    try:
-        if not minio_client.bucket_exists(settings.MINIO_BUCKET):
-            minio_client.make_bucket(settings.MINIO_BUCKET)
-    except S3Error as e:
-        raise RuntimeError(f"MinIO bucket init failed: {e}")
 
 
 async def upload_file(storage_key: str, data: bytes, mime_type: str, length: int) -> None:

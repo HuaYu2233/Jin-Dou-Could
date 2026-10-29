@@ -32,3 +32,7 @@ except Exception:
 async def get_db():
     async with AsyncSessionLocal() as session:
         yield session
+
+
+async def dispose_engine() -> None:
+    await engine.dispose()
