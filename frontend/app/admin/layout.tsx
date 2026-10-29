@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/stores/auth";
@@ -13,24 +13,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const isLoading = useAuthStore((s) => s.isLoading);
   const fetchMe = useAuthStore((s) => s.fetchMe);
   const { t } = useTranslation();
+  const [verified, setVerified] = useState(false);
 
   useEffect(() => {
-    fetchMe();
+    fetchMe().finally(() => setVerified(true));
   }, [fetchMe]);
 
   useEffect(() => {
-    if (isLoading) return;
+    if (!verified) return;
     if (!isAuthenticated) {
       router.replace("/login");
     } else if (user && !user.is_admin) {
       router.replace("/dashboard");
     }
-  }, [user, isAuthenticated, isLoading, router]);
+  }, [user, isAuthenticated, verified, router]);
 
-  if (isLoading || (!user && isAuthenticated)) {
+  if (!verified) {
     return (
       <div className={styles.container}>
         <Header />
