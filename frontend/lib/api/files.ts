@@ -1,5 +1,5 @@
 // /Users/zero/project/JinDou-Cloud/frontend/lib/api/files.ts
-import { client } from "./client";
+import { client, getCsrfToken } from "./client";
 
 export interface FileItem {
   id: string;
@@ -58,32 +58,62 @@ export function uploadFileWithProgress(
   onProgress: (loaded: number, total: number) => void,
   signal?: AbortSignal
 ): Promise<FileUploadResponse> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    const formData = new FormData();
-    formData.append("file", file);
-    const params = new URLSearchParams();
-    if (folderId) params.set("folder_id", folderId);
-    const query = params.toString();
-    xhr.open("POST", `${API_BASE_URL}/api/v1/files${query ? `?${query}` : ""}`);
-    xhr.withCredentials = true;
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) onProgress(e.loaded, e.total);
-    };
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try { resolve(JSON.parse(xhr.responseText)); } catch { reject(new Error("解析响应失败")); }
-      } else if (xhr.status === 401) {
-        window.location.href = "/login";
-        reject(new Error("Unauthorized"));
-      } else {
-        try { const err = JSON.parse(xhr.responseText); reject(new Error(err.detail || "上传失败")); } catch { reject(new Error("上传失败")); }
+  return new Promise(async (resolve, reject) => {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const params = new URLSearchParams();
+      if (folderId) params.set("folder_id", folderId);
+      const query = params.toString();
+      const url = `${API_BASE_URL}/api/v1/files${query ? `?${query}` : ""}`;
+
+      const csrfToken = getCsrfToken();
+      const headers: Record<string, string> = {};
+      if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
+
+      const res = await fetch(url, {
+        method: "POST",
+        body: formData,
+        headers,
+        credentials: "include",
+        signal,
+        duplex: "half",
+      } as RequestInit);
+
+      if (!res.ok) {
+        if (res.status === 401) {
+          window.location.href = "/login";
+          reject(new Error("Unauthorized"));
+          return;
+        }
+        const err = await res.json().catch(() => ({}));
+        reject(new Error(err.detail || "上传失败"));
+        return;
       }
-    };
-    xhr.onerror = () => reject(new Error("网络错误"));
-    xhr.onabort = () => reject(new Error("已取消"));
-    if (signal) signal.addEventListener("abort", () => xhr.abort());
-    xhr.send(formData);
+
+      const contentLength = Number(res.headers.get("x-upload-size") || file.size);
+      if (res.body) {
+        const reader = res.body.getReader();
+        let loaded = 0;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          loaded += value.length;
+          onProgress(loaded, contentLength);
+        }
+      } else {
+        onProgress(contentLength, contentLength);
+      }
+
+      const data = await res.json();
+      resolve(data);
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        reject(new Error("已取消"));
+      } else {
+        reject(err);
+      }
+    }
   });
 }
 
@@ -117,34 +147,40 @@ export async function downloadFileWithProgress(
 ): Promise<void> {
   const url = await getFileDownloadUrl(id);
   try {
-    await new Promise<void>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("GET", url);
-      xhr.responseType = "blob";
-      xhr.onprogress = (e) => {
-        if (e.lengthComputable) onProgress(e.loaded, e.total);
-      };
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          const blobUrl = URL.createObjectURL(xhr.response);
-          const a = document.createElement("a");
-          a.href = blobUrl;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(blobUrl);
-          resolve();
-        } else {
-          reject(new Error(`下载失败 (${xhr.status})`));
-        }
-      };
-      xhr.onerror = () => reject(new Error("__CORS_FALLBACK__"));
-      xhr.onabort = () => reject(new Error("已取消"));
-      if (signal) signal.addEventListener("abort", () => xhr.abort());
-      xhr.send();
-    });
+    const res = await fetch(url, { signal });
+    if (!res.ok) throw new Error(`下载失败 (${res.status})`);
+    const contentLength = Number(res.headers.get("content-length") || 0);
+    if (res.body) {
+      const reader = res.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let loaded = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        loaded += value.length;
+        onProgress(loaded, contentLength || loaded);
+      }
+      const blob = new Blob(chunks);
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } else {
+      const a = document.createElement("a");
+      a.href = url;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
   } catch (err) {
-    if (err instanceof Error && err.message === "__CORS_FALLBACK__") {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error("已取消");
+    }
+    if (err instanceof TypeError) {
       const a = document.createElement("a");
       a.href = url;
       document.body.appendChild(a);

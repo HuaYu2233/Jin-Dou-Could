@@ -3,7 +3,7 @@ import { API_BASE_URL } from "@/lib/config";
 
 type FetchOptions = RequestInit & { skipAuth?: boolean };
 
-function getCsrfToken(): string | undefined {
+export function getCsrfToken(): string | undefined {
   if (typeof document === "undefined") return undefined;
   const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/);
   return match ? decodeURIComponent(match[1]) : undefined;
