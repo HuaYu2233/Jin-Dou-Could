@@ -32,6 +32,26 @@ export async function client<T>(endpoint: string, options: FetchOptions = {}): P
     credentials: "include",
   });
 
+  if (res.status === 403) {
+    const errData = await res.json().catch(() => ({}));
+    if (errData.detail === "CSRF token missing, retry after cookie is set") {
+      const retryToken = getCsrfToken();
+      if (retryToken) {
+        const retryHeaders = { ...headers, "X-CSRF-Token": retryToken };
+        const retryRes = await fetch(`${API_BASE_URL}${endpoint}`, {
+          ...rest,
+          body,
+          headers: retryHeaders,
+          credentials: "include",
+        });
+        if (retryRes.ok) return retryRes.json();
+        const retryErr = await retryRes.json().catch(() => ({}));
+        throw new Error(retryErr.detail || "Request failed");
+      }
+    }
+    throw new Error(errData.detail || "Forbidden");
+  }
+
   if (res.status === 401 && !options.skipAuth) {
     const refreshed = await tryRefreshToken();
     if (refreshed) {
