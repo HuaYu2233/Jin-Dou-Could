@@ -1,7 +1,7 @@
 DC = docker compose
 DC_DEV = docker compose -f docker-compose.yml -f docker-compose.dev.yml
 
-.PHONY: help dev dev-restart prod prod-build hot-reload logs down
+.PHONY: help dev dev-restart prod prod-build hot-reload logs down setup
 
 help:
 	@echo "Commands:"
@@ -10,8 +10,12 @@ help:
 	@echo "  make prod-build   - 生产构建镜像（BuildKit 缓存）"
 	@echo "  make prod         - 生产模式启动"
 	@echo "  make hot-reload   - 热更新后端代码（docker cp）"
+	@echo "  make setup        - 初始化 git 性能优化（fsmonitor）"
 	@echo "  make logs         - 查看日志"
 	@echo "  make down         - 停止所有服务"
+
+setup:
+	@git config core.fsmonitor true && git config core.untrackedCache true && git config feature.manyFiles true && git fsmonitor--daemon start 2>/dev/null; echo "Git performance config applied (fsmonitor + untrackedCache)"
 
 dev:
 	@$(DC_DEV) up -d --no-build db redis minio backend frontend

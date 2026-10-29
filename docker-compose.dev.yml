@@ -79,3 +79,15 @@ services:
 volumes:
   frontend_node_modules:
   frontend_next_cache:
+
+x-watch: &watch-config
+  watch:
+    - path: ./backend/app
+      target: /app/app
+      action: sync
+    - path: ./frontend
+      target: /app
+      action: sync
+      ignore:
+        - node_modules/
+        - .next/

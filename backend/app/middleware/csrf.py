@@ -77,9 +77,10 @@ class CSRFMiddleware:
             await self.app(scope, receive, send)
 
     def _build_cookie(self, token: str) -> str:
-        cookie = f"{_CSRF_COOKIE_NAME}={token}; Path=/; SameSite=Lax"
         if settings.ENVIRONMENT == "production":
-            cookie += "; Secure"
+            cookie = f"{_CSRF_COOKIE_NAME}={token}; Path=/; SameSite=None; Secure"
+        else:
+            cookie = f"{_CSRF_COOKIE_NAME}={token}; Path=/; SameSite=Lax"
         return cookie
 
     async def _run_with_cookie(

@@ -92,7 +92,10 @@ JinDou-Cloud/
 ├── backups/                    # 备份输出目录
 ├── .env.example                # 配置模板
 ├── .gitignore
-└── docker-compose.yml
+├── .gitconfig                  # Git 性能优化参考配置
+├── Makefile                    # 开发快捷命令（dev/prod/setup）
+├── docker-compose.yml          # 生产编排
+└── docker-compose.dev.yml      # 开发编排（预构建镜像 + volume）
 ```
 
 ## 快速开始
@@ -134,7 +137,7 @@ make logs
 | PostgreSQL          | localhost:5433             |
 | Redis               | localhost:6379             |
 
-> **开发 vs 生产**：`docker compose up` 默认合并 `docker-compose.override.yml`（热重载 + volume 挂载）；生产部署使用 `docker compose -f docker-compose.yml up`（构建产物运行，无 volume）。
+> **开发 vs 生产**：`make dev` 使用 `docker-compose.dev.yml`（预构建镜像 + volume 挂载，~2 秒启动，热重载）；`make prod` 使用 `docker-compose.yml`（生产构建产物运行，无 volume）。首次 clone 后运行 `make setup` 启用 git 性能优化。
 
 ### 默认账号
 

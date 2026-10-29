@@ -34,7 +34,7 @@ export async function client<T>(endpoint: string, options: FetchOptions = {}): P
 
   if (res.status === 403) {
     const errData = await res.json().catch(() => ({}));
-    if (errData.detail === "CSRF token missing, retry after cookie is set") {
+    if (errData.detail && errData.detail.includes("CSRF token missing") && errData.detail.includes("retry after cookie is set")) {
       const retryToken = getCsrfToken();
       if (retryToken) {
         const retryHeaders = { ...headers, "X-CSRF-Token": retryToken };
