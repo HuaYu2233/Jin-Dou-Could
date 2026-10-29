@@ -14,7 +14,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isLoading = useAuthStore((s) => s.isLoading);
+  const fetchMe = useAuthStore((s) => s.fetchMe);
   const { t } = useTranslation();
+
+  useEffect(() => {
+    fetchMe();
+  }, [fetchMe]);
 
   useEffect(() => {
     if (isLoading) return;
@@ -24,6 +29,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       router.replace("/dashboard");
     }
   }, [user, isAuthenticated, isLoading, router]);
+
+  if (isLoading || (!user && isAuthenticated)) {
+    return (
+      <div className={styles.container}>
+        <Header />
+        <main className={styles.main}>
+          <div className={styles.loading}>Loading...</div>
+        </main>
+      </div>
+    );
+  }
 
   const navItems = [
     { href: "/admin", labelKey: "admin.nav.overview" as TranslationKey },
