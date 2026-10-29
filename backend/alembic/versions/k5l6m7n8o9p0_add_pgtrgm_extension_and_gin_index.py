@@ -15,12 +15,14 @@ depends_on = None
 
 def upgrade() -> None:
     op.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
-    op.execute(
-        'CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_files_filename_trgm '
-        'ON files USING gin (filename gin_trgm_ops)'
-    )
+    with op.get_context().autocommit_block():
+        op.execute(
+            'CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_files_filename_trgm '
+            'ON files USING gin (filename gin_trgm_ops)'
+        )
 
 
 def downgrade() -> None:
-    op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_files_filename_trgm")
+    with op.get_context().autocommit_block():
+        op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_files_filename_trgm")
     op.execute("DROP EXTENSION IF EXISTS pg_trgm")

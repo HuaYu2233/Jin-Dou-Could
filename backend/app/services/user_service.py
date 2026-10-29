@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.models.user import User
-from app.core.security import hash_password, verify_password, revoke_token
+from app.core.security import hash_password, verify_password, hash_security_answer, revoke_token
 from app.core.config import settings
 from app.core.storage import upload_file, get_presigned_download_url
 from app.schemas.user import UserCreate
@@ -90,7 +90,7 @@ async def update_security_question(
     if len(answer.strip()) < 1:
         raise ValueError("密保答案不能为空")
     user.security_question = question.strip()
-    user.security_answer = hash_password(answer.strip().lower())
+    user.security_answer = hash_security_answer(answer.strip())
     await db.commit()
     await db.refresh(user)
     return user

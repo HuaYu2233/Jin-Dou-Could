@@ -17,7 +17,11 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
-    op.add_column('files', sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True))
+    from sqlalchemy import inspect
+    conn = op.get_bind()
+    cols = {col["name"] for col in inspect(conn).get_columns("files")}
+    if "deleted_at" not in cols:
+        op.add_column('files', sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True))
 
 def downgrade() -> None:
     op.drop_column('files', 'deleted_at')

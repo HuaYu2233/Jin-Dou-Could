@@ -33,8 +33,8 @@ class Settings(BaseSettings):
 
     MINIO_ENDPOINT: str = "minio:9000"
     MINIO_PUBLIC_ENDPOINT: str = "localhost:9000"
-    MINIO_ACCESS_KEY: str = "minioadmin"
-    MINIO_SECRET_KEY: str = "minioadmin123"
+    MINIO_ACCESS_KEY: str
+    MINIO_SECRET_KEY: str
     MINIO_BUCKET: str = "cloud-drive"
     MINIO_SECURE: bool = False
     MINIO_DOWNLOAD_EXPIRES: int = 3600
@@ -85,6 +85,9 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = ""
     CELERY_RESULT_BACKEND_URL: str = ""
     CELERY_TASK_ALWAYS_EAGER: bool = False
+
+    # CSRF
+    CSRF_ENABLED: bool = True
 
     # WebSocket
     WS_PUBSUB_ENABLED: bool = True

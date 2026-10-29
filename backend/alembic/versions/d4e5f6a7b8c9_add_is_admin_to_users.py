@@ -16,7 +16,11 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
-    op.add_column('users', sa.Column('is_admin', sa.Boolean(), nullable=False, server_default=sa.text('false')))
+    from sqlalchemy import inspect
+    conn = op.get_bind()
+    cols = {col["name"] for col in inspect(conn).get_columns("users")}
+    if "is_admin" not in cols:
+        op.add_column('users', sa.Column('is_admin', sa.Boolean(), nullable=False, server_default=sa.text('false')))
 
 def downgrade() -> None:
     op.drop_column('users', 'is_admin')

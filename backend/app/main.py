@@ -14,6 +14,7 @@ from app.core.logging import setup_logging
 from app.middleware.request_logging import RequestLoggingMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
+from app.middleware.csrf import CSRFMiddleware
 from loguru import logger
 
 
@@ -59,6 +60,9 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 # 全局限流（滑动窗口，基于 IP + 路径）
 app.add_middleware(RateLimitMiddleware)
+
+# CSRF 双提交 Cookie 防护
+app.add_middleware(CSRFMiddleware)
 
 # GZip 压缩（最小 500 字节以上才压缩）
 app.add_middleware(GZipMiddleware, minimum_size=500)

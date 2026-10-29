@@ -226,6 +226,7 @@ docker compose logs -f backend
 | -------------------- | ------------------------------------------ | ------ |
 | `WS_PUBSUB_ENABLED`  | WebSocket Redis Pub/Sub 多 Worker 消息广播 | true   |
 | `PROMETHEUS_ENABLED` | 启用 Prometheus 指标（`/metrics` 端点）    | false  |
+| `CSRF_ENABLED`       | CSRF 双提交 Cookie 防护                    | true   |
 
 ### 密码找回
 

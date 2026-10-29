@@ -11,6 +11,15 @@ def hash_password(password: str) -> str:
 def verify_password(plain: str, hashed: str) -> bool:
     return bcrypt.checkpw(plain.encode('utf-8'), hashed.encode('utf-8'))
 
+# ========== 安全回答 ==========
+def hash_security_answer(answer: str) -> str:
+    normalized = answer.strip().lower()
+    return bcrypt.hashpw(normalized.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def verify_security_answer(plain: str, hashed: str) -> bool:
+    normalized = plain.strip().lower()
+    return bcrypt.checkpw(normalized.encode('utf-8'), hashed.encode('utf-8'))
+
 # ========== JWT ==========
 def _create_token(data: dict, expires_delta: timedelta, token_type: str) -> str:
     to_encode = data.copy()

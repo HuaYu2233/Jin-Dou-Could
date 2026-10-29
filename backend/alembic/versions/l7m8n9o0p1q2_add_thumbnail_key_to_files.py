@@ -14,7 +14,11 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("files", sa.Column("thumbnail_key", sa.String(512), nullable=True))
+    from sqlalchemy import inspect
+    conn = op.get_bind()
+    cols = {col["name"] for col in inspect(conn).get_columns("files")}
+    if "thumbnail_key" not in cols:
+        op.add_column("files", sa.Column("thumbnail_key", sa.String(512), nullable=True))
 
 
 def downgrade() -> None:

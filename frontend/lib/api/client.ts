@@ -3,6 +3,12 @@ import { API_BASE_URL } from "@/lib/config";
 
 type FetchOptions = RequestInit & { skipAuth?: boolean };
 
+function getCsrfToken(): string | undefined {
+  if (typeof document === "undefined") return undefined;
+  const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : undefined;
+}
+
 export async function client<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
   const { skipAuth, body, ...rest } = options;
 
@@ -12,6 +18,11 @@ export async function client<T>(endpoint: string, options: FetchOptions = {}): P
   };
   if (!isFormData && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
+  }
+
+  const csrfToken = getCsrfToken();
+  if (csrfToken && rest.method && rest.method.toUpperCase() !== "GET") {
+    headers["X-CSRF-Token"] = csrfToken;
   }
 
   const res = await fetch(`${API_BASE_URL}${endpoint}`, {

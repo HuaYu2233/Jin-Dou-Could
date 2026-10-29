@@ -15,15 +15,21 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "folders",
-        sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
-    )
-    op.create_index(
-        "ix_folders_owner_deleted_at",
-        "folders",
-        ["owner_id", "deleted_at"],
-    )
+    from sqlalchemy import inspect
+    conn = op.get_bind()
+    cols = {col["name"] for col in inspect(conn).get_columns("folders")}
+    if "deleted_at" not in cols:
+        op.add_column(
+            "folders",
+            sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
+        )
+    folder_idxs = {idx["name"] for idx in inspect(conn).get_indexes("folders")}
+    if "ix_folders_owner_deleted_at" not in folder_idxs:
+        op.create_index(
+            "ix_folders_owner_deleted_at",
+            "folders",
+            ["owner_id", "deleted_at"],
+        )
 
 
 def downgrade() -> None:

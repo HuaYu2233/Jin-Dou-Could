@@ -14,7 +14,11 @@ branch_labels = None
 depends_on = None
 
 def upgrade() -> None:
-    op.add_column("users", sa.Column("avatar_key", sa.String(length=255), nullable=True))
+    from sqlalchemy import inspect
+    conn = op.get_bind()
+    cols = {col["name"] for col in inspect(conn).get_columns("users")}
+    if "avatar_key" not in cols:
+        op.add_column("users", sa.Column("avatar_key", sa.String(length=255), nullable=True))
 
 def downgrade() -> None:
     op.drop_column("users", "avatar_key")

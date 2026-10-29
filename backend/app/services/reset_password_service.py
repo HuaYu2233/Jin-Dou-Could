@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.redis import redis_client
-from app.core.security import hash_password, verify_password
+from app.core.security import hash_password, verify_security_answer
 from app.models.user import User
 from app.services.email_service import send_verification_code_async
 
@@ -68,7 +68,7 @@ async def reset_password_by_security(
     if not user.security_question or not user.security_answer:
         raise ValueError("未设置密保问题")
 
-    if not verify_password(answer.strip().lower(), user.security_answer):
+    if not verify_security_answer(answer, user.security_answer):
         raise ValueError("密保答案错误")
 
     user.hashed_password = hash_password(new_password)

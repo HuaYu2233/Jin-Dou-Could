@@ -15,16 +15,22 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_index(
-        "ix_files_owner_folder_created",
-        "files",
-        ["owner_id", "folder_id", "created_at"],
-    )
-    op.create_index(
-        "ix_files_owner_deleted_at",
-        "files",
-        ["owner_id", "deleted_at"],
-    )
+    from sqlalchemy import inspect
+    conn = op.get_bind()
+    existing = {idx["name"] for idx in inspect(conn).get_indexes("files")}
+
+    if "ix_files_owner_folder_created" not in existing:
+        op.create_index(
+            "ix_files_owner_folder_created",
+            "files",
+            ["owner_id", "folder_id", "created_at"],
+        )
+    if "ix_files_owner_deleted_at" not in existing:
+        op.create_index(
+            "ix_files_owner_deleted_at",
+            "files",
+            ["owner_id", "deleted_at"],
+        )
 
 
 def downgrade() -> None:
