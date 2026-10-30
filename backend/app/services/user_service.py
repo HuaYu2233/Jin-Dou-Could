@@ -45,7 +45,7 @@ async def upload_avatar(
         raise ValueError("仅支持 JPG/PNG/WEBP/GIF 格式")
 
     storage_key = f"avatars/{user.id}"
-    await upload_file(storage_key, content, mime_type, len(content))
+    await upload_file(storage_key, content, mime_type)
 
     user.avatar_key = storage_key
     await db.commit()

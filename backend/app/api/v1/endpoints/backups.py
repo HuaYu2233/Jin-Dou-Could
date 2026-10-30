@@ -13,12 +13,7 @@ async def list_backups(_: User = Depends(get_current_admin)):
 
 @router.post("/trigger", response_model=BackupTriggerResponse)
 async def trigger_backup(_: User = Depends(get_current_admin)):
-    try:
-        await backup_service.trigger_backup()
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    await backup_service.trigger_backup()
     return BackupTriggerResponse(detail="备份已触发", timestamp=None)
 
 @router.get("/{timestamp}/download")

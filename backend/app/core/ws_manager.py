@@ -59,17 +59,6 @@ class ConnectionManager:
         except Exception as exc:
             logger.bind(log_type="ws").warning(f"Redis publish 失败: {exc}")
 
-    async def broadcast(self, event: str, data: dict):
-        payload = json.dumps({
-            "event": event,
-            "data": data,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
-        for user_id in list(self._connections.keys()):
-            if self._pubsub_enabled:
-                await self._publish(user_id, payload)
-            await self._send_local(user_id, payload)
-
     async def start_pubsub(self):
         if not self._pubsub_enabled:
             return
@@ -116,13 +105,6 @@ class ConnectionManager:
                 await self._send_local(user_id, payload)
         except Exception as exc:
             logger.bind(log_type="ws").warning(f"Redis Pub/Sub 监听异常: {exc}")
-
-    @property
-    def online_count(self) -> int:
-        return len(self._connections)
-
-    def user_online(self, user_id: str) -> bool:
-        return user_id in self._connections and len(self._connections[user_id]) > 0
 
 
 ws_manager = ConnectionManager()

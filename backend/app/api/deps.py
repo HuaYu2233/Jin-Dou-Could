@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from uuid import UUID
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordBearer
@@ -45,6 +45,7 @@ def _deserialize_user(data: str) -> User:
     user.created_at = datetime.fromisoformat(d["created_at"]) if d["created_at"] else None
     user.updated_at = datetime.fromisoformat(d["updated_at"]) if d["updated_at"] else None
     user._from_cache = True
+    user._cache_incomplete = True
     return user
 
 async def invalidate_user_cache(user_id: UUID | str) -> None:
@@ -79,12 +80,8 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail="Token 类型错误，请使用 access token")
 
     jti = payload.get("jti")
-    exp = payload.get("exp")
-    if jti and exp:
-        if exp < datetime.now(timezone.utc).timestamp():
-            raise HTTPException(status_code=401, detail="Token 已过期，请重新登录")
-        if await redis_client.exists(f"token_blacklist:{jti}"):
-            raise HTTPException(status_code=401, detail="Token 已被撤销，请重新登录")
+    if jti and await redis_client.exists(f"token_blacklist:{jti}"):
+        raise HTTPException(status_code=401, detail="Token 已被撤销，请重新登录")
 
     user_id = payload["sub"]
     cache_key = f"user:{user_id}"

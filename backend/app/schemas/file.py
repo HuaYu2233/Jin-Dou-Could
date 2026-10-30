@@ -30,10 +30,6 @@ class FileUploadResponse(BaseModel):
     file_type: str
     status: str
 
-class FileDownloadResponse(BaseModel):
-    url: str
-    expires: int
-
 class FileMoveRequest(BaseModel):
     file_ids: list[UUID]
     target_folder_id: UUID | None = None

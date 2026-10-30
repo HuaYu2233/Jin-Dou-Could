@@ -22,7 +22,7 @@ engine = create_async_engine(
 )
 AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-_sync_url = settings.DATABASE_URL.replace("+asyncpg", "+psycopg2").replace("+asyncpg", "")
+_sync_url = settings.DATABASE_URL.replace("+asyncpg", "+psycopg2")
 try:
     sync_engine = _create_engine(_sync_url, pool_size=3, max_overflow=2, pool_pre_ping=True)
     sync_session_factory = sessionmaker(bind=sync_engine, expire_on_commit=False)

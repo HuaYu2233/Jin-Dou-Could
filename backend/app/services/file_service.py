@@ -2,14 +2,13 @@ import re
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func
 from app.models.file import File
 from app.models.user import User
 from app.core.storage import (
     upload_fileobj,
     upload_stream_multipart,
     delete_file,
-    get_object_stream,
     get_presigned_download_url,
     get_presigned_preview_url,
 )
@@ -106,6 +105,9 @@ def _is_compatible_mime(declared: str, detected: str) -> bool:
     }
     return aliases.get((declared, detected), False) or aliases.get((detected, declared), False)
 
+_DOCUMENT_MIME_PREFIXES = {"application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument", "application/vnd.ms-excel", "application/vnd.ms-powerpoint"}
+_ARCHIVE_MIME_TYPES = {"application/zip", "application/x-rar-compressed", "application/x-7z-compressed"}
+
 def categorize_file_type(mime_type: str) -> str:
     if mime_type.startswith("image/"):
         return "image"
@@ -115,21 +117,9 @@ def categorize_file_type(mime_type: str) -> str:
         return "audio"
     if mime_type.startswith("text/"):
         return "document"
-    if mime_type in (
-        "application/pdf",
-        "application/msword",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "application/vnd.ms-excel",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "application/vnd.ms-powerpoint",
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    ):
+    if any(mime_type == p or mime_type.startswith(p + ".") for p in _DOCUMENT_MIME_PREFIXES):
         return "document"
-    if mime_type in (
-        "application/zip",
-        "application/x-rar-compressed",
-        "application/x-7z-compressed",
-    ):
+    if mime_type in _ARCHIVE_MIME_TYPES:
         return "archive"
     return "other"
 
@@ -163,7 +153,7 @@ async def create_file(
     elif size >= settings.MULTIPART_THRESHOLD:
         await upload_stream_multipart(storage_key, fileobj, mime_type, size)
     else:
-        await upload_fileobj(storage_key, fileobj, mime_type, size)
+        await upload_fileobj(storage_key, fileobj, mime_type)
 
     file = File(
         id=file_id,
@@ -411,7 +401,7 @@ async def soft_delete_file(
     file = await get_file(db, file_id, owner_id)
     if not file:
         return False
-    file.deleted_at = func.now()
+    file.deleted_at = datetime.now(timezone.utc)
 
     owner_result = await db.execute(select(User).where(User.id == owner_id))
     owner = owner_result.scalar_one_or_none()
@@ -487,16 +477,6 @@ async def recalculate_used_storage(
         await db.refresh(owner)
 
     return actual
-
-
-async def get_download_stream(file: File):
-    from app.core.storage import stream_object
-    return {
-        "stream": stream_object(file.storage_key),
-        "mime_type": file.mime_type,
-        "filename": file.filename,
-        "size": file.size,
-    }
 
 
 async def prepare_upload(

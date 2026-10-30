@@ -8,7 +8,7 @@ from app.core.redis import redis_client
 
 EXEMPT_PATHS = {"/health", "/docs", "/openapi.json", "/redoc"}
 LOGIN_PATHS = {"/api/v1/auth/login", "/api/v1/auth/register"}
-LOGIN_RATE_LIMIT = 10
+LOGIN_RATE_LIMIT = settings.LOGIN_RATE_LIMIT_MAX_ATTEMPTS
 _TRUSTED_PROXIES: set[str] | None = None
 
 

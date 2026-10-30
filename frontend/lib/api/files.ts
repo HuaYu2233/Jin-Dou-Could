@@ -131,15 +131,6 @@ export async function getFileThumbnailUrl(id: string): Promise<{ url: string; ha
   return client<{ url: string; has_thumbnail: boolean }>(`/api/v1/files/${id}/thumbnail`);
 }
 
-export async function downloadFile(id: string): Promise<void> {
-  const url = await getFileDownloadUrl(id);
-  const a = document.createElement("a");
-  a.href = url;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-}
-
 export async function downloadFileWithProgress(
   id: string,
   onProgress: (loaded: number, total: number) => void,

@@ -54,7 +54,7 @@ JinDou-Cloud/
 │   │   ├── api/v1/             # API 路由
 │   │   │   ├── endpoints/      # auth, files, folders, shares, users, admin, health
 │   │   │   └── api.py          # 路由聚合
-│   │   ├── core/               # config, security, storage, logging, redis, alerting, celery_app
+│   │   ├── core/               # config, security, storage, logging, redis, alerting, celery_app, smtp, webhook
 │   │   ├── db/                 # 数据库引擎与会话
 │   │   ├── middleware/         # rate_limit, request_logging, security_headers
 │   │   ├── models/             # SQLAlchemy 模型（user, file, folder, share）
@@ -394,14 +394,14 @@ ALERT_WEBHOOK_TYPE=dingtalk  # dingtalk/feishu/wechat/generic
 ## 健康检查
 
 ```bash
-# Liveness（轻量心跳，不检查外部依赖）
+# Liveness（轻量心跳，检查 Redis 连通性）
 curl http://localhost:8000/health
 
 # Readiness（全组件探测，用于负载均衡器）
 curl http://localhost:8000/health/ready
 ```
 
-`/health/ready` 返回各组件状态与延迟：
+`/health` 检查 Redis 连通性，Redis 不可达时返回 `degraded`。`/health/ready` 返回各组件状态与延迟：
 
 ```json
 {
@@ -440,17 +440,17 @@ curl http://localhost:8000/health/ready
 
 ### 安全加固
 
-| 模块      | 措施                                                                                          |
-| --------- | --------------------------------------------------------------------------------------------- |
-| 基础设施  | Docker socket 移除、端口绑定 127.0.0.1、Redis 密码 + 禁用 FLUSHALL                            |
-| 认证      | JWT 增加 `type` 字段，防止 access/refresh token 混用                                          |
-| 缓存      | Redis 用户缓存脱敏（移除密码、密保问题/答案）                                                 |
-| 上传      | python-magic 真实 MIME 检测 + 白名单 + 文件名净化                                             |
-| 限流      | 全局 IP 滑动窗口限流 + 登录/注册路径严格限流（10次/分钟）；仅信任代理 IP 读取 X-Forwarded-For |
-| 响应头    | CSP / HSTS / X-Frame-Options / nosniff / Referrer-Policy                                      |
-| CSRF      | 纯 ASGI 中间件，避免 BaseHTTPMiddleware 开销；scope 级 cookie/header 解析，不构造 Request     |
-| WebSocket | 首条消息认证（非 URL 参数传 Token），5 秒认证超时，4KB 消息长度限制                           |
-| 告警      | 降级发送使用 `asyncio.to_thread` 避免阻塞事件循环；`create_task` 异常回调捕获                 |
+| 模块      | 措施                                                                                                  |
+| --------- | ----------------------------------------------------------------------------------------------------- |
+| 基础设施  | Docker socket 移除、端口绑定 127.0.0.1、Redis 密码 + 禁用 FLUSHALL                                    |
+| 认证      | JWT 增加 `type` 字段，防止 access/refresh token 混用                                                  |
+| 缓存      | Redis 用户缓存脱敏（移除密码、密保问题/答案）                                                         |
+| 上传      | python-magic 真实 MIME 检测 + 白名单 + 文件名净化                                                     |
+| 限流      | 全局 IP 滑动窗口限流 + 登录/注册路径严格限流（可配置次数/分钟）；仅信任代理 IP 读取 X-Forwarded-For   |
+| 响应头    | CSP（connect-src 动态读取 MINIO_PUBLIC_ENDPOINT）/ HSTS / X-Frame-Options / nosniff / Referrer-Policy |
+| CSRF      | 纯 ASGI 中间件，避免 BaseHTTPMiddleware 开销；scope 级 cookie/header 解析，不构造 Request             |
+| WebSocket | 首条消息认证（非 URL 参数传 Token），5 秒认证超时，4KB 消息长度限制                                   |
+| 告警      | 降级发送使用 `asyncio.to_thread` 避免阻塞事件循环；`create_task` 异常回调捕获                         |
 
 ### 性能优化
 
@@ -459,7 +459,7 @@ curl http://localhost:8000/health/ready
 | 上传         | 流式直传 MinIO，内存占用 O(1)（非 O(N×文件大小)）                                                                             |
 | MinIO        | 异步包装（`run_in_threadpool`），不阻塞事件循环                                                                               |
 | S3 批量删除  | `delete_objects` 批量接口替代逐个 `delete_object`，分批 1000 key，失败自动降级逐个重试                                        |
-| S3 初始化    | `asyncio.Lock` 保护 S3 客户端初始化，防止并发重复创建                                                                         |
+| S3 初始化    | `asyncio.Lock` 保护 S3 客户端初始化与关闭，防止并发重复创建和竞态条件                                                         |
 | 部署         | Gunicorn 多 worker，充分利用多核，支持优雅关闭                                                                                |
 | 压缩         | GZip 中间件（≥500B 自动压缩）                                                                                                 |
 | 数据库       | 连接池可配置（`pool_size`/`max_overflow`/`pool_timeout`/`pool_recycle`）                                                      |
@@ -478,7 +478,7 @@ curl http://localhost:8000/health/ready
 | 生命周期管理 | FastAPI lifespan 统一管理 S3 客户端、Redis 连接、数据库引擎、WebSocket Pub/Sub 的初始化与优雅关闭                             |
 | 缓存失效     | Redis `SCAN` 替代 `KEYS` 避免阻塞；分批 delete（每批 500 key）；用户缓存失效联动文件计数缓存                                  |
 | 请求日志     | 纯 ASGI 中间件替代 BaseHTTPMiddleware，避免消耗 request body 和流式响应问题                                                   |
-| 健康检查     | liveness（`/health`）与 readiness（`/health/ready`）分离，轻量心跳 vs 全组件探测                                              |
+| 健康检查     | liveness（`/health`，检查 Redis）与 readiness（`/health/ready`）分离，轻量心跳 vs 全组件探测                                  |
 | 传输管理     | 已完成/失败任务自动清理，最多保留 30 条历史记录                                                                               |
 
 ## 常用命令

@@ -55,14 +55,15 @@ async def init_s3_clients():
 
 async def close_s3_clients():
     global _s3_client, _s3_client_ctx, _presigned_client, _presigned_client_ctx
-    if _s3_client_ctx is not None:
-        await _s3_client_ctx.__aexit__(None, None, None)
-        _s3_client_ctx = None
-        _s3_client = None
-    if _presigned_client_ctx is not None:
-        await _presigned_client_ctx.__aexit__(None, None, None)
-        _presigned_client_ctx = None
-        _presigned_client = None
+    async with _init_lock:
+        if _s3_client_ctx is not None:
+            await _s3_client_ctx.__aexit__(None, None, None)
+            _s3_client_ctx = None
+            _s3_client = None
+        if _presigned_client_ctx is not None:
+            await _presigned_client_ctx.__aexit__(None, None, None)
+            _presigned_client_ctx = None
+            _presigned_client = None
     logger.info("S3 clients closed")
 
 
@@ -118,7 +119,7 @@ async def ensure_bucket() -> None:
         pass
 
 
-async def upload_file(storage_key: str, data: bytes, mime_type: str, length: int) -> None:
+async def upload_file(storage_key: str, data: bytes, mime_type: str) -> None:
     async with get_s3_client() as client:
         await client.put_object(
             Bucket=settings.MINIO_BUCKET,
@@ -128,7 +129,7 @@ async def upload_file(storage_key: str, data: bytes, mime_type: str, length: int
         )
 
 
-async def upload_fileobj(storage_key: str, fileobj, mime_type: str, length: int) -> None:
+async def upload_fileobj(storage_key: str, fileobj, mime_type: str) -> None:
     async with get_s3_client() as client:
         await client.put_object(
             Bucket=settings.MINIO_BUCKET,
@@ -255,16 +256,6 @@ async def upload_stream_multipart(
             except Exception:
                 pass
             raise
-
-
-async def get_object_stream(storage_key: str):
-    async with get_s3_client() as client:
-        resp = await client.get_object(
-            Bucket=settings.MINIO_BUCKET,
-            Key=storage_key,
-        )
-        async with resp["Body"] as stream:
-            return stream
 
 
 async def stream_object(storage_key: str, chunk_size: int = 8192):

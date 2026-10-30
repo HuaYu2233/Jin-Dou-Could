@@ -1,10 +1,11 @@
+from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.base import get_db
 from app.models.user import User
 from app.api.deps import get_current_admin, invalidate_user_cache
 from app.schemas.user import UserListItem, UserUpdate, AdminStats
-from app.services import admin_service
+from app.services import admin_service, file_service
 
 router = APIRouter()
 
@@ -63,3 +64,14 @@ async def delete_user(
         raise HTTPException(status_code=400, detail=str(e))
     await invalidate_user_cache(user_id)
     return {"detail": "用户已删除"}
+
+
+@router.post("/users/{user_id}/recalculate-storage")
+async def recalculate_storage(
+    user_id: UUID,
+    _: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    actual = await file_service.recalculate_used_storage(db, user_id)
+    await invalidate_user_cache(user_id)
+    return {"used_storage": actual}

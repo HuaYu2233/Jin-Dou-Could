@@ -1,8 +1,8 @@
-import json
 import urllib.request
 from loguru import logger
 from app.core.celery_app import celery_app
 from app.core.config import settings
+from app.core.webhook import build_webhook_payload
 
 
 @celery_app.task(
@@ -16,17 +16,7 @@ def send_alert_webhook(self, text: str) -> None:
     if not settings.ALERT_WEBHOOK_URL:
         return
 
-    wtype = settings.ALERT_WEBHOOK_TYPE
-    if wtype == "dingtalk":
-        payload = {"msgtype": "text", "text": {"content": text}}
-    elif wtype == "feishu":
-        payload = {"msg_type": "text", "content": {"text": text}}
-    elif wtype == "wechat":
-        payload = {"msgtype": "text", "text": {"content": text}}
-    else:
-        payload = {"text": text, "level": "error", "source": "jindou-cloud"}
-
-    data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    data = build_webhook_payload(text)
     req = urllib.request.Request(
         settings.ALERT_WEBHOOK_URL,
         data=data,

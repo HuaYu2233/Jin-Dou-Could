@@ -210,6 +210,8 @@ async def restore_folder(
         owner_result = await db.execute(select(User).where(User.id == owner_id))
         owner = owner_result.scalar_one_or_none()
         if owner:
+            if owner.used_storage + total_size > owner.storage_quota:
+                raise ValueError("存储空间不足，无法恢复文件夹")
             owner.used_storage += total_size
 
     await db.commit()
@@ -334,12 +336,3 @@ async def _get_breadcrumbs(
     for folder in chain:
         breadcrumbs.append({"id": str(folder.id), "name": folder.name, "path": f"/folder/{folder.id}"})
     return breadcrumbs
-
-
-async def get_folder_path(
-    db: AsyncSession, folder_id: uuid.UUID | None, owner_id: uuid.UUID
-) -> str:
-    if folder_id is None:
-        return "/"
-    breadcrumbs = await _get_breadcrumbs(db, folder_id, owner_id)
-    return "/".join(b["name"] for b in breadcrumbs[1:])

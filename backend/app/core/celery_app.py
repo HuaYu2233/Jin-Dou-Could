@@ -15,12 +15,13 @@ def _build_celery_url(base_url: str, db: int) -> str:
 _broker_url = _build_celery_url(settings.CELERY_BROKER_URL, 1)
 _backend_url = _build_celery_url(settings.CELERY_RESULT_BACKEND_URL, 2)
 
+_fallback_to_eager = False
 if not settings.CELERY_BROKER_URL and not settings.CELERY_TASK_ALWAYS_EAGER:
     logger.warning(
         "CELERY_BROKER_URL 为空且 CELERY_TASK_ALWAYS_EAGER=False，"
         "Celery Worker 将无法连接 Broker。自动回退为 eager 模式（同步执行）。"
     )
-    settings.CELERY_TASK_ALWAYS_EAGER = True
+    _fallback_to_eager = True
 
 celery_app = Celery(
     "jindou_cloud",
@@ -37,7 +38,7 @@ celery_app.conf.update(
     task_track_started=True,
     task_acks_late=True,
     worker_prefetch_multiplier=1,
-    task_always_eager=settings.CELERY_TASK_ALWAYS_EAGER,
+    task_always_eager=settings.CELERY_TASK_ALWAYS_EAGER or _fallback_to_eager,
     task_eager_propagates=True,
     broker_connection_retry_on_startup=True,
 )
