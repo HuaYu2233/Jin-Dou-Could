@@ -7,6 +7,33 @@ on:
     branches: [main]
 
 jobs:
+  # ==================== 后端 Lint ====================
+  backend-lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv pip install --system ".[dev]"
+
+      - name: Ruff check
+        run: ruff check .
+
+      - name: Ruff format check
+        run: ruff format --check .
+
+  # ==================== 后端测试 ====================
   backend-test:
     runs-on: ubuntu-latest
     defaults:
@@ -41,7 +68,7 @@ jobs:
     env:
       DATABASE_URL: postgresql+asyncpg://testuser:testpass@localhost:5432/testdb
       REDIS_URL: redis://localhost:6379/0
-      SECRET_KEY: test-secret-key
+      SECRET_KEY: test-secret-key-that-is-long-enough-32chars
       ENVIRONMENT: test
       CSRF_ENABLED: "false"
 
@@ -56,12 +83,13 @@ jobs:
         uses: astral-sh/setup-uv@v4
 
       - name: Install dependencies
-        run: uv pip install --system .
+        run: uv pip install --system ".[dev]"
 
       - name: Run tests
-        run: python -m pytest tests/ -v --tb=short
+        run: python -m pytest tests/ -v --tb=short --cov=app --cov-report=term-missing:skip-covered
 
-  frontend-lint:
+  # ==================== 前端 Lint + 测试 ====================
+  frontend-check:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -83,3 +111,76 @@ jobs:
 
       - name: Type check
         run: npx tsc --noEmit
+
+      - name: Unit tests
+        run: npm run test
+
+  # ==================== Docker 构建验证 ====================
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: [backend-lint, frontend-check]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build celery-worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile.celery
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ==================== 依赖安全审计 ====================
+  security-audit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Python dependency audit
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Audit Python dependencies
+        working-directory: backend
+        run: |
+          uv export --no-hashes --no-dev -o requirements.txt 2>/dev/null || true
+          pip-audit -r requirements.txt --desc || true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Audit Node dependencies
+        working-directory: frontend
+        run: npm audit --audit-level=high || true

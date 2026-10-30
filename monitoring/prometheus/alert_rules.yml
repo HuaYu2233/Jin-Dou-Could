@@ -1,0 +1,65 @@
+groups:
+  - name: cloud-drive-alerts
+    rules:
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate on {{ $labels.instance }}"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High P95 latency on {{ $labels.instance }}"
+          description: "P95 latency is {{ $value }}s (threshold: 2s)"
+
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes / 1073741824 > 512
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value | humanize }}B (threshold: 512MB)"
+
+      - alert: RedisDown
+        expr: up{job="cloud-drive-redis"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
+          description: "Redis exporter cannot reach Redis instance"
+
+      - alert: PostgreSQLDown
+        expr: up{job="cloud-drive-postgres"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "Postgres exporter cannot reach PostgreSQL instance"
+
+      - alert: MinIODown
+        expr: up{job="cloud-drive-minio"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MinIO is down"
+          description: "MinIO metrics endpoint is unreachable"
+
+      - alert: StorageQuotaNearLimit
+        expr: cloud_drive_used_storage_bytes / cloud_drive_storage_quota_bytes > 0.9
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "User storage quota near limit"
+          description: "Storage usage is {{ $value | humanizePercentage }} of quota"

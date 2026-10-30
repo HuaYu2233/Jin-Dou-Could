@@ -39,10 +39,12 @@
 | 组件           | 版本   | 用途                                                    |
 | -------------- | ------ | ------------------------------------------------------- |
 | PostgreSQL     | 15     | 关系数据库                                              |
+| PgBouncer      | 1.23   | 数据库连接池代理，减少实际 DB 连接数                    |
 | Redis          | 7      | 缓存 / 限流 / Token 黑名单 / Celery Broker / WS Pub/Sub |
 | MinIO          | latest | 对象存储                                                |
-| Nginx          | -      | 反向代理（可选）                                        |
+| Nginx          | -      | 反向代理 + MinIO 缓存层 + 限流（可选）                  |
 | Prometheus     | 可选   | 指标采集（`PROMETHEUS_ENABLED=true`）                   |
+| Grafana        | 可选   | 监控仪表盘 + 告警可视化                                 |
 | Docker Compose | 2.0+   | 容器编排                                                |
 
 ## 项目结构
@@ -67,6 +69,7 @@ JinDou-Cloud/
 │   ├── pyproject.toml          # 依赖声明（uv 管理）
 │   ├── uv.lock                 # 依赖锁定文件
 │   ├── Dockerfile
+│   ├── Dockerfile.celery       # Celery Worker 轻量镜像
 │   └── .dockerignore
 ├── frontend/                   # Next.js 前端
 │   ├── app/
@@ -88,6 +91,9 @@ JinDou-Cloud/
 │   ├── Dockerfile
 │   └── .dockerignore
 ├── nginx/                      # Nginx 配置（可选）
+├── monitoring/                 # 监控配置
+│   ├── prometheus/             # Prometheus 配置 + 告警规则
+│   └── grafana/                # Grafana 仪表盘 + provisioning
 ├── scripts/                    # 备份/恢复脚本 + Dockerfile.backup
 ├── backups/                    # 备份输出目录
 ├── .env.example                # 配置模板
@@ -134,6 +140,8 @@ make logs
 | 后端 API            | http://localhost:8000      |
 | API 文档（Swagger） | http://localhost:8000/docs |
 | MinIO 控制台        | http://localhost:9001      |
+| Grafana 仪表盘      | http://localhost:3001      |
+| Prometheus          | http://localhost:9090      |
 | PostgreSQL          | localhost:5433             |
 | Redis               | localhost:6379             |
 
@@ -220,7 +228,7 @@ make logs
 | `DB_POOL_SIZE`             | 数据库连接池大小              | 5      |
 | `DB_MAX_OVERFLOW`          | 连接池溢出上限                | 5      |
 | `DB_POOL_TIMEOUT`          | 获取连接超时（秒）            | 30     |
-| `DB_MAX_CONNECTIONS`       | PostgreSQL 最大连接数         | 80     |
+| `DB_MAX_CONNECTIONS`       | PostgreSQL 最大连接数         | 100    |
 | `HTTPS_REDIRECT`           | 强制 HTTPS 重定向             | false  |
 | `SECURITY_HEADERS_ENABLED` | 启用安全响应头                | true   |
 | `RATE_LIMIT_ENABLED`       | 启用全局限流                  | true   |
@@ -229,11 +237,12 @@ make logs
 
 ### WebSocket 与可观测性
 
-| 配置项               | 说明                                       | 默认值 |
-| -------------------- | ------------------------------------------ | ------ |
-| `WS_PUBSUB_ENABLED`  | WebSocket Redis Pub/Sub 多 Worker 消息广播 | true   |
-| `PROMETHEUS_ENABLED` | 启用 Prometheus 指标（`/metrics` 端点）    | false  |
-| `CSRF_ENABLED`       | CSRF 双提交 Cookie 防护                    | true   |
+| 配置项                   | 说明                                       | 默认值 |
+| ------------------------ | ------------------------------------------ | ------ |
+| `WS_PUBSUB_ENABLED`      | WebSocket Redis Pub/Sub 多 Worker 消息广播 | true   |
+| `PROMETHEUS_ENABLED`     | 启用 Prometheus 指标（`/metrics` 端点）    | false  |
+| `GRAFANA_ADMIN_PASSWORD` | Grafana 管理员密码                         | admin  |
+| `CSRF_ENABLED`           | CSRF 双提交 Cookie 防护                    | true   |
 
 ### 密码找回
 
@@ -358,6 +367,8 @@ npx vitest run tests/stores/i18n.test.ts       # i18n store 测试
 
 - **轮转**：每日 0 点切割，超期自动清理
 - **脱敏**：password/token/secret 等字段自动替换为 `***`
+- **请求追踪**：`ContextVar` 自动注入 `request_id` + `user_id` 到所有日志，无需手动 bind
+- **跨服务追踪**：上游传入 `X-Request-ID` → 下游回传 `X-Correlation-ID` 响应头
 - **查看**：`tail -f backend/logs/app.log`
 
 ## 备份系统
@@ -476,8 +487,18 @@ curl http://localhost:8000/health/ready
 | WS 多 Worker | Redis Pub/Sub 消息总线，多 Gunicorn Worker 下 WebSocket 消息跨进程广播，`WS_PUBSUB_ENABLED` 可配置                            |
 | 可观测性     | Prometheus 指标（`PROMETHEUS_ENABLED=true`），暴露 `/metrics` 端点，采集请求量/延迟/错误率/在途请求                           |
 | 生命周期管理 | FastAPI lifespan 统一管理 S3 客户端、Redis 连接、数据库引擎、WebSocket Pub/Sub 的初始化与优雅关闭                             |
-| 缓存失效     | Redis `SCAN` 替代 `KEYS` 避免阻塞；分批 delete（每批 500 key）；用户缓存失效联动文件计数缓存                                  |
+| 缓存失效     | Redis Hash 分组存储替代独立 key，`HKEYS`+`HDEL` 按用户精确删除，避免 `SCAN` 全库遍历；TTL 从 30s/15s 提升至 120s/60s          |
 | 请求日志     | 纯 ASGI 中间件替代 BaseHTTPMiddleware，避免消耗 request body 和流式响应问题                                                   |
+| 请求追踪     | `ContextVar` 注入 `request_id`+`user_id` 到所有日志；上游 `X-Request-ID` → 下游 `X-Correlation-ID` 跨服务追踪                 |
+| 游标分页     | 移除 OFFSET 回退，skip>0 用子查询取分界点走 keyset 分页；前端 `cursorMap` 维护游标状态                                        |
+| MIME 异步    | `magic.from_buffer` 改为 `asyncio.to_thread` 避免阻塞事件循环                                                                 |
+| 图片优化     | Next.js `remotePatterns` 配置 MinIO 图片优化，WebP 转码 + 按设备尺寸缩放 + 缓存 TTL 7200s                                     |
+| PgBouncer    | 数据库连接池代理，所有服务通过 pgbouncer:6432 连接，实际 DB 连接数从 60+ 降至 20                                              |
+| Celery 镜像  | 独立 `Dockerfile.celery` 轻量镜像，不含 Gunicorn/Uvicorn/curl，减小体积和攻击面                                               |
+| WS 按需订阅  | Redis Pub/Sub 从 `psubscribe("ws:user:*")` 通配符改为按需 `subscribe`/`unsubscribe`，避免消息风暴                             |
+| Nginx 缓存   | MinIO 缩略图（120min）+ 文件下载（60min）代理缓存层；API 60r/m + 下载 30r/m 限流                                              |
+| 监控仪表盘   | Grafana + Prometheus + Redis/PostgreSQL/MinIO Exporter，预配置仪表盘 + 7 条告警规则                                           |
+| CI 流水线    | 后端 ruff lint + 前端 tsc/vitest + Docker 构建验证 + pip-audit/npm audit 安全审计                                             |
 | 健康检查     | liveness（`/health`，检查 Redis）与 readiness（`/health/ready`）分离，轻量心跳 vs 全组件探测                                  |
 | 传输管理     | 已完成/失败任务自动清理，最多保留 30 条历史记录                                                                               |
 
@@ -566,34 +587,27 @@ docker compose exec backend pytest tests/ -v                           # 运行�
 ### 流水线阶段
 
 ```
-┌─────────────┐  ┌─────────────┐  ┌──────────────┐
-│ Backend Lint │  │ Backend TC  │  │ Backend Test │
-│   (ruff)     │  │  (pyright)  │  │   (pytest)   │
-└──────┬───────┘  └──────┬──────┘  └──────┬───────┘
-       │                 │                 │
-┌──────┴───────┐  ┌──────┴──────┐  ┌──────┴───────┐
-│ Frontend Lint│  │ Frontend TC │  │ Frontend Test│
-│  (eslint)    │  │  (tsc)      │  │  (vitest)    │
-└──────┬───────┘  └──────┬──────┘  └──────┬───────┘
-       │                 │                 │
-       └────────┬───────┴────────┬───────┘
-                │                │
-         ┌──────┴──────┐  ┌─────┴──────┐
-         │ Docker Build│  │   Deploy   │
-         │ (3 images)  │→ │ (master)   │
-         └─────────────┘  └────────────┘
+┌─────────────┐  ┌──────────────┐  ┌───────────────┐
+│ Backend Lint │  │ Backend Test │  │ Frontend Check│
+│   (ruff)     │  │  (pytest)    │  │ lint+type+test│
+└──────┬───────┘  └──────┬───────┘  └──────┬────────┘
+       │                 │                  │
+       └────────┬───────┴──────────┬───────┘
+                │                  │
+         ┌──────┴──────┐   ┌──────┴──────┐
+         │ Docker Build│   │  Security   │
+         │ (3 images)  │   │  Audit      │
+         └─────────────┘   └─────────────┘
 ```
 
-| 阶段               | 触发条件         | 内容                                      |
-| ------------------ | ---------------- | ----------------------------------------- |
-| Backend Lint       | push/PR          | `ruff check` + `ruff format --check`      |
-| Backend TypeCheck  | push/PR          | `pyright` 类型检查                        |
-| Backend Test       | push/PR          | `pytest` 162 个测试                       |
-| Frontend Lint      | push/PR          | `next lint` (ESLint)                      |
-| Frontend TypeCheck | push/PR          | `tsc --noEmit`                            |
-| Frontend Test      | push/PR          | `vitest run` 28 个测试                    |
-| Docker Build       | Lint+Test 通过   | 构建 backend / frontend / backup 三个镜像 |
-| Deploy             | master/main 分支 | 推送镜像到 Docker Hub + SSH 部署          |
+| 阶段           | 触发条件         | 内容                                            |
+| -------------- | ---------------- | ----------------------------------------------- |
+| Backend Lint   | push/PR          | `ruff check` + `ruff format --check`            |
+| Backend Test   | push/PR          | `pytest --cov` 162 个测试 + 覆盖率报告          |
+| Frontend Check | push/PR          | `next lint` + `tsc --noEmit` + `vitest run`     |
+| Docker Build   | Lint+Test 通过   | 构建 backend / celery / frontend 三个镜像       |
+| Security Audit | push/PR          | `pip-audit` Python 依赖 + `npm audit` Node 依赖 |
+| Deploy         | master/main 分支 | 推送镜像到 Docker Hub + SSH 部署                |
 
 ### 配置 Secrets
 

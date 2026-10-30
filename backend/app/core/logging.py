@@ -7,6 +7,12 @@ from loguru import logger
 from app.core.config import settings
 from app.core.alerting import alert_sink
 
+try:
+    from app.middleware.request_logging import request_id_ctx, user_id_ctx
+except Exception:
+    request_id_ctx = None
+    user_id_ctx = None
+
 SENSITIVE_KEYS = {
     "password", "token", "authorization", "secret",
     "refresh_token", "access_token", "cookie",
@@ -38,6 +44,14 @@ def _json_patcher(record):
             "message": record["message"],
             "extra": extra,
         }
+        if request_id_ctx is not None:
+            rid = request_id_ctx.get("")
+            if rid:
+                payload["request_id"] = rid
+        if user_id_ctx is not None:
+            uid = user_id_ctx.get(None)
+            if uid:
+                payload["user_id"] = uid
         if record["exception"]:
             exc = record["exception"]
             payload["exception"] = "".join(
