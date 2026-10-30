@@ -17,6 +17,7 @@ export interface FileItem {
 export interface FileListResponse {
   items: FileItem[];
   total: number;
+  next_cursor?: string;
 }
 
 export interface FileUploadResponse {
@@ -31,10 +32,12 @@ export interface FileUploadResponse {
 export async function listFiles(
   skip = 0,
   limit = 20,
-  fileType?: string
+  fileType?: string,
+  cursor?: string
 ): Promise<FileListResponse> {
   const params = new URLSearchParams({ skip: String(skip), limit: String(limit) });
   if (fileType && fileType !== "all") params.set("file_type", fileType);
+  if (cursor) params.set("cursor", cursor);
   return client<FileListResponse>(`/api/v1/files?${params}`);
 }
 
@@ -189,8 +192,9 @@ export async function deleteFile(id: string): Promise<void> {
   return client<void>(`/api/v1/files/${id}`, { method: "DELETE" });
 }
 
-export async function searchFiles(keyword: string, skip = 0, limit = 20): Promise<FileListResponse> {
+export async function searchFiles(keyword: string, skip = 0, limit = 20, cursor?: string): Promise<FileListResponse> {
   const params = new URLSearchParams({ keyword, skip: String(skip), limit: String(limit) });
+  if (cursor) params.set("cursor", cursor);
   return client<FileListResponse>(`/api/v1/files/search?${params}`);
 }
 

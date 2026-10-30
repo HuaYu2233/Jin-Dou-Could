@@ -23,6 +23,7 @@ interface FileListResult {
   trashedFolders: FolderTrashItem[];
   total: number;
   breadcrumbs: BreadcrumbItem[];
+  nextCursor?: string;
 }
 
 export function useFileList(category: CategoryId) {
@@ -30,6 +31,7 @@ export function useFileList(category: CategoryId) {
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [keyword, setKeyword] = useState("");
   const [debouncedKeyword, setDebouncedKeyword] = useState("");
+  const [cursorMap, setCursorMap] = useState<Record<number, string>>({});
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -50,9 +52,11 @@ export function useFileList(category: CategoryId) {
     queryKey,
     enabled,
     queryFn: async () => {
+      const cursor = page > 1 ? cursorMap[page - 1] : undefined;
       if (debouncedKeyword) {
-        const res = await searchFiles(debouncedKeyword, (page - 1) * PAGE_SIZE, PAGE_SIZE);
-        return { files: res.items, folders: [], trashedFolders: [], total: res.total, breadcrumbs: [] };
+        const res = await searchFiles(debouncedKeyword, (page - 1) * PAGE_SIZE, PAGE_SIZE, cursor);
+        if (res.next_cursor) setCursorMap((prev) => ({ ...prev, [page]: res.next_cursor! }));
+        return { files: res.items, folders: [], trashedFolders: [], total: res.total, breadcrumbs: [], nextCursor: res.next_cursor };
       }
       if (category === "all") {
         const res = await listFolderContents(currentFolderId ?? undefined, (page - 1) * PAGE_SIZE, PAGE_SIZE);
@@ -77,8 +81,9 @@ export function useFileList(category: CategoryId) {
           breadcrumbs: [],
         };
       }
-      const res = await listFiles((page - 1) * PAGE_SIZE, PAGE_SIZE, category);
-      return { files: res.items, folders: [], trashedFolders: [], total: res.total, breadcrumbs: [] };
+      const res = await listFiles((page - 1) * PAGE_SIZE, PAGE_SIZE, category, cursor);
+      if (res.next_cursor) setCursorMap((prev) => ({ ...prev, [page]: res.next_cursor! }));
+      return { files: res.items, folders: [], trashedFolders: [], total: res.total, breadcrumbs: [], nextCursor: res.next_cursor };
     },
   });
 
@@ -98,10 +103,10 @@ export function useFileList(category: CategoryId) {
     keyword,
     currentFolderId,
     PAGE_SIZE,
-    setPage,
+    setPage: (p: number) => { setPage(p); },
     setKeyword,
     setError: (_msg?: string) => {},
-    setCurrentFolderId,
+    setCurrentFolderId: (id: string | null) => { setCurrentFolderId(id); setPage(1); setCursorMap({}); },
     setTotal: () => {},
     loadFiles: async (_active?: boolean) => { await refetch(); },
     invalidateFiles,

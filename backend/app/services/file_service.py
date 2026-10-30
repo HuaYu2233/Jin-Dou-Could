@@ -1,3 +1,4 @@
+import asyncio
 import re
 import uuid
 from datetime import datetime, timezone
@@ -16,10 +17,11 @@ from app.core.config import settings
 from app.core.redis import redis_client
 
 _FILENAME_MAX_LEN = 255
-_COUNT_CACHE_TTL = 30
-_SEARCH_CACHE_TTL = 15
+_COUNT_CACHE_TTL = 120
+_SEARCH_CACHE_TTL = 60
 _CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]")
 _PATH_SEP_RE = re.compile(r"[\\/]+")
+_CACHE_HASH_KEY = "file_caches"
 
 ALLOWED_MIME_TYPES = {
     "image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp", "image/svg+xml",
@@ -48,23 +50,14 @@ def sanitize_filename(name: str) -> str:
 
 
 async def invalidate_file_caches(owner_id: uuid.UUID) -> None:
-    patterns = [
-        f"file_count:{owner_id}:*",
-        f"trash_count:{owner_id}",
-        f"search_count:{owner_id}:*",
-    ]
-    for pattern in patterns:
-        try:
-            if "*" in pattern:
-                keys = []
-                async for key in redis_client.scan_iter(match=pattern, count=100):
-                    keys.append(key)
-                for i in range(0, len(keys), 500):
-                    await redis_client.delete(*keys[i : i + 500])
-            else:
-                await redis_client.delete(pattern)
-        except Exception:
-            pass
+    oid = str(owner_id)
+    try:
+        fields = await redis_client.hkeys(_CACHE_HASH_KEY)
+        to_delete = [f for f in fields if f.startswith(f"{oid}:")]
+        if to_delete:
+            await redis_client.hdel(_CACHE_HASH_KEY, *to_delete)
+    except Exception:
+        pass
 
 
 async def detect_real_mime_type(fileobj, declared: str) -> str:
@@ -79,7 +72,7 @@ async def detect_real_mime_type(fileobj, declared: str) -> str:
         if head:
             if isinstance(head, str):
                 head = head.encode("utf-8")
-            detected = magic.from_buffer(head, mime=True)
+            detected = await asyncio.to_thread(magic.from_buffer, head, True)
             if detected and detected in ALLOWED_MIME_TYPES:
                 return detected
     except Exception:
@@ -207,38 +200,45 @@ async def list_files(
 
     next_cursor = None
 
-    cache_key = f"file_count:{owner_id}:{file_type or ''}:{folder_id or 'root'}"
-    cached_total = await redis_client.get(cache_key)
+    cache_field = f"{owner_id}:count:{file_type or ''}:{folder_id or 'root'}"
+    cached_total = await redis_client.hget(_CACHE_HASH_KEY, cache_field)
     if cached_total is not None:
         total = int(cached_total)
     else:
         count_result = await db.execute(select(func.count()).select_from(File).where(*filters))
         total = count_result.scalar_one()
-        await redis_client.setex(cache_key, _COUNT_CACHE_TTL, str(total))
+        await redis_client.hset(_CACHE_HASH_KEY, cache_field, str(total))
+        await redis_client.expire(_CACHE_HASH_KEY, _COUNT_CACHE_TTL)
 
     if cursor:
-        try:
-            cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=timezone.utc)
-            query = (
-                select(File)
-                .where(*filters, File.created_at < cursor_dt)
-                .order_by(File.created_at.desc())
-                .limit(limit)
-            )
-        except (ValueError, TypeError):
-            query = (
-                select(File)
-                .where(*filters)
-                .order_by(File.created_at.desc())
-                .offset(skip)
-                .limit(limit)
-            )
+        cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=timezone.utc)
+        query = (
+            select(File)
+            .where(*filters, File.created_at < cursor_dt)
+            .order_by(File.created_at.desc())
+            .limit(limit)
+        )
+    elif skip > 0:
+        sub = (
+            select(File.created_at)
+            .where(*filters)
+            .order_by(File.created_at.desc())
+            .offset(skip - 1)
+            .limit(1)
+            .correlate(None)
+            .subquery()
+        )
+        query = (
+            select(File)
+            .where(*filters, File.created_at <= sub.c.created_at)
+            .order_by(File.created_at.desc())
+            .limit(limit)
+        )
     else:
         query = (
             select(File)
             .where(*filters)
             .order_by(File.created_at.desc())
-            .offset(skip)
             .limit(limit)
         )
 
@@ -275,38 +275,45 @@ async def search_files(
 
     next_cursor = None
 
-    cache_key = f"search_count:{owner_id}:{keyword}"
-    cached_total = await redis_client.get(cache_key)
+    cache_field = f"{owner_id}:search:{keyword}"
+    cached_total = await redis_client.hget(_CACHE_HASH_KEY, cache_field)
     if cached_total is not None:
         total = int(cached_total)
     else:
         count_result = await db.execute(select(func.count()).select_from(File).where(*filters))
         total = count_result.scalar_one()
-        await redis_client.setex(cache_key, _SEARCH_CACHE_TTL, str(total))
+        await redis_client.hset(_CACHE_HASH_KEY, cache_field, str(total))
+        await redis_client.expire(_CACHE_HASH_KEY, _SEARCH_CACHE_TTL)
 
     if cursor:
-        try:
-            cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=timezone.utc)
-            query = (
-                select(File)
-                .where(*filters, File.created_at < cursor_dt)
-                .order_by(*order_cols)
-                .limit(limit)
-            )
-        except (ValueError, TypeError):
-            query = (
-                select(File)
-                .where(*filters)
-                .order_by(*order_cols)
-                .offset(skip)
-                .limit(limit)
-            )
+        cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=timezone.utc)
+        query = (
+            select(File)
+            .where(*filters, File.created_at < cursor_dt)
+            .order_by(*order_cols)
+            .limit(limit)
+        )
+    elif skip > 0:
+        sub = (
+            select(File.created_at)
+            .where(*filters)
+            .order_by(*order_cols)
+            .offset(skip - 1)
+            .limit(1)
+            .correlate(None)
+            .subquery()
+        )
+        query = (
+            select(File)
+            .where(*filters, File.created_at <= sub.c.created_at)
+            .order_by(*order_cols)
+            .limit(limit)
+        )
     else:
         query = (
             select(File)
             .where(*filters)
             .order_by(*order_cols)
-            .offset(skip)
             .limit(limit)
         )
 
@@ -350,38 +357,45 @@ async def list_trash_files(
 
     next_cursor = None
 
-    cache_key = f"trash_count:{owner_id}"
-    cached_total = await redis_client.get(cache_key)
+    cache_field = f"{owner_id}:trash"
+    cached_total = await redis_client.hget(_CACHE_HASH_KEY, cache_field)
     if cached_total is not None:
         total = int(cached_total)
     else:
         count_result = await db.execute(select(func.count()).select_from(File).where(*filters))
         total = count_result.scalar_one()
-        await redis_client.setex(cache_key, _COUNT_CACHE_TTL, str(total))
+        await redis_client.hset(_CACHE_HASH_KEY, cache_field, str(total))
+        await redis_client.expire(_CACHE_HASH_KEY, _COUNT_CACHE_TTL)
 
     if cursor:
-        try:
-            cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=timezone.utc)
-            query = (
-                select(File)
-                .where(*filters, File.deleted_at < cursor_dt)
-                .order_by(File.deleted_at.desc())
-                .limit(limit)
-            )
-        except (ValueError, TypeError):
-            query = (
-                select(File)
-                .where(*filters)
-                .order_by(File.deleted_at.desc())
-                .offset(skip)
-                .limit(limit)
-            )
+        cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=timezone.utc)
+        query = (
+            select(File)
+            .where(*filters, File.deleted_at < cursor_dt)
+            .order_by(File.deleted_at.desc())
+            .limit(limit)
+        )
+    elif skip > 0:
+        sub = (
+            select(File.deleted_at)
+            .where(*filters)
+            .order_by(File.deleted_at.desc())
+            .offset(skip - 1)
+            .limit(1)
+            .correlate(None)
+            .subquery()
+        )
+        query = (
+            select(File)
+            .where(*filters, File.deleted_at <= sub.c.deleted_at)
+            .order_by(File.deleted_at.desc())
+            .limit(limit)
+        )
     else:
         query = (
             select(File)
             .where(*filters)
             .order_by(File.deleted_at.desc())
-            .offset(skip)
             .limit(limit)
         )
 
