@@ -117,6 +117,14 @@
   margin-bottom: 8px;
 }
 
+.taskNameWrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
 .taskName {
   font-size: 13px;
   font-weight: 500;
@@ -124,6 +132,17 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.multipartBadge {
+  font-size: 10px;
+  color: #7c3aed;
+  background: #f5f3ff;
+  padding: 1px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  font-weight: 600;
+  letter-spacing: 0.3px;
 }
 
 .taskStatus {
@@ -137,6 +156,10 @@
 
 .status_transferring {
   color: #2563eb;
+}
+
+.status_paused {
+  color: #d97706;
 }
 
 .status_completed {
@@ -173,6 +196,10 @@
   background: linear-gradient(90deg, #60a5fa, #3b82f6);
 }
 
+.fill_paused {
+  background: #f59e0b;
+}
+
 .fill_completed {
   background: #22c55e;
 }
@@ -205,16 +232,41 @@
   white-space: nowrap;
 }
 
+.taskActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.pauseBtn,
+.resumeBtn,
+.cancelBtn,
 .removeBtn {
   border: none;
   background: transparent;
   color: #9ca3af;
   font-size: 14px;
   cursor: pointer;
-  padding: 2px 4px;
+  padding: 2px 6px;
   border-radius: 4px;
-  flex-shrink: 0;
   transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.pauseBtn:hover {
+  color: #d97706;
+  background: #fffbeb;
+}
+
+.resumeBtn:hover {
+  color: #16a34a;
+  background: #f0fdf4;
+}
+
+.cancelBtn:hover {
+  color: #ef4444;
+  background: #fef2f2;
 }
 
 .removeBtn:hover {

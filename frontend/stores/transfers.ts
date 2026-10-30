@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 export type TransferType = "upload" | "download";
-export type TransferStatus = "pending" | "transferring" | "completed" | "error" | "canceled";
+export type TransferStatus = "pending" | "transferring" | "paused" | "completed" | "error" | "canceled";
 
 export interface TransferTask {
   id: string;
@@ -14,7 +14,10 @@ export interface TransferTask {
   error?: string;
   createdAt: number;
   fileId?: string;
+  isMultipart?: boolean;
 }
+
+const abortControllers = new Map<string, AbortController>();
 
 interface TransferState {
   tasks: TransferTask[];
@@ -23,11 +26,17 @@ interface TransferState {
     type: TransferType;
     total: number;
     fileId?: string;
+    isMultipart?: boolean;
   }) => string;
   updateTask: (id: string, updates: Partial<TransferTask>) => void;
   removeTask: (id: string) => void;
   clearCompleted: () => void;
   hasActive: () => boolean;
+  pauseTask: (id: string) => void;
+  resumeTask: (id: string) => void;
+  cancelTask: (id: string) => void;
+  registerAbortController: (id: string, controller: AbortController) => void;
+  getAbortController: (id: string) => AbortController | undefined;
 }
 
 const MAX_COMPLETED_TASKS = 30;
@@ -40,7 +49,7 @@ function genId() {
 export const useTransferStore = create<TransferState>((set, get) => ({
   tasks: [],
 
-  addTask({ filename, type, total, fileId }) {
+  addTask({ filename, type, total, fileId, isMultipart }) {
     const id = genId();
     const task: TransferTask = {
       id,
@@ -52,6 +61,7 @@ export const useTransferStore = create<TransferState>((set, get) => ({
       total,
       createdAt: Date.now(),
       fileId,
+      isMultipart,
     };
     set((state) => ({ tasks: [task, ...state.tasks] }));
     return id;
@@ -77,6 +87,7 @@ export const useTransferStore = create<TransferState>((set, get) => ({
       );
       const isTerminal = updates.status === "completed" || updates.status === "error" || updates.status === "canceled";
       if (isTerminal) {
+        abortControllers.delete(id);
         const active = updated.filter(
           (t) => t.status !== "completed" && t.status !== "error" && t.status !== "canceled"
         );
@@ -90,20 +101,70 @@ export const useTransferStore = create<TransferState>((set, get) => ({
   },
 
   removeTask(id) {
+    abortControllers.delete(id);
     set((state) => ({ tasks: state.tasks.filter((t) => t.id !== id) }));
   },
 
   clearCompleted() {
-    set((state) => ({
-      tasks: state.tasks.filter(
+    set((state) => {
+      const keep = state.tasks.filter(
         (t) => t.status !== "completed" && t.status !== "error" && t.status !== "canceled"
-      ),
-    }));
+      );
+      const remove = state.tasks.filter(
+        (t) => t.status === "completed" || t.status === "error" || t.status === "canceled"
+      );
+      for (const t of remove) abortControllers.delete(t.id);
+      return { tasks: keep };
+    });
   },
 
   hasActive() {
     return get().tasks.some(
       (t) => t.status === "pending" || t.status === "transferring"
     );
+  },
+
+  pauseTask(id) {
+    const controller = abortControllers.get(id);
+    if (controller) {
+      controller.abort();
+      abortControllers.delete(id);
+    }
+    set((state) => ({
+      tasks: state.tasks.map((t) =>
+        t.id === id && t.status === "transferring" ? { ...t, status: "paused" } : t
+      ),
+    }));
+  },
+
+  resumeTask(id) {
+    set((state) => ({
+      tasks: state.tasks.map((t) =>
+        t.id === id && t.status === "paused" ? { ...t, status: "pending" } : t
+      ),
+    }));
+  },
+
+  cancelTask(id) {
+    const controller = abortControllers.get(id);
+    if (controller) {
+      controller.abort();
+      abortControllers.delete(id);
+    }
+    set((state) => ({
+      tasks: state.tasks.map((t) =>
+        t.id === id && (t.status === "transferring" || t.status === "paused" || t.status === "pending")
+          ? { ...t, status: "canceled" }
+          : t
+      ),
+    }));
+  },
+
+  registerAbortController(id, controller) {
+    abortControllers.set(id, controller);
+  },
+
+  getAbortController(id) {
+    return abortControllers.get(id);
   },
 }));

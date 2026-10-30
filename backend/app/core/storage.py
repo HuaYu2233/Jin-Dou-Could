@@ -337,3 +337,56 @@ async def get_presigned_preview_url(
             ExpiresIn=expires,
         )
         return url
+
+
+async def create_multipart(storage_key: str, mime_type: str) -> str:
+    async with get_s3_client() as client:
+        resp = await client.create_multipart_upload(
+            Bucket=settings.MINIO_BUCKET,
+            Key=storage_key,
+            ContentType=mime_type,
+        )
+        return resp["UploadId"]
+
+
+async def upload_part(
+    storage_key: str,
+    upload_id: str,
+    part_number: int,
+    data: bytes,
+) -> str:
+    async with get_s3_client() as client:
+        resp = await client.upload_part(
+            Bucket=settings.MINIO_BUCKET,
+            Key=storage_key,
+            UploadId=upload_id,
+            PartNumber=part_number,
+            Body=data,
+        )
+        return resp["ETag"]
+
+
+async def complete_multipart(
+    storage_key: str,
+    upload_id: str,
+    parts: list[dict],
+) -> None:
+    async with get_s3_client() as client:
+        await client.complete_multipart_upload(
+            Bucket=settings.MINIO_BUCKET,
+            Key=storage_key,
+            UploadId=upload_id,
+            MultipartUpload={"Parts": parts},
+        )
+
+
+async def abort_multipart(storage_key: str, upload_id: str) -> None:
+    async with get_s3_client() as client:
+        try:
+            await client.abort_multipart_upload(
+                Bucket=settings.MINIO_BUCKET,
+                Key=storage_key,
+                UploadId=upload_id,
+            )
+        except Exception:
+            pass

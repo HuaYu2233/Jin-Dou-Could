@@ -158,6 +158,7 @@ export default function DashboardPage() {
         <input
           ref={fileInputRef}
           type="file"
+          multiple
           style={{ display: "none" }}
           onChange={handleFileSelect}
         />

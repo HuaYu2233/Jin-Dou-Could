@@ -18,9 +18,38 @@ from app.middleware.csrf import CSRFMiddleware
 from loguru import logger
 
 
+def _check_production_security() -> None:
+    errors = []
+
+    if settings.ALGORITHM == "HS256":
+        errors.append("JWT 使用 HS256 对称算法，生产环境建议迁移到 RS256（设置 ALGORITHM=RS256 + JWT_PRIVATE_KEY_PATH + JWT_PUBLIC_KEY_PATH）")
+
+    if settings.ALGORITHM == "RS256":
+        if not settings.JWT_PRIVATE_KEY_PATH:
+            errors.append("RS256 模式下必须设置 JWT_PRIVATE_KEY_PATH")
+        if not settings.JWT_PUBLIC_KEY_PATH:
+            errors.append("RS256 模式下必须设置 JWT_PUBLIC_KEY_PATH")
+
+    if not settings.HTTPS_REDIRECT:
+        errors.append("生产环境未启用 HTTPS 重定向（设置 HTTPS_REDIRECT=true）")
+
+    if not settings.SECURITY_HEADERS_ENABLED:
+        errors.append("生产环境未启用安全响应头（设置 SECURITY_HEADERS_ENABLED=true）")
+
+    if not settings.RATE_LIMIT_ENABLED:
+        errors.append("生产环境未启用限流（设置 RATE_LIMIT_ENABLED=true）")
+
+    if errors:
+        msg = "生产环境安全检查失败:\n" + "\n".join(f"  - {e}" for e in errors)
+        logger.warning(msg)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logging()
+
+    if settings.ENVIRONMENT == "production":
+        _check_production_security()
 
     await init_s3_clients()
     await ensure_bucket()
@@ -29,6 +58,7 @@ async def lifespan(app: FastAPI):
 
     logger.info(
         f"应用启动完成 | env={settings.ENVIRONMENT} | "
+        f"algorithm={settings.ALGORITHM} | "
         f"prometheus={settings.PROMETHEUS_ENABLED} | "
         f"ws_pubsub={settings.WS_PUBSUB_ENABLED} | "
         f"minio_secure={settings.MINIO_SECURE}"

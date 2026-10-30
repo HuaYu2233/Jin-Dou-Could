@@ -14,12 +14,15 @@ import {
   deleteFolder,
   restoreFolder,
   purgeFolder,
+  multipartUploadFile,
   type FileItem,
   type FolderItem,
   type FolderTrashItem,
   type ShareCreateResponse,
 } from "@/lib/api/files";
 import { useTransferStore } from "@/stores/transfers";
+
+const MULTIPART_THRESHOLD = 16 * 1024 * 1024;
 
 interface UseFileOperationsParams {
   selectedIds: Set<string>;
@@ -49,25 +52,51 @@ export function useFileOperations({
   async function handleUpload(file: File) {
     setUploading(true);
     setError("");
-    const addTask = useTransferStore.getState().addTask;
-    const updateTask = useTransferStore.getState().updateTask;
-    const taskId = addTask({ filename: file.name, type: "upload", total: file.size });
+    const store = useTransferStore.getState();
+    const isMultipart = file.size >= MULTIPART_THRESHOLD;
+    const taskId = store.addTask({
+      filename: file.name,
+      type: "upload",
+      total: file.size,
+      isMultipart,
+    });
+
+    const controller = new AbortController();
+    store.registerAbortController(taskId, controller);
+
     try {
-      updateTask(taskId, { status: "transferring" });
-      const res = await uploadFileWithProgress(
-        file,
-        currentFolderId ?? undefined,
-        (loaded, total) => updateTask(taskId, { loaded, total })
-      );
-      updateTask(taskId, { status: "completed", loaded: file.size, progress: 100, fileId: res.id });
+      store.updateTask(taskId, { status: "transferring" });
+
+      let res: { id: string };
+
+      if (isMultipart) {
+        res = await multipartUploadFile(
+          file,
+          currentFolderId ?? undefined,
+          (progress) => store.updateTask(taskId, { loaded: progress.loaded, total: progress.total }),
+          controller.signal
+        );
+      } else {
+        res = await uploadFileWithProgress(
+          file,
+          currentFolderId ?? undefined,
+          (loaded, total) => store.updateTask(taskId, { loaded, total }),
+          controller.signal
+        );
+      }
+
+      store.updateTask(taskId, { status: "completed", loaded: file.size, progress: 100, fileId: res.id });
       await loadFiles();
       fetchMe();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "上传失败";
-      if (msg === "已取消") {
-        updateTask(taskId, { status: "canceled" });
+      const currentTask = useTransferStore.getState().tasks.find((t) => t.id === taskId);
+      if (currentTask?.status === "paused") {
+        // paused by user, don't override
+      } else if (msg === "已取消" || controller.signal.aborted) {
+        store.updateTask(taskId, { status: "canceled" });
       } else {
-        updateTask(taskId, { status: "error", error: msg });
+        store.updateTask(taskId, { status: "error", error: msg });
         setError(msg);
       }
     } finally {
@@ -76,34 +105,44 @@ export function useFileOperations({
   }
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file) handleUpload(file);
+    const files = e.target.files;
+    if (files) {
+      for (let i = 0; i < files.length; i++) {
+        handleUpload(files[i]);
+      }
+    }
     e.target.value = "";
   }
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
-    const file = e.dataTransfer.files?.[0];
-    if (file) handleUpload(file);
+    const files = e.dataTransfer.files;
+    if (files) {
+      for (let i = 0; i < files.length; i++) {
+        handleUpload(files[i]);
+      }
+    }
   }
 
   async function handleDownload(file: FileItem) {
-    const addTask = useTransferStore.getState().addTask;
-    const updateTask = useTransferStore.getState().updateTask;
-    const taskId = addTask({ filename: file.filename, type: "download", total: file.size, fileId: file.id });
+    const store = useTransferStore.getState();
+    const taskId = store.addTask({ filename: file.filename, type: "download", total: file.size, fileId: file.id });
+    const controller = new AbortController();
+    store.registerAbortController(taskId, controller);
     try {
-      updateTask(taskId, { status: "transferring" });
+      store.updateTask(taskId, { status: "transferring" });
       await downloadFileWithProgress(
         file.id,
-        (loaded, total) => updateTask(taskId, { loaded, total })
+        (loaded, total) => store.updateTask(taskId, { loaded, total }),
+        controller.signal
       );
-      updateTask(taskId, { status: "completed", progress: 100 });
+      store.updateTask(taskId, { status: "completed", progress: 100 });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "下载失败";
-      if (msg === "已取消") {
-        updateTask(taskId, { status: "canceled" });
+      if (msg === "已取消" || controller.signal.aborted) {
+        store.updateTask(taskId, { status: "canceled" });
       } else {
-        updateTask(taskId, { status: "error", error: msg });
+        store.updateTask(taskId, { status: "error", error: msg });
         setError(msg);
       }
     }

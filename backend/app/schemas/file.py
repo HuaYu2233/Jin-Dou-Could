@@ -33,3 +33,28 @@ class FileUploadResponse(BaseModel):
 class FileMoveRequest(BaseModel):
     file_ids: list[UUID]
     target_folder_id: UUID | None = None
+
+class MultipartInitRequest(BaseModel):
+    filename: str
+    mime_type: str = "application/octet-stream"
+    total_size: int
+    folder_id: UUID | None = None
+
+class MultipartInitResponse(BaseModel):
+    upload_id: str
+    storage_key: str
+    part_size: int
+    total_parts: int
+
+class MultipartPartRequest(BaseModel):
+    part_number: int
+    etag: str
+
+class MultipartCompleteRequest(BaseModel):
+    upload_id: str
+    storage_key: str
+    filename: str
+    mime_type: str
+    total_size: int
+    folder_id: UUID | None = None
+    parts: list[MultipartPartRequest]

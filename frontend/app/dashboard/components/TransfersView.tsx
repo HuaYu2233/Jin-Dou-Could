@@ -14,6 +14,7 @@ function statusLabel(task: TransferTask): string {
   switch (task.status) {
     case "pending": return "等待中";
     case "transferring": return "传输中";
+    case "paused": return "已暂停";
     case "completed": return "已完成";
     case "error": return "失败";
     case "canceled": return "已取消";
@@ -25,6 +26,9 @@ export default function TransfersView() {
   const tasks = useTransferStore((s) => s.tasks);
   const removeTask = useTransferStore((s) => s.removeTask);
   const clearCompleted = useTransferStore((s) => s.clearCompleted);
+  const pauseTask = useTransferStore((s) => s.pauseTask);
+  const resumeTask = useTransferStore((s) => s.resumeTask);
+  const cancelTask = useTransferStore((s) => s.cancelTask);
 
   const activeCount = tasks.filter(
     (t) => t.status === "pending" || t.status === "transferring"
@@ -61,9 +65,14 @@ export default function TransfersView() {
               </div>
               <div className={styles.taskBody}>
                 <div className={styles.taskTop}>
-                  <span className={styles.taskName} title={task.filename}>
-                    {task.filename}
-                  </span>
+                  <div className={styles.taskNameWrap}>
+                    <span className={styles.taskName} title={task.filename}>
+                      {task.filename}
+                    </span>
+                    {task.isMultipart && (
+                      <span className={styles.multipartBadge}>分片</span>
+                    )}
+                  </div>
                   <span className={`${styles.taskStatus} ${styles[`status_${task.status}`] || ""}`}>
                     {statusLabel(task)}
                   </span>
@@ -82,15 +91,44 @@ export default function TransfersView() {
                   {task.error && <span className={styles.taskError}>{task.error}</span>}
                 </div>
               </div>
-              {(task.status === "completed" || task.status === "error" || task.status === "canceled") && (
-                <button
-                  className={styles.removeBtn}
-                  onClick={() => removeTask(task.id)}
-                  title="移除"
-                >
-                  ✕
-                </button>
-              )}
+              <div className={styles.taskActions}>
+                {task.status === "transferring" && (
+                  <button
+                    className={styles.pauseBtn}
+                    onClick={() => pauseTask(task.id)}
+                    title="暂停"
+                  >
+                    ⏸
+                  </button>
+                )}
+                {task.status === "paused" && (
+                  <button
+                    className={styles.resumeBtn}
+                    onClick={() => resumeTask(task.id)}
+                    title="恢复"
+                  >
+                    ▶
+                  </button>
+                )}
+                {(task.status === "transferring" || task.status === "paused" || task.status === "pending") && (
+                  <button
+                    className={styles.cancelBtn}
+                    onClick={() => cancelTask(task.id)}
+                    title="取消"
+                  >
+                    ✕
+                  </button>
+                )}
+                {(task.status === "completed" || task.status === "error" || task.status === "canceled") && (
+                  <button
+                    className={styles.removeBtn}
+                    onClick={() => removeTask(task.id)}
+                    title="移除"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>

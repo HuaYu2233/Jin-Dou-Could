@@ -139,8 +139,12 @@ services:
       - CELERY_TASK_ALWAYS_EAGER=${CELERY_TASK_ALWAYS_EAGER:-false}
       - WS_PUBSUB_ENABLED=${WS_PUBSUB_ENABLED:-true}
       - PROMETHEUS_ENABLED=${PROMETHEUS_ENABLED:-false}
+      - ALGORITHM=${ALGORITHM:-HS256}
+      - JWT_PRIVATE_KEY_PATH=${JWT_PRIVATE_KEY_PATH:-}
+      - JWT_PUBLIC_KEY_PATH=${JWT_PUBLIC_KEY_PATH:-}
     volumes:
       - ./backups:/backups
+      - jwt_keys:/run/secrets:ro
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -334,3 +338,4 @@ volumes:
   nginx_cache:
   prometheus_data:
   grafana_data:
+  jwt_keys:

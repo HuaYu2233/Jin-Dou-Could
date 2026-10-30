@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     ALGORITHM: str = "HS256"
+    JWT_PRIVATE_KEY_PATH: str = ""
+    JWT_PUBLIC_KEY_PATH: str = ""
 
     ENVIRONMENT: str = "development"
     MAX_UPLOAD_SIZE: int = 104857600
@@ -42,6 +44,7 @@ class Settings(BaseSettings):
     MINIO_DOWNLOAD_EXPIRES: int = 3600
     UPLOAD_CHUNK_SIZE: int = 8 * 1024 * 1024
     MULTIPART_THRESHOLD: int = 16 * 1024 * 1024
+    UPLOAD_PART_SIZE: int = 5 * 1024 * 1024
 
     CORS_ORIGINS: str = "http://localhost:3000"
 
@@ -100,12 +103,22 @@ class Settings(BaseSettings):
     @field_validator("SECRET_KEY")
     @classmethod
     def _validate_secret_key(cls, v: str) -> str:
-        weak = {
+        weak_patterns = {
             "change-me-in-production",
             "your-super-secret-key-change-this-in-production",
             "change-this-to-a-random-secret-key",
+            "dev-secret-key-change-in-prod",
+            "secret",
+            "password",
+            "test-secret-key",
         }
-        if not v or v in weak or len(v) < 32:
+        if not v:
+            raise ValueError("SECRET_KEY 不能为空")
+        if v in weak_patterns:
+            raise ValueError(f"SECRET_KEY 不能使用已知弱值: {v}")
+        if any(pattern in v.lower() for pattern in ["change", "todo", "fixme", "placeholder", "example"]):
+            raise ValueError(f"SECRET_KEY 包含占位符关键词，请替换为强随机值: {v[:20]}...")
+        if len(v) < 32:
             raise ValueError("SECRET_KEY 必须设置为不少于 32 字符的强随机值")
         return v
 

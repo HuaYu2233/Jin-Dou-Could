@@ -94,7 +94,7 @@ JinDou-Cloud/
 ├── monitoring/                 # 监控配置
 │   ├── prometheus/             # Prometheus 配置 + 告警规则
 │   └── grafana/                # Grafana 仪表盘 + provisioning
-├── scripts/                    # 备份/恢复脚本 + Dockerfile.backup
+├── scripts/                    # 备份/恢复脚本 + JWT 密钥生成 + Dockerfile.backup
 ├── backups/                    # 备份输出目录
 ├── .env.example                # 配置模板
 ├── .gitignore
@@ -169,11 +169,14 @@ make logs
 
 ### JWT 与认证
 
-| 配置项                        | 说明                     | 默认值 |
-| ----------------------------- | ------------------------ | ------ |
-| `SECRET_KEY`                  | JWT 签名密钥（≥32 字符） | -      |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | Access Token 过期时间    | 30     |
-| `REFRESH_TOKEN_EXPIRE_DAYS`   | Refresh Token 过期时间   | 7      |
+| 配置项                        | 说明                                              | 默认值  |
+| ----------------------------- | ------------------------------------------------- | ------- |
+| `SECRET_KEY`                  | JWT 签名密钥（≥32 字符，HS256 模式使用）          | -       |
+| `ALGORITHM`                   | JWT 签名算法：`HS256`（对称）或 `RS256`（非对称） | `HS256` |
+| `JWT_PRIVATE_KEY_PATH`        | RS256 私钥文件路径（签名用，仅 Auth 服务持有）    | -       |
+| `JWT_PUBLIC_KEY_PATH`         | RS256 公钥文件路径（验证用，所有服务可持有）      | -       |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | Access Token 过期时间                             | 30      |
+| `REFRESH_TOKEN_EXPIRE_DAYS`   | Refresh Token 过期时间                            | 7       |
 
 ### 前端与网络
 
@@ -260,7 +263,8 @@ make logs
 3. **前端**：`runner` 阶段多阶段构建镜像（~216MB，非 root 运行），standalone 模式
 4. **HTTPS**：挂载 SSL 证书到 nginx，取消 `nginx.conf` 中 443 server 块注释，设 `HTTPS_REDIRECT=true`
 5. **安全密钥**：修改所有密码和 `SECRET_KEY`（≥32 字符强随机值）
-6. **域名配置**：`NEXT_PUBLIC_API_URL` 和 `CORS_ORIGINS` 改为实际域名
+6. **JWT RS256**（推荐）：生成 RSA 密钥对并配置 `ALGORITHM=RS256`
+7. **域名配置**：`NEXT_PUBLIC_API_URL` 和 `CORS_ORIGINS` 改为实际域名
 
 ```bash
 # 1. 修改 .env
@@ -273,26 +277,33 @@ make logs
 # 2. 挂载 SSL 证书（可选，启用 HTTPS）
 #    将 fullchain.pem 和 privkey.pem 放入 nginx/ssl/
 
-# 3. 构建并启动（仅使用 docker-compose.yml，不加载 override）
+# 3. 生成 JWT RS256 密钥对（推荐）
+./scripts/generate-jwt-keys.sh 4096 ./secrets
+# 在 .env 中配置:
+# ALGORITHM=RS256
+# JWT_PRIVATE_KEY_PATH=./secrets/jwt_private.pem
+# JWT_PUBLIC_KEY_PATH=./secrets/jwt_public.pem
+
+# 4. 构建并启动（仅使用 docker-compose.yml，不加载 override）
 docker compose -f docker-compose.yml up -d --build
 
-# 4. 验证生产模式
+# 5. 验证生产模式
 docker compose logs backend | grep -i gunicorn
 curl -sI https://your-domain.com | grep -i strict-transport-security
 ```
 
 ## API 概览
 
-| 模块     | 路径前缀              | 主要功能                                         |
-| -------- | --------------------- | ------------------------------------------------ |
-| 认证     | `/api/v1/auth`        | 登录、注册、刷新 Token、忘记密码、密保问题       |
-| 用户     | `/api/v1/users`       | 用户信息、修改资料、修改密码、存储统计           |
-| 文件     | `/api/v1/files`       | 上传、下载、删除、预览、搜索、移动、回收站       |
-| 文件夹   | `/api/v1/folders`     | 创建、重命名、删除、列表、回收站、恢复、彻底删除 |
-| 分享     | `/api/v1/shares`      | 创建分享、提取码验证、公开访问                   |
-| 管理     | `/api/v1/admin`       | 系统统计、用户管理、备份管理                     |
-| 任务     | `/api/v1/admin/tasks` | 任务状态查询、活跃任务列表                       |
-| 健康检查 | `/health`             | 各组件状态与延迟探测                             |
+| 模块     | 路径前缀              | 主要功能                                                                         |
+| -------- | --------------------- | -------------------------------------------------------------------------------- |
+| 认证     | `/api/v1/auth`        | 登录、注册、刷新 Token、忘记密码、密保问题                                       |
+| 用户     | `/api/v1/users`       | 用户信息、修改资料、修改密码、存储统计                                           |
+| 文件     | `/api/v1/files`       | 上传、下载、删除、预览、搜索、移动、回收站、分片上传（init/part/complete/abort） |
+| 文件夹   | `/api/v1/folders`     | 创建、重命名、删除、列表、回收站、恢复、彻底删除                                 |
+| 分享     | `/api/v1/shares`      | 创建分享、提取码验证、公开访问                                                   |
+| 管理     | `/api/v1/admin`       | 系统统计、用户管理、备份管理                                                     |
+| 任务     | `/api/v1/admin/tasks` | 任务状态查询、活跃任务列表                                                       |
+| 健康检查 | `/health`             | 各组件状态与延迟探测                                                             |
 
 完整 API 文档：http://localhost:8000/docs
 
@@ -430,11 +441,12 @@ curl http://localhost:8000/health/ready
 ## 核心功能
 
 - **文件管理**：上传、下载、删除、重命名、文件夹嵌套
+- **大文件分片上传**：≥16MB 自动分片，支持断点续传、暂停/恢复/取消
 - **文件预览**：图片缩略图、网格/列表视图切换
 - **批量操作**：多选文件批量移动、删除
 - **拖拽移动**：拖拽文件到文件夹图标完成移动
 - **文件分享**：生成分享链接和提取码，支持一键复制
-- **传输管理**：上传/下载进度追踪，侧边栏红点提示
+- **传输管理**：上传/下载进度追踪，暂停/恢复/取消，侧边栏红点提示
 - **存储统计**：侧边栏显示已用容量
 - **回收站**：文件和文件夹恢复、彻底删除（级联软删除一致性）
 - **响应式设计**：适配平板和手机屏幕
@@ -446,6 +458,8 @@ curl http://localhost:8000/health/ready
 - **异步任务队列**：Celery + Redis，邮件发送、备份触发、缩略图生成、告警通知异步执行
 - **日志告警**：ERROR 日志通过 Webhook/邮件通知
 - **健康检查**：检测 DB/MinIO/Redis 连通性与延迟
+- **JWT RS256**：支持非对称签名算法，私钥签名/公钥验证，密钥分离部署
+- **启动安全检查**：生产环境自动校验弱密码/HTTPS/安全头/限流配置，输出警告
 
 ## 安全与性能优化
 
@@ -455,6 +469,8 @@ curl http://localhost:8000/health/ready
 | --------- | ----------------------------------------------------------------------------------------------------- |
 | 基础设施  | Docker socket 移除、端口绑定 127.0.0.1、Redis 密码 + 禁用 FLUSHALL                                    |
 | 认证      | JWT 增加 `type` 字段，防止 access/refresh token 混用                                                  |
+| JWT RS256 | 支持 RS256 非对称签名，私钥签名/公钥验证，密钥分离部署，防止对称密钥泄露导致 Token 伪造               |
+| 启动检查  | 生产环境自动校验 SECRET_KEY 弱值/占位符、HS256 警告、HTTPS/安全头/限流配置，输出警告而非强制终止      |
 | 缓存      | Redis 用户缓存脱敏（移除密码、密保问题/答案）                                                         |
 | 上传      | python-magic 真实 MIME 检测 + 白名单 + 文件名净化                                                     |
 | 限流      | 全局 IP 滑动窗口限流 + 登录/注册路径严格限流（可配置次数/分钟）；仅信任代理 IP 读取 X-Forwarded-For   |
@@ -465,42 +481,43 @@ curl http://localhost:8000/health/ready
 
 ### 性能优化
 
-| 模块         | 措施                                                                                                                          |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| 上传         | 流式直传 MinIO，内存占用 O(1)（非 O(N×文件大小)）                                                                             |
-| MinIO        | 异步包装（`run_in_threadpool`），不阻塞事件循环                                                                               |
-| S3 批量删除  | `delete_objects` 批量接口替代逐个 `delete_object`，分批 1000 key，失败自动降级逐个重试                                        |
-| S3 初始化    | `asyncio.Lock` 保护 S3 客户端初始化与关闭，防止并发重复创建和竞态条件                                                         |
-| 部署         | Gunicorn 多 worker，充分利用多核，支持优雅关闭                                                                                |
-| 压缩         | GZip 中间件（≥500B 自动压缩）                                                                                                 |
-| 数据库       | 连接池可配置（`pool_size`/`max_overflow`/`pool_timeout`/`pool_recycle`）                                                      |
-| 限流         | Redis 滑动窗口限流，全局 IP + 登录路径双层控制；Redis 不可达时放行并记录告警日志                                              |
-| 任务         | Celery 异步队列，邮件/备份/缩略图/告警不阻塞请求                                                                              |
-| 缩略图       | 图片上传后自动异步生成 256×256 缩略图，前端渐进加载（shimmer → blur → sharp），列表优先请求缩略图而非原图                     |
-| 分页         | `share_service.list_shares` 改为两次查询（count + data），避免窗口函数跨分页 total 不一致                                     |
-| 搜索         | pg_trgm `similarity()` 三元组相似度搜索 + GIN 索引，替代低效 `ilike`                                                          |
-| 文件夹       | `list_folder_contents` 文件查询与 count 合并，3 次查询→2 次；`delete_folder`/`restore_folder` 用 SQL SUM 替代 Python 遍历求和 |
-| Docker       | 多阶段构建：backend 315MB / frontend 216MB，生产无 `--reload`，非 root 运行，HEALTHCHECK                                      |
-| 虚拟滚动     | react-virtuoso（TableVirtuoso + VirtuosoGrid），文件列表仅渲染可视区域 DOM，万级文件无卡顿                                    |
-| 请求缓存     | TanStack Query（useQuery + useMutation），staleTime 30s，自动去重/缓存/stale-while-revalidate，mutation 后精准失效            |
-| 实时通知     | WebSocket 长连接，上传完成/分享创建/存储变更即时推送，前端自动 invalidate 对应缓存，指数退避重连（1→2→4→8→16s）               |
-| WS 多 Worker | Redis Pub/Sub 消息总线，多 Gunicorn Worker 下 WebSocket 消息跨进程广播，`WS_PUBSUB_ENABLED` 可配置                            |
-| 可观测性     | Prometheus 指标（`PROMETHEUS_ENABLED=true`），暴露 `/metrics` 端点，采集请求量/延迟/错误率/在途请求                           |
-| 生命周期管理 | FastAPI lifespan 统一管理 S3 客户端、Redis 连接、数据库引擎、WebSocket Pub/Sub 的初始化与优雅关闭                             |
-| 缓存失效     | Redis Hash 分组存储替代独立 key，`HKEYS`+`HDEL` 按用户精确删除，避免 `SCAN` 全库遍历；TTL 从 30s/15s 提升至 120s/60s          |
-| 请求日志     | 纯 ASGI 中间件替代 BaseHTTPMiddleware，避免消耗 request body 和流式响应问题                                                   |
-| 请求追踪     | `ContextVar` 注入 `request_id`+`user_id` 到所有日志；上游 `X-Request-ID` → 下游 `X-Correlation-ID` 跨服务追踪                 |
-| 游标分页     | 移除 OFFSET 回退，skip>0 用子查询取分界点走 keyset 分页；前端 `cursorMap` 维护游标状态                                        |
-| MIME 异步    | `magic.from_buffer` 改为 `asyncio.to_thread` 避免阻塞事件循环                                                                 |
-| 图片优化     | Next.js `remotePatterns` 配置 MinIO 图片优化，WebP 转码 + 按设备尺寸缩放 + 缓存 TTL 7200s                                     |
-| PgBouncer    | 数据库连接池代理，所有服务通过 pgbouncer:6432 连接，实际 DB 连接数从 60+ 降至 20                                              |
-| Celery 镜像  | 独立 `Dockerfile.celery` 轻量镜像，不含 Gunicorn/Uvicorn/curl，减小体积和攻击面                                               |
-| WS 按需订阅  | Redis Pub/Sub 从 `psubscribe("ws:user:*")` 通配符改为按需 `subscribe`/`unsubscribe`，避免消息风暴                             |
-| Nginx 缓存   | MinIO 缩略图（120min）+ 文件下载（60min）代理缓存层；API 60r/m + 下载 30r/m 限流                                              |
-| 监控仪表盘   | Grafana + Prometheus + Redis/PostgreSQL/MinIO Exporter，预配置仪表盘 + 7 条告警规则                                           |
-| CI 流水线    | 后端 ruff lint + 前端 tsc/vitest + Docker 构建验证 + pip-audit/npm audit 安全审计                                             |
-| 健康检查     | liveness（`/health`，检查 Redis）与 readiness（`/health/ready`）分离，轻量心跳 vs 全组件探测                                  |
-| 传输管理     | 已完成/失败任务自动清理，最多保留 30 条历史记录                                                                               |
+| 模块         | 措施                                                                                                                              |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| 上传         | 流式直传 MinIO，内存占用 O(1)（非 O(N×文件大小)）                                                                                 |
+| 分片上传     | ≥16MB 自动分片，MinIO Multipart API 三阶段（init→part→complete），Redis Hash 存储会话状态（TTL 24h），支持断点续传/暂停/恢复/取消 |
+| MinIO        | 异步包装（`run_in_threadpool`），不阻塞事件循环                                                                                   |
+| S3 批量删除  | `delete_objects` 批量接口替代逐个 `delete_object`，分批 1000 key，失败自动降级逐个重试                                            |
+| S3 初始化    | `asyncio.Lock` 保护 S3 客户端初始化与关闭，防止并发重复创建和竞态条件                                                             |
+| 部署         | Gunicorn 多 worker，充分利用多核，支持优雅关闭                                                                                    |
+| 压缩         | GZip 中间件（≥500B 自动压缩）                                                                                                     |
+| 数据库       | 连接池可配置（`pool_size`/`max_overflow`/`pool_timeout`/`pool_recycle`）                                                          |
+| 限流         | Redis 滑动窗口限流，全局 IP + 登录路径双层控制；Redis 不可达时放行并记录告警日志                                                  |
+| 任务         | Celery 异步队列，邮件/备份/缩略图/告警不阻塞请求                                                                                  |
+| 缩略图       | 图片上传后自动异步生成 256×256 缩略图，前端渐进加载（shimmer → blur → sharp），列表优先请求缩略图而非原图                         |
+| 分页         | `share_service.list_shares` 改为两次查询（count + data），避免窗口函数跨分页 total 不一致                                         |
+| 搜索         | pg_trgm `similarity()` 三元组相似度搜索 + GIN 索引，替代低效 `ilike`                                                              |
+| 文件夹       | `list_folder_contents` 文件查询与 count 合并，3 次查询→2 次；`delete_folder`/`restore_folder` 用 SQL SUM 替代 Python 遍历求和     |
+| Docker       | 多阶段构建：backend 315MB / frontend 216MB，生产无 `--reload`，非 root 运行，HEALTHCHECK                                          |
+| 虚拟滚动     | react-virtuoso（TableVirtuoso + VirtuosoGrid），文件列表仅渲染可视区域 DOM，万级文件无卡顿                                        |
+| 请求缓存     | TanStack Query（useQuery + useMutation），staleTime 30s，自动去重/缓存/stale-while-revalidate，mutation 后精准失效                |
+| 实时通知     | WebSocket 长连接，上传完成/分享创建/存储变更即时推送，前端自动 invalidate 对应缓存，指数退避重连（1→2→4→8→16s）                   |
+| WS 多 Worker | Redis Pub/Sub 消息总线，多 Gunicorn Worker 下 WebSocket 消息跨进程广播，`WS_PUBSUB_ENABLED` 可配置                                |
+| 可观测性     | Prometheus 指标（`PROMETHEUS_ENABLED=true`），暴露 `/metrics` 端点，采集请求量/延迟/错误率/在途请求                               |
+| 生命周期管理 | FastAPI lifespan 统一管理 S3 客户端、Redis 连接、数据库引擎、WebSocket Pub/Sub 的初始化与优雅关闭                                 |
+| 缓存失效     | Redis Hash 分组存储替代独立 key，`HKEYS`+`HDEL` 按用户精确删除，避免 `SCAN` 全库遍历；TTL 从 30s/15s 提升至 120s/60s              |
+| 请求日志     | 纯 ASGI 中间件替代 BaseHTTPMiddleware，避免消耗 request body 和流式响应问题                                                       |
+| 请求追踪     | `ContextVar` 注入 `request_id`+`user_id` 到所有日志；上游 `X-Request-ID` → 下游 `X-Correlation-ID` 跨服务追踪                     |
+| 游标分页     | 移除 OFFSET 回退，skip>0 用子查询取分界点走 keyset 分页；前端 `cursorMap` 维护游标状态                                            |
+| MIME 异步    | `magic.from_buffer` 改为 `asyncio.to_thread` 避免阻塞事件循环                                                                     |
+| 图片优化     | Next.js `remotePatterns` 配置 MinIO 图片优化，WebP 转码 + 按设备尺寸缩放 + 缓存 TTL 7200s                                         |
+| PgBouncer    | 数据库连接池代理，所有服务通过 pgbouncer:6432 连接，实际 DB 连接数从 60+ 降至 20                                                  |
+| Celery 镜像  | 独立 `Dockerfile.celery` 轻量镜像，不含 Gunicorn/Uvicorn/curl，减小体积和攻击面                                                   |
+| WS 按需订阅  | Redis Pub/Sub 从 `psubscribe("ws:user:*")` 通配符改为按需 `subscribe`/`unsubscribe`，避免消息风暴                                 |
+| Nginx 缓存   | MinIO 缩略图（120min）+ 文件下载（60min）代理缓存层；API 60r/m + 下载 30r/m 限流                                                  |
+| 监控仪表盘   | Grafana + Prometheus + Redis/PostgreSQL/MinIO Exporter，预配置仪表盘 + 7 条告警规则                                               |
+| CI 流水线    | 后端 ruff lint + 前端 tsc/vitest + Docker 构建验证 + pip-audit/npm audit 安全审计                                                 |
+| 健康检查     | liveness（`/health`，检查 Redis）与 readiness（`/health/ready`）分离，轻量心跳 vs 全组件探测                                      |
+| 传输管理     | 已完成/失败任务自动清理，最多保留 30 条历史记录                                                                                   |
 
 ## 常用命令
 
@@ -546,6 +563,9 @@ docker compose exec frontend sh
 
 # ---- 健康检查 ----
 curl http://localhost:8000/health
+
+# ---- JWT RS256 密钥生成 ----
+./scripts/generate-jwt-keys.sh 4096 ./secrets    # 生成 4096 位 RSA 密钥对
 ```
 
 ## 开发说明

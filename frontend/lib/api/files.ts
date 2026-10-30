@@ -390,3 +390,146 @@ export async function downloadSharedFile(
   a.click();
   document.body.removeChild(a);
 }
+
+export interface MultipartInitResult {
+  upload_id: string;
+  storage_key: string;
+  part_size: number;
+  total_parts: number;
+}
+
+export interface MultipartPartResult {
+  part_number: number;
+  etag: string;
+}
+
+export interface MultipartPartInfo {
+  part_number: number;
+  etag: string;
+}
+
+export async function multipartInit(
+  filename: string,
+  mimeType: string,
+  totalSize: number,
+  folderId?: string
+): Promise<MultipartInitResult> {
+  return client<MultipartInitResult>("/api/v1/files/multipart/init", {
+    method: "POST",
+    body: JSON.stringify({
+      filename,
+      mime_type: mimeType,
+      total_size: totalSize,
+      folder_id: folderId ?? null,
+    }),
+  });
+}
+
+export async function multipartUploadPart(
+  storageKey: string,
+  uploadId: string,
+  partNumber: number,
+  data: Blob
+): Promise<MultipartPartResult> {
+  const formData = new FormData();
+  formData.append("part", data);
+  const params = new URLSearchParams({
+    storage_key: storageKey,
+    upload_id: uploadId,
+    part_number: String(partNumber),
+  });
+  return client<MultipartPartResult>(`/api/v1/files/multipart/part?${params}`, {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export async function multipartComplete(
+  uploadId: string,
+  storageKey: string,
+  filename: string,
+  mimeType: string,
+  totalSize: number,
+  parts: MultipartPartInfo[],
+  folderId?: string
+): Promise<FileUploadResponse> {
+  return client<FileUploadResponse>("/api/v1/files/multipart/complete", {
+    method: "POST",
+    body: JSON.stringify({
+      upload_id: uploadId,
+      storage_key: storageKey,
+      filename,
+      mime_type: mimeType,
+      total_size: totalSize,
+      folder_id: folderId ?? null,
+      parts: parts.map((p) => ({ part_number: p.part_number, etag: p.etag })),
+    }),
+  });
+}
+
+export async function multipartAbort(
+  storageKey: string,
+  uploadId: string
+): Promise<{ message: string }> {
+  const params = new URLSearchParams({
+    storage_key: storageKey,
+    upload_id: uploadId,
+  });
+  return client<{ message: string }>(`/api/v1/files/multipart/abort?${params}`, {
+    method: "POST",
+  });
+}
+
+export interface MultipartUploadProgress {
+  loaded: number;
+  total: number;
+}
+
+export async function multipartUploadFile(
+  file: File,
+  folderId?: string,
+  onProgress?: (progress: MultipartUploadProgress) => void,
+  signal?: AbortSignal
+): Promise<FileUploadResponse> {
+  const { upload_id, storage_key, part_size, total_parts } = await multipartInit(
+    file.name,
+    file.type || "application/octet-stream",
+    file.size,
+    folderId
+  );
+
+  const completedParts: MultipartPartInfo[] = [];
+  let loaded = 0;
+
+  for (let i = 0; i < total_parts; i++) {
+    if (signal?.aborted) {
+      await multipartAbort(storage_key, upload_id).catch(() => {});
+      throw new Error("已取消");
+    }
+
+    const start = i * part_size;
+    const end = Math.min(start + part_size, file.size);
+    const blob = file.slice(start, end);
+
+    const { part_number, etag } = await multipartUploadPart(
+      storage_key,
+      upload_id,
+      i + 1,
+      blob
+    );
+
+    completedParts.push({ part_number, etag });
+    loaded += end - start;
+    onProgress?.({ loaded, total: file.size });
+  }
+
+  return multipartComplete(
+    upload_id,
+    storage_key,
+    file.name,
+    file.type || "application/octet-stream",
+    file.size,
+    completedParts,
+    folderId
+  );
+}

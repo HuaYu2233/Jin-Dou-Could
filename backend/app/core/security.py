@@ -1,5 +1,6 @@
 import uuid
 import bcrypt
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
 from app.core.config import settings
@@ -20,12 +21,41 @@ def verify_security_answer(plain: str, hashed: str) -> bool:
     normalized = plain.strip().lower()
     return bcrypt.checkpw(normalized.encode('utf-8'), hashed.encode('utf-8'))
 
+# ========== JWT Key Loading ==========
+_signing_key: str | None = None
+_verifying_key: str | None = None
+
+
+def _get_signing_key() -> str:
+    global _signing_key
+    if _signing_key is not None:
+        return _signing_key
+    if settings.ALGORITHM == "RS256" and settings.JWT_PRIVATE_KEY_PATH:
+        _signing_key = Path(settings.JWT_PRIVATE_KEY_PATH).read_text()
+    else:
+        _signing_key = settings.SECRET_KEY
+    return _signing_key
+
+
+def _get_verifying_key() -> str:
+    global _verifying_key
+    if _verifying_key is not None:
+        return _verifying_key
+    if settings.ALGORITHM == "RS256" and settings.JWT_PUBLIC_KEY_PATH:
+        _verifying_key = Path(settings.JWT_PUBLIC_KEY_PATH).read_text()
+    elif settings.ALGORITHM == "RS256" and settings.JWT_PRIVATE_KEY_PATH:
+        _verifying_key = Path(settings.JWT_PRIVATE_KEY_PATH).read_text()
+    else:
+        _verifying_key = settings.SECRET_KEY
+    return _verifying_key
+
+
 # ========== JWT ==========
 def _create_token(data: dict, expires_delta: timedelta, token_type: str) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + expires_delta
     to_encode.update({"exp": expire, "jti": str(uuid.uuid4()), "type": token_type})
-    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    return jwt.encode(to_encode, _get_signing_key(), algorithm=settings.ALGORITHM)
 
 def create_access_token(data: dict) -> str:
     return _create_token(data, timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES), token_type="access")
@@ -35,7 +65,7 @@ def create_refresh_token(data: dict) -> str:
 
 def decode_token(token: str) -> dict | None:
     try:
-        return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        return jwt.decode(token, _get_verifying_key(), algorithms=[settings.ALGORITHM])
     except JWTError:
         return None
 
