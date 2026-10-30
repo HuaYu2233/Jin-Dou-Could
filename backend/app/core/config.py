@@ -30,6 +30,7 @@ class Settings(BaseSettings):
 
     RATE_LIMIT_ENABLED: bool = True
     RATE_LIMIT_PER_MINUTE: int = 60
+    TRUSTED_PROXIES: str = ""
 
     MINIO_ENDPOINT: str = "minio:9000"
     MINIO_PUBLIC_ENDPOINT: str = "localhost:9000"

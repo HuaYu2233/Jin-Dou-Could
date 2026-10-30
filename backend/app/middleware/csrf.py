@@ -10,6 +10,27 @@ _CSRF_HEADER_NAME = "x-csrf-token"
 _API_PREFIX = "/api/"
 
 
+def _get_cookie_from_scope(scope: Scope, name: str) -> str | None:
+    headers = dict(scope.get("headers", []))
+    cookie_header = headers.get(b"cookie")
+    if not cookie_header:
+        return None
+    cookie_str = cookie_header.decode("latin-1")
+    for part in cookie_str.split(";"):
+        part = part.strip()
+        if part.startswith(f"{name}="):
+            return part[len(name) + 1:]
+    return None
+
+
+def _get_header_from_scope(scope: Scope, name: str) -> str | None:
+    headers = dict(scope.get("headers", []))
+    value = headers.get(name.encode("latin-1"))
+    if value:
+        return value.decode("latin-1")
+    return None
+
+
 class CSRFMiddleware:
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
@@ -23,26 +44,28 @@ class CSRFMiddleware:
             await self.app(scope, receive, send)
             return
 
-        request = Request(scope, receive)
-        needs_cookie = not request.cookies.get(_CSRF_COOKIE_NAME)
+        cookie_token = _get_cookie_from_scope(scope, _CSRF_COOKIE_NAME)
+        needs_cookie = not cookie_token
         new_token = secrets.token_urlsafe(32) if needs_cookie else None
 
-        if request.method in _SAFE_METHODS:
+        method = scope.get("method", "")
+        path = scope.get("path", "")
+
+        if method in _SAFE_METHODS:
             if needs_cookie:
                 await self._run_with_cookie(scope, receive, send, new_token)
             else:
                 await self.app(scope, receive, send)
             return
 
-        if not request.url.path.startswith(_API_PREFIX):
+        if not path.startswith(_API_PREFIX):
             if needs_cookie:
                 await self._run_with_cookie(scope, receive, send, new_token)
             else:
                 await self.app(scope, receive, send)
             return
 
-        cookie_token = request.cookies.get(_CSRF_COOKIE_NAME)
-        header_token = request.headers.get(_CSRF_HEADER_NAME)
+        header_token = _get_header_from_scope(scope, _CSRF_HEADER_NAME)
 
         if not cookie_token or not header_token or not secrets.compare_digest(cookie_token, header_token):
             if needs_cookie:

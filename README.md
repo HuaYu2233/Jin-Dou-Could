@@ -214,17 +214,18 @@ make logs
 
 ### 性能与安全
 
-| 配置项                     | 说明                         | 默认值 |
-| -------------------------- | ---------------------------- | ------ |
-| `BACKEND_WORKERS`          | Gunicorn worker 进程数       | 4      |
-| `DB_POOL_SIZE`             | 数据库连接池大小             | 5      |
-| `DB_MAX_OVERFLOW`          | 连接池溢出上限               | 5      |
-| `DB_POOL_TIMEOUT`          | 获取连接超时（秒）           | 30     |
-| `DB_MAX_CONNECTIONS`       | PostgreSQL 最大连接数        | 80     |
-| `HTTPS_REDIRECT`           | 强制 HTTPS 重定向            | false  |
-| `SECURITY_HEADERS_ENABLED` | 启用安全响应头               | true   |
-| `RATE_LIMIT_ENABLED`       | 启用全局限流                 | true   |
-| `RATE_LIMIT_PER_MINUTE`    | 每分钟每 IP 每路径最大请求数 | 60     |
+| 配置项                     | 说明                          | 默认值 |
+| -------------------------- | ----------------------------- | ------ |
+| `BACKEND_WORKERS`          | Gunicorn worker 进程数        | 4      |
+| `DB_POOL_SIZE`             | 数据库连接池大小              | 5      |
+| `DB_MAX_OVERFLOW`          | 连接池溢出上限                | 5      |
+| `DB_POOL_TIMEOUT`          | 获取连接超时（秒）            | 30     |
+| `DB_MAX_CONNECTIONS`       | PostgreSQL 最大连接数         | 80     |
+| `HTTPS_REDIRECT`           | 强制 HTTPS 重定向             | false  |
+| `SECURITY_HEADERS_ENABLED` | 启用安全响应头                | true   |
+| `RATE_LIMIT_ENABLED`       | 启用全局限流                  | true   |
+| `RATE_LIMIT_PER_MINUTE`    | 每分钟每 IP 最大请求数        | 60     |
+| `TRUSTED_PROXIES`          | 信任的反向代理 IP（逗号分隔） | -      |
 
 ### WebSocket 与可观测性
 
@@ -393,10 +394,14 @@ ALERT_WEBHOOK_TYPE=dingtalk  # dingtalk/feishu/wechat/generic
 ## 健康检查
 
 ```bash
+# Liveness（轻量心跳，不检查外部依赖）
 curl http://localhost:8000/health
+
+# Readiness（全组件探测，用于负载均衡器）
+curl http://localhost:8000/health/ready
 ```
 
-返回各组件状态与延迟：
+`/health/ready` 返回各组件状态与延迟：
 
 ```json
 {
@@ -435,37 +440,46 @@ curl http://localhost:8000/health
 
 ### 安全加固
 
-| 模块     | 措施                                                               |
-| -------- | ------------------------------------------------------------------ |
-| 基础设施 | Docker socket 移除、端口绑定 127.0.0.1、Redis 密码 + 禁用 FLUSHALL |
-| 认证     | JWT 增加 `type` 字段，防止 access/refresh token 混用               |
-| 缓存     | Redis 用户缓存脱敏（移除密码、密保问题/答案）                      |
-| 上传     | python-magic 真实 MIME 检测 + 白名单 + 文件名净化                  |
-| 限流     | 提取码 5 次失败锁定 15 分钟；登录按真实 IP（X-Forwarded-For）限流  |
-| 响应头   | CSP / HSTS / X-Frame-Options / nosniff / Referrer-Policy           |
+| 模块      | 措施                                                                                          |
+| --------- | --------------------------------------------------------------------------------------------- |
+| 基础设施  | Docker socket 移除、端口绑定 127.0.0.1、Redis 密码 + 禁用 FLUSHALL                            |
+| 认证      | JWT 增加 `type` 字段，防止 access/refresh token 混用                                          |
+| 缓存      | Redis 用户缓存脱敏（移除密码、密保问题/答案）                                                 |
+| 上传      | python-magic 真实 MIME 检测 + 白名单 + 文件名净化                                             |
+| 限流      | 全局 IP 滑动窗口限流 + 登录/注册路径严格限流（10次/分钟）；仅信任代理 IP 读取 X-Forwarded-For |
+| 响应头    | CSP / HSTS / X-Frame-Options / nosniff / Referrer-Policy                                      |
+| CSRF      | 纯 ASGI 中间件，避免 BaseHTTPMiddleware 开销；scope 级 cookie/header 解析，不构造 Request     |
+| WebSocket | 首条消息认证（非 URL 参数传 Token），5 秒认证超时，4KB 消息长度限制                           |
+| 告警      | 降级发送使用 `asyncio.to_thread` 避免阻塞事件循环；`create_task` 异常回调捕获                 |
 
 ### 性能优化
 
-| 模块         | 措施                                                                                                            |
-| ------------ | --------------------------------------------------------------------------------------------------------------- |
-| 上传         | 流式直传 MinIO，内存占用 O(1)（非 O(N×文件大小)）                                                               |
-| MinIO        | 异步包装（`run_in_threadpool`），不阻塞事件循环                                                                 |
-| 部署         | Gunicorn 多 worker，充分利用多核，支持优雅关闭                                                                  |
-| 压缩         | GZip 中间件（≥500B 自动压缩）                                                                                   |
-| 数据库       | 连接池可配置（`pool_size`/`max_overflow`/`pool_timeout`/`pool_recycle`）                                        |
-| 限流         | Redis 滑动窗口限流，按 IP + 路径粒度控制                                                                        |
-| 任务         | Celery 异步队列，邮件/备份/缩略图/告警不阻塞请求                                                                |
-| 缩略图       | 图片上传后自动异步生成 256×256 缩略图，前端渐进加载（shimmer → blur → sharp），列表优先请求缩略图而非原图       |
-| 分页         | 窗口函数 `count() over()` 合并数据+总数为单次查询，消除 N+1 count 问题                                          |
-| 搜索         | pg_trgm `similarity()` 三元组相似度搜索 + GIN 索引，替代低效 `ilike`                                            |
-| 文件夹       | `list_folder_contents` 文件查询与 count 合并，3 次查询→2 次                                                     |
-| Docker       | 多阶段构建：backend 315MB / frontend 216MB，生产无 `--reload`，非 root 运行，HEALTHCHECK                        |
-| 虚拟滚动     | react-virtuoso（TableVirtuoso + VirtuosoGrid），文件列表仅渲染可视区域 DOM，万级文件无卡顿                      |
-| 请求缓存     | TanStack Query（useQuery + useMutation），自动去重/缓存/stale-while-revalidate，mutation 后乐观更新或精准失效   |
-| 实时通知     | WebSocket 长连接，上传完成/分享创建/存储变更即时推送，前端自动 invalidate 对应缓存，指数退避重连（1→2→4→8→16s） |
-| WS 多 Worker | Redis Pub/Sub 消息总线，多 Gunicorn Worker 下 WebSocket 消息跨进程广播，`WS_PUBSUB_ENABLED` 可配置              |
-| 可观测性     | Prometheus 指标（`PROMETHEUS_ENABLED=true`），暴露 `/metrics` 端点，采集请求量/延迟/错误率/在途请求             |
-| 生命周期管理 | FastAPI lifespan 统一管理 S3 客户端、Redis 连接、数据库引擎、WebSocket Pub/Sub 的初始化与优雅关闭               |
+| 模块         | 措施                                                                                                                          |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| 上传         | 流式直传 MinIO，内存占用 O(1)（非 O(N×文件大小)）                                                                             |
+| MinIO        | 异步包装（`run_in_threadpool`），不阻塞事件循环                                                                               |
+| S3 批量删除  | `delete_objects` 批量接口替代逐个 `delete_object`，分批 1000 key，失败自动降级逐个重试                                        |
+| S3 初始化    | `asyncio.Lock` 保护 S3 客户端初始化，防止并发重复创建                                                                         |
+| 部署         | Gunicorn 多 worker，充分利用多核，支持优雅关闭                                                                                |
+| 压缩         | GZip 中间件（≥500B 自动压缩）                                                                                                 |
+| 数据库       | 连接池可配置（`pool_size`/`max_overflow`/`pool_timeout`/`pool_recycle`）                                                      |
+| 限流         | Redis 滑动窗口限流，全局 IP + 登录路径双层控制；Redis 不可达时放行并记录告警日志                                              |
+| 任务         | Celery 异步队列，邮件/备份/缩略图/告警不阻塞请求                                                                              |
+| 缩略图       | 图片上传后自动异步生成 256×256 缩略图，前端渐进加载（shimmer → blur → sharp），列表优先请求缩略图而非原图                     |
+| 分页         | `share_service.list_shares` 改为两次查询（count + data），避免窗口函数跨分页 total 不一致                                     |
+| 搜索         | pg_trgm `similarity()` 三元组相似度搜索 + GIN 索引，替代低效 `ilike`                                                          |
+| 文件夹       | `list_folder_contents` 文件查询与 count 合并，3 次查询→2 次；`delete_folder`/`restore_folder` 用 SQL SUM 替代 Python 遍历求和 |
+| Docker       | 多阶段构建：backend 315MB / frontend 216MB，生产无 `--reload`，非 root 运行，HEALTHCHECK                                      |
+| 虚拟滚动     | react-virtuoso（TableVirtuoso + VirtuosoGrid），文件列表仅渲染可视区域 DOM，万级文件无卡顿                                    |
+| 请求缓存     | TanStack Query（useQuery + useMutation），staleTime 30s，自动去重/缓存/stale-while-revalidate，mutation 后精准失效            |
+| 实时通知     | WebSocket 长连接，上传完成/分享创建/存储变更即时推送，前端自动 invalidate 对应缓存，指数退避重连（1→2→4→8→16s）               |
+| WS 多 Worker | Redis Pub/Sub 消息总线，多 Gunicorn Worker 下 WebSocket 消息跨进程广播，`WS_PUBSUB_ENABLED` 可配置                            |
+| 可观测性     | Prometheus 指标（`PROMETHEUS_ENABLED=true`），暴露 `/metrics` 端点，采集请求量/延迟/错误率/在途请求                           |
+| 生命周期管理 | FastAPI lifespan 统一管理 S3 客户端、Redis 连接、数据库引擎、WebSocket Pub/Sub 的初始化与优雅关闭                             |
+| 缓存失效     | Redis `SCAN` 替代 `KEYS` 避免阻塞；分批 delete（每批 500 key）；用户缓存失效联动文件计数缓存                                  |
+| 请求日志     | 纯 ASGI 中间件替代 BaseHTTPMiddleware，避免消耗 request body 和流式响应问题                                                   |
+| 健康检查     | liveness（`/health`）与 readiness（`/health/ready`）分离，轻量心跳 vs 全组件探测                                              |
+| 传输管理     | 已完成/失败任务自动清理，最多保留 30 条历史记录                                                                               |
 
 ## 常用命令
 

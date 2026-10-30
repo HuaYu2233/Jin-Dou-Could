@@ -1,7 +1,10 @@
 import uuid
+from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.models.user import User
+from app.models.file import File
+from app.core.storage import delete_file as s3_delete_file, batch_delete_files
 
 
 async def get_stats(db: AsyncSession) -> dict:
@@ -88,5 +91,20 @@ async def delete_user(
         if admin_count <= 1:
             raise ValueError("系统至少保留一个管理员")
 
+    files_result = await db.execute(select(File.storage_key).where(File.owner_id == target_id))
+    storage_keys = [row[0] for row in files_result.all()]
+
+    await db.execute(File.__table__.delete().where(File.owner_id == target_id))
     await db.delete(target)
     await db.commit()
+
+    if storage_keys:
+        try:
+            await batch_delete_files(storage_keys)
+        except Exception as exc:
+            logger.bind(log_type="storage").error(f"用户 {target_id} 批量 S3 删除失败，尝试逐个删除: {exc}")
+            for key in storage_keys:
+                try:
+                    await s3_delete_file(key)
+                except Exception as e2:
+                    logger.bind(log_type="storage").warning(f"孤儿 S3 对象: {key}, 删除失败: {e2}")

@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 from app.models.folder import Folder
 from app.models.file import File
 from app.models.user import User
-from app.core.storage import delete_file as s3_delete_file
+from app.core.storage import delete_file as s3_delete_file, batch_delete_files
 
 
 async def create_folder(
@@ -117,11 +117,26 @@ async def delete_folder(
         .where(Folder.id.in_(all_folder_ids), Folder.deleted_at.is_(None))
         .values(deleted_at=now)
     )
+
+    files_result = await db.execute(
+        select(func.coalesce(func.sum(File.size), 0)).where(
+            File.folder_id.in_(all_folder_ids),
+            File.deleted_at.is_(None),
+        )
+    )
+    total_size = files_result.scalar_one()
+
     await db.execute(
         update(File)
         .where(File.folder_id.in_(all_folder_ids), File.deleted_at.is_(None))
         .values(deleted_at=now)
     )
+
+    if total_size > 0:
+        owner_result = await db.execute(select(User).where(User.id == owner_id))
+        owner = owner_result.scalar_one_or_none()
+        if owner:
+            owner.used_storage = max(0, owner.used_storage - total_size)
 
     await db.commit()
     return True
@@ -172,6 +187,14 @@ async def restore_folder(
 
     all_folder_ids = await _collect_subfolder_ids(db, folder_id, owner_id)
 
+    files_result = await db.execute(
+        select(func.coalesce(func.sum(File.size), 0)).where(
+            File.folder_id.in_(all_folder_ids),
+            File.deleted_at.is_not(None),
+        )
+    )
+    total_size = files_result.scalar_one()
+
     await db.execute(
         update(Folder)
         .where(Folder.id.in_(all_folder_ids), Folder.deleted_at.is_not(None))
@@ -182,6 +205,12 @@ async def restore_folder(
         .where(File.folder_id.in_(all_folder_ids), File.deleted_at.is_not(None))
         .values(deleted_at=None)
     )
+
+    if total_size > 0:
+        owner_result = await db.execute(select(User).where(User.id == owner_id))
+        owner = owner_result.scalar_one_or_none()
+        if owner:
+            owner.used_storage += total_size
 
     await db.commit()
     return True
@@ -204,13 +233,16 @@ async def purge_folder(
     )
     files_to_purge = list(files_result.scalars().all())
 
-    total_size = 0
-    for file in files_to_purge:
+    storage_keys = [f.storage_key for f in files_to_purge]
+    if storage_keys:
         try:
-            await s3_delete_file(file.storage_key)
+            await batch_delete_files(storage_keys)
         except Exception:
-            pass
-        total_size += file.size
+            for key in storage_keys:
+                try:
+                    await s3_delete_file(key)
+                except Exception:
+                    pass
 
     for file in files_to_purge:
         await db.delete(file)
@@ -225,12 +257,6 @@ async def purge_folder(
         await db.delete(subfolder)
 
     await db.delete(folder)
-
-    if total_size > 0:
-        owner_result = await db.execute(select(User).where(User.id == owner_id))
-        owner = owner_result.scalar_one_or_none()
-        if owner:
-            owner.used_storage = max(0, owner.used_storage - total_size)
 
     await db.commit()
     return True

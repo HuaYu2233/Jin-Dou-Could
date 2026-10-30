@@ -17,6 +17,8 @@ from app.core.config import settings
 from app.core.redis import redis_client
 
 _FILENAME_MAX_LEN = 255
+_COUNT_CACHE_TTL = 30
+_SEARCH_CACHE_TTL = 15
 _CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]")
 _PATH_SEP_RE = re.compile(r"[\\/]+")
 
@@ -44,6 +46,26 @@ def sanitize_filename(name: str) -> str:
     if not name:
         name = "unknown"
     return name[:_FILENAME_MAX_LEN]
+
+
+async def invalidate_file_caches(owner_id: uuid.UUID) -> None:
+    patterns = [
+        f"file_count:{owner_id}:*",
+        f"trash_count:{owner_id}",
+        f"search_count:{owner_id}:*",
+    ]
+    for pattern in patterns:
+        try:
+            if "*" in pattern:
+                keys = []
+                async for key in redis_client.scan_iter(match=pattern, count=100):
+                    keys.append(key)
+                for i in range(0, len(keys), 500):
+                    await redis_client.delete(*keys[i : i + 500])
+            else:
+                await redis_client.delete(pattern)
+        except Exception:
+            pass
 
 
 async def detect_real_mime_type(fileobj, declared: str) -> str:
@@ -202,7 +224,7 @@ async def list_files(
     else:
         count_result = await db.execute(select(func.count()).select_from(File).where(*filters))
         total = count_result.scalar_one()
-        await redis_client.setex(cache_key, 5, str(total))
+        await redis_client.setex(cache_key, _COUNT_CACHE_TTL, str(total))
 
     if cursor:
         try:
@@ -270,7 +292,7 @@ async def search_files(
     else:
         count_result = await db.execute(select(func.count()).select_from(File).where(*filters))
         total = count_result.scalar_one()
-        await redis_client.setex(cache_key, 5, str(total))
+        await redis_client.setex(cache_key, _SEARCH_CACHE_TTL, str(total))
 
     if cursor:
         try:
@@ -345,7 +367,7 @@ async def list_trash_files(
     else:
         count_result = await db.execute(select(func.count()).select_from(File).where(*filters))
         total = count_result.scalar_one()
-        await redis_client.setex(cache_key, 5, str(total))
+        await redis_client.setex(cache_key, _COUNT_CACHE_TTL, str(total))
 
     if cursor:
         try:
@@ -390,6 +412,12 @@ async def soft_delete_file(
     if not file:
         return False
     file.deleted_at = func.now()
+
+    owner_result = await db.execute(select(User).where(User.id == owner_id))
+    owner = owner_result.scalar_one_or_none()
+    if owner:
+        owner.used_storage = max(0, owner.used_storage - file.size)
+
     await db.commit()
     return True
 
@@ -407,6 +435,12 @@ async def restore_file(
     if not file:
         return False
     file.deleted_at = None
+
+    owner_result = await db.execute(select(User).where(User.id == owner_id))
+    owner = owner_result.scalar_one_or_none()
+    if owner:
+        owner.used_storage += file.size
+
     await db.commit()
     return True
 
@@ -424,15 +458,36 @@ async def purge_file(
     if not file:
         return False
 
-    await delete_file(file.storage_key)
-
-    owner_result = await db.execute(select(User).where(User.id == owner_id))
-    owner = owner_result.scalar_one()
-    owner.used_storage -= file.size
+    try:
+        await delete_file(file.storage_key)
+    except Exception:
+        pass
 
     await db.delete(file)
     await db.commit()
     return True
+
+
+async def recalculate_used_storage(
+    db: AsyncSession, owner_id: uuid.UUID
+) -> int:
+    result = await db.execute(
+        select(func.coalesce(func.sum(File.size), 0)).where(
+            File.owner_id == owner_id,
+            File.deleted_at.is_(None),
+        )
+    )
+    actual = result.scalar_one()
+
+    owner_result = await db.execute(select(User).where(User.id == owner_id))
+    owner = owner_result.scalar_one_or_none()
+    if owner and owner.used_storage != actual:
+        owner.used_storage = actual
+        await db.commit()
+        await db.refresh(owner)
+
+    return actual
+
 
 async def get_download_stream(file: File):
     from app.core.storage import stream_object

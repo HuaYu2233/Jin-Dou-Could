@@ -48,7 +48,19 @@ def _deserialize_user(data: str) -> User:
     return user
 
 async def invalidate_user_cache(user_id: UUID | str) -> None:
-    await redis_client.delete(f"user:{user_id}")
+    uid = str(user_id)
+    pipe = redis_client.pipeline()
+    pipe.delete(f"user:{uid}")
+    pipe.delete(f"trash_count:{uid}")
+    await pipe.execute()
+    try:
+        keys = []
+        async for key in redis_client.scan_iter(match=f"file_count:{uid}:*", count=100):
+            keys.append(key)
+        for i in range(0, len(keys), 500):
+            await redis_client.delete(*keys[i : i + 500])
+    except Exception:
+        pass
 
 async def get_current_user(
     request: Request,

@@ -1,3 +1,4 @@
+import asyncio
 import aiobotocore.session
 from botocore.config import Config
 from app.core.config import settings
@@ -18,36 +19,38 @@ _s3_client = None
 _s3_client_ctx = None
 _presigned_client = None
 _presigned_client_ctx = None
+_init_lock = asyncio.Lock()
 
 _ENDPOINT_SCHEME = "https" if settings.MINIO_SECURE else "http"
 
 
 async def init_s3_clients():
     global _s3_client, _s3_client_ctx, _presigned_client, _presigned_client_ctx
-    if _s3_client is not None:
-        return
-    _s3_client_ctx = _session.create_client(
-        "s3",
-        endpoint_url=f"{_ENDPOINT_SCHEME}://{settings.MINIO_ENDPOINT}",
-        aws_access_key_id=settings.MINIO_ACCESS_KEY,
-        aws_secret_access_key=settings.MINIO_SECRET_KEY,
-        region_name="us-east-1",
-        config=_s3_config,
-        use_ssl=settings.MINIO_SECURE,
-    )
-    _s3_client = await _s3_client_ctx.__aenter__()
+    async with _init_lock:
+        if _s3_client is not None:
+            return
+        _s3_client_ctx = _session.create_client(
+            "s3",
+            endpoint_url=f"{_ENDPOINT_SCHEME}://{settings.MINIO_ENDPOINT}",
+            aws_access_key_id=settings.MINIO_ACCESS_KEY,
+            aws_secret_access_key=settings.MINIO_SECRET_KEY,
+            region_name="us-east-1",
+            config=_s3_config,
+            use_ssl=settings.MINIO_SECURE,
+        )
+        _s3_client = await _s3_client_ctx.__aenter__()
 
-    _presigned_client_ctx = _session.create_client(
-        "s3",
-        endpoint_url=f"{_ENDPOINT_SCHEME}://{settings.MINIO_PUBLIC_ENDPOINT}",
-        aws_access_key_id=settings.MINIO_ACCESS_KEY,
-        aws_secret_access_key=settings.MINIO_SECRET_KEY,
-        region_name="us-east-1",
-        config=_s3_config,
-        use_ssl=settings.MINIO_SECURE,
-    )
-    _presigned_client = await _presigned_client_ctx.__aenter__()
-    logger.info(f"S3 clients initialized (secure={settings.MINIO_SECURE})")
+        _presigned_client_ctx = _session.create_client(
+            "s3",
+            endpoint_url=f"{_ENDPOINT_SCHEME}://{settings.MINIO_PUBLIC_ENDPOINT}",
+            aws_access_key_id=settings.MINIO_ACCESS_KEY,
+            aws_secret_access_key=settings.MINIO_SECRET_KEY,
+            region_name="us-east-1",
+            config=_s3_config,
+            use_ssl=settings.MINIO_SECURE,
+        )
+        _presigned_client = await _presigned_client_ctx.__aenter__()
+        logger.info(f"S3 clients initialized (secure={settings.MINIO_SECURE})")
 
 
 async def close_s3_clients():
@@ -281,6 +284,26 @@ async def delete_file(storage_key: str) -> None:
             Bucket=settings.MINIO_BUCKET,
             Key=storage_key,
         )
+
+
+async def batch_delete_files(storage_keys: list[str]) -> None:
+    if not storage_keys:
+        return
+    batch_size = 1000
+    all_errors: list[str] = []
+    async with get_s3_client() as client:
+        for i in range(0, len(storage_keys), batch_size):
+            batch = storage_keys[i : i + batch_size]
+            objects = [{"Key": key} for key in batch]
+            resp = await client.delete_objects(
+                Bucket=settings.MINIO_BUCKET,
+                Delete={"Objects": objects, "Quiet": True},
+            )
+            errors = resp.get("Errors", [])
+            if errors:
+                all_errors.extend(e["Key"] for e in errors)
+    if all_errors:
+        raise RuntimeError(f"批量删除部分失败: {all_errors[:10]}")
 
 
 async def get_presigned_download_url(

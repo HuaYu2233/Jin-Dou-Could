@@ -1,3 +1,4 @@
+import asyncio
 import json
 import threading
 import time
@@ -63,14 +64,44 @@ class AlertManager:
                 from app.tasks.alert_tasks import send_alert_webhook
                 send_alert_webhook.delay(text)
             except Exception:
-                self._fallback_webhook(text)
+                try:
+                    loop = asyncio.get_running_loop()
+                    task = loop.create_task(self._async_fallback_webhook(text))
+                    task.add_done_callback(self._on_fallback_task_done)
+                except RuntimeError:
+                    self._fallback_webhook(text)
 
         if settings.ALERT_EMAIL_ENABLED:
             try:
                 from app.tasks.email_tasks import send_alert_email
                 send_alert_email.delay(subject, text)
             except Exception:
-                self._fallback_email(subject, text)
+                try:
+                    loop = asyncio.get_running_loop()
+                    task = loop.create_task(self._async_fallback_email(subject, text))
+                    task.add_done_callback(self._on_fallback_task_done)
+                except RuntimeError:
+                    self._fallback_email(subject, text)
+
+    async def _async_fallback_webhook(self, text):
+        try:
+            await asyncio.to_thread(self._fallback_webhook, text)
+        except Exception as e:
+            logger.bind(log_type="alert").debug(f"异步 Webhook 告警降级发送失败: {e}")
+
+    async def _async_fallback_email(self, subject, text):
+        try:
+            await asyncio.to_thread(self._fallback_email, subject, text)
+        except Exception as e:
+            logger.bind(log_type="alert").debug(f"异步邮件告警降级发送失败: {e}")
+
+    @staticmethod
+    def _on_fallback_task_done(task: asyncio.Task) -> None:
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc:
+            logger.bind(log_type="alert").debug(f"降级告警 task 异常: {exc}")
 
     def _fallback_webhook(self, text):
         wtype = settings.ALERT_WEBHOOK_TYPE

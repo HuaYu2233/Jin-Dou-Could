@@ -11,6 +11,8 @@ import {
   FileListResponse,
 } from "@/lib/api/files";
 
+const STALE_TIME = 30_000;
+
 export function useFileList(
   category: string,
   page: number,
@@ -25,6 +27,7 @@ export function useFileList(
       const fileType = category !== "all" ? category : undefined;
       return apiListFiles((page - 1) * 20, 20, fileType);
     },
+    staleTime: STALE_TIME,
   });
 }
 

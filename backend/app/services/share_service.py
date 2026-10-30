@@ -73,22 +73,23 @@ async def list_shares(
     skip: int = 0,
     limit: int = 20,
 ) -> tuple[list, int]:
-    base_q = (
+    count_result = await db.execute(
+        select(func.count()).select_from(Share).where(Share.owner_id == owner_id)
+    )
+    total = count_result.scalar_one()
+
+    result = await db.execute(
         select(Share, File.filename, File.size)
         .join(File, Share.file_id == File.id)
         .where(Share.owner_id == owner_id)
         .order_by(Share.created_at.desc())
+        .offset(skip)
+        .limit(limit)
     )
-    window_q = base_q.add_columns(
-        func.count().over().label("total")
-    ).offset(skip).limit(limit)
-
-    result = await db.execute(window_q)
     rows = result.all()
     items = []
-    total = 0
     for row in rows:
-        share, filename, file_size, total = row
+        share, filename, file_size = row
         items.append(
             {
                 "id": share.id,

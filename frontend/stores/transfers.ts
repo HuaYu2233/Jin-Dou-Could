@@ -30,6 +30,7 @@ interface TransferState {
   hasActive: () => boolean;
 }
 
+const MAX_COMPLETED_TASKS = 30;
 let counter = 0;
 function genId() {
   counter += 1;
@@ -57,8 +58,8 @@ export const useTransferStore = create<TransferState>((set, get) => ({
   },
 
   updateTask(id, updates) {
-    set((state) => ({
-      tasks: state.tasks.map((t) =>
+    set((state) => {
+      const updated = state.tasks.map((t) =>
         t.id === id
           ? {
               ...t,
@@ -73,8 +74,19 @@ export const useTransferStore = create<TransferState>((set, get) => ({
                   : t.progress,
             }
           : t
-      ),
-    }));
+      );
+      const isTerminal = updates.status === "completed" || updates.status === "error" || updates.status === "canceled";
+      if (isTerminal) {
+        const active = updated.filter(
+          (t) => t.status !== "completed" && t.status !== "error" && t.status !== "canceled"
+        );
+        const completed = updated.filter(
+          (t) => t.status === "completed" || t.status === "error" || t.status === "canceled"
+        );
+        return { tasks: [...active, ...completed.slice(0, MAX_COMPLETED_TASKS)] };
+      }
+      return { tasks: updated };
+    });
   },
 
   removeTask(id) {
