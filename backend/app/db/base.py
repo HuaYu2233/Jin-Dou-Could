@@ -8,8 +8,8 @@ _pool_size = settings.DB_POOL_SIZE
 _max_overflow = settings.DB_MAX_OVERFLOW
 
 if settings.ENVIRONMENT == "production":
-    _pool_size = max(_pool_size, 10)
-    _max_overflow = max(_max_overflow, 5)
+    _pool_size = max(_pool_size, 5)
+    _max_overflow = max(_max_overflow, 3)
 
 engine = create_async_engine(
     settings.DATABASE_URL,
@@ -22,9 +22,10 @@ engine = create_async_engine(
 )
 AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-_sync_url = settings.DATABASE_URL.replace("+asyncpg", "+psycopg2")
+_direct_url = getattr(settings, "DATABASE_URL_DIRECT", None) or settings.DATABASE_URL
+_sync_url = _direct_url.replace("+asyncpg", "+psycopg2")
 try:
-    sync_engine = _create_engine(_sync_url, pool_size=3, max_overflow=2, pool_pre_ping=True)
+    sync_engine = _create_engine(_sync_url, pool_size=2, max_overflow=1, pool_pre_ping=True)
     sync_session_factory = sessionmaker(bind=sync_engine, expire_on_commit=False)
 except Exception:
     sync_session_factory = None

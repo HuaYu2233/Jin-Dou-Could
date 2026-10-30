@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-clouduser}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cloudpass123}
       POSTGRES_DB: ${POSTGRES_DB:-clouddrive}
-    command: postgres -c max_connections=${DB_MAX_CONNECTIONS:-80}
+    command: postgres -c max_connections=${DB_MAX_CONNECTIONS:-100}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -55,6 +55,30 @@ services:
       timeout: 20s
       retries: 3
 
+  # ==================== PgBouncer 连接池代理 ====================
+  pgbouncer:
+    image: edoburu/pgbouncer:1.21-alpine
+    container_name: cloud-drive-pgbouncer
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgres://${POSTGRES_USER:-clouduser}:${POSTGRES_PASSWORD:-cloudpass123}@db:5432/${POSTGRES_DB:-clouddrive}
+      - PGBOUNCER_POOL_MODE=transaction
+      - PGBOUNCER_MAX_CLIENT_CONN=200
+      - PGBOUNCER_DEFAULT_POOL_SIZE=20
+      - PGBOUNCER_MIN_POOL_SIZE=5
+      - PGBOUNCER_RESERVE_POOL_SIZE=5
+      - PGBOUNCER_RESERVE_POOL_TIMEOUT=3
+      - PGBOUNCER_SERVER_IDLE_TIMEOUT=300
+      - PGBOUNCER_SERVER_LIFETIME=3600
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgbouncer -u pgbouncer -q /etc/pgbouncer/pgbouncer.ini -R || exit 0"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # ==================== FastAPI 后端 ====================
   backend:
     build:
@@ -66,7 +90,8 @@ services:
       - "host.docker.internal:host-gateway"
       - "localhost:host-gateway"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-clouduser}:${POSTGRES_PASSWORD:-cloudpass123}@db:5432/${POSTGRES_DB:-clouddrive}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-clouduser}:${POSTGRES_PASSWORD:-cloudpass123}@pgbouncer:6432/${POSTGRES_DB:-clouddrive}
+      - DATABASE_URL_DIRECT=postgresql+asyncpg://${POSTGRES_USER:-clouduser}:${POSTGRES_PASSWORD:-cloudpass123}@db:5432/${POSTGRES_DB:-clouddrive}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redispass123}@redis:6379/0
       - MINIO_ENDPOINT=minio:9000
       - MINIO_PUBLIC_ENDPOINT=localhost:9000
@@ -119,24 +144,24 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
-      db:
+      pgbouncer:
         condition: service_healthy
       redis:
         condition: service_healthy
       minio:
         condition: service_healthy
     command: >
-      sh -c "alembic upgrade head && exec gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w ${BACKEND_WORKERS:-4} --bind 0.0.0.0:8000 --timeout 120 --graceful-timeout 30"
+      sh -c "DATABASE_URL=$${DATABASE_URL_DIRECT} alembic upgrade head && exec gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w ${BACKEND_WORKERS:-4} --bind 0.0.0.0:8000 --timeout 120 --graceful-timeout 30"
 
   # ==================== Celery Worker ====================
   celery-worker:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.celery
     container_name: cloud-drive-celery-worker
     restart: unless-stopped
     environment:
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-clouduser}:${POSTGRES_PASSWORD:-cloudpass123}@db:5432/${POSTGRES_DB:-clouddrive}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-clouduser}:${POSTGRES_PASSWORD:-cloudpass123}@pgbouncer:6432/${POSTGRES_DB:-clouddrive}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redispass123}@redis:6379/0
       - MINIO_ENDPOINT=minio:9000
       - MINIO_PUBLIC_ENDPOINT=localhost:9000
@@ -173,7 +198,7 @@ services:
     volumes:
       - ./backups:/backups
     depends_on:
-      db:
+      pgbouncer:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -237,12 +262,15 @@ services:
       - "80:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - nginx_cache:/var/cache/nginx
     depends_on:
       - frontend
       - backend
+      - minio
 
 volumes:
   postgres_data:
   redis_data:
   minio_data:
   backup_logs:
+  nginx_cache:

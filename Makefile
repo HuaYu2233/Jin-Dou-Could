@@ -18,13 +18,13 @@ setup:
 	@git config core.fsmonitor true && git config core.untrackedCache true && git config feature.manyFiles true && git fsmonitor--daemon start 2>/dev/null; echo "Git performance config applied (fsmonitor + untrackedCache)"
 
 dev:
-	@$(DC_DEV) up -d --no-build db redis minio backend frontend
+	@$(DC_DEV) up -d --no-build db redis minio pgbouncer backend frontend
 
 dev-restart:
 	@$(DC_DEV) up -d --force-recreate --no-build backend frontend
 
 prod-build:
-	@DOCKER_BUILDKIT=1 $(DC) build backend frontend
+	@DOCKER_BUILDKIT=1 $(DC) build backend celery-worker frontend
 
 prod:
 	@$(DC) up -d

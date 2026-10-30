@@ -1,4 +1,27 @@
 services:
+  pgbouncer:
+    image: edoburu/pgbouncer:1.21-alpine
+    container_name: cloud-drive-pgbouncer
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgres://${POSTGRES_USER:-clouduser}:${POSTGRES_PASSWORD:-cloudpass123}@db:5432/${POSTGRES_DB:-clouddrive}
+      - PGBOUNCER_POOL_MODE=transaction
+      - PGBOUNCER_MAX_CLIENT_CONN=100
+      - PGBOUNCER_DEFAULT_POOL_SIZE=10
+      - PGBOUNCER_MIN_POOL_SIZE=3
+      - PGBOUNCER_RESERVE_POOL_SIZE=3
+      - PGBOUNCER_RESERVE_POOL_TIMEOUT=3
+      - PGBOUNCER_SERVER_IDLE_TIMEOUT=300
+      - PGBOUNCER_SERVER_LIFETIME=3600
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgbouncer -u pgbouncer -q /etc/pgbouncer/pgbouncer.ini -R || exit 0"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     image: jindou-cloud-backend:latest
     container_name: cloud-drive-backend
@@ -9,11 +32,12 @@ services:
       - "localhost:host-gateway"
     entrypoint: []
     command: >
-      sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+      sh -c "DATABASE_URL=$${DATABASE_URL_DIRECT} alembic upgrade head && DATABASE_URL=$${DATABASE_URL} uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     environment:
       - ENVIRONMENT=development
       - CELERY_TASK_ALWAYS_EAGER=true
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-clouduser}:${POSTGRES_PASSWORD:-cloudpass123}@db:5432/${POSTGRES_DB:-clouddrive}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-clouduser}:${POSTGRES_PASSWORD:-cloudpass123}@pgbouncer:6432/${POSTGRES_DB:-clouddrive}
+      - DATABASE_URL_DIRECT=postgresql+asyncpg://${POSTGRES_USER:-clouduser}:${POSTGRES_PASSWORD:-cloudpass123}@db:5432/${POSTGRES_DB:-clouddrive}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redispass123}@redis:6379/0
       - MINIO_ENDPOINT=minio:9000
       - MINIO_PUBLIC_ENDPOINT=localhost:9000
@@ -42,7 +66,7 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
-      db:
+      pgbouncer:
         condition: service_healthy
       redis:
         condition: service_healthy
