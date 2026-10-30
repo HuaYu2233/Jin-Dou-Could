@@ -90,7 +90,7 @@ services:
       - "host.docker.internal:host-gateway"
       - "localhost:host-gateway"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-clouduser}:${POSTGRES_PASSWORD:-cloudpass123}@pgbouncer:6432/${POSTGRES_DB:-clouddrive}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-clouduser}:${POSTGRES_PASSWORD:-cloudpass123}@db:5432/${POSTGRES_DB:-clouddrive}
       - DATABASE_URL_DIRECT=postgresql+asyncpg://${POSTGRES_USER:-clouduser}:${POSTGRES_PASSWORD:-cloudpass123}@db:5432/${POSTGRES_DB:-clouddrive}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redispass123}@redis:6379/0
       - MINIO_ENDPOINT=minio:9000
@@ -148,7 +148,7 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
-      pgbouncer:
+      db:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -165,7 +165,7 @@ services:
     container_name: cloud-drive-celery-worker
     restart: unless-stopped
     environment:
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-clouduser}:${POSTGRES_PASSWORD:-cloudpass123}@pgbouncer:6432/${POSTGRES_DB:-clouddrive}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-clouduser}:${POSTGRES_PASSWORD:-cloudpass123}@db:5432/${POSTGRES_DB:-clouddrive}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redispass123}@redis:6379/0
       - MINIO_ENDPOINT=minio:9000
       - MINIO_PUBLIC_ENDPOINT=localhost:9000
@@ -202,7 +202,7 @@ services:
     volumes:
       - ./backups:/backups
     depends_on:
-      pgbouncer:
+      db:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -216,12 +216,21 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      target: runner
+      target: dev
     container_name: cloud-drive-frontend
     restart: unless-stopped
+    working_dir: /app
+    entrypoint: []
+    command: sh -c "[ -d node_modules ] || npm install --legacy-peer-deps; npm run dev"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+      - frontend_next_cache:/app/.next
     environment:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
       - API_URL=http://backend:8000
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
     ports:
       - "3000:3000"
     depends_on:
@@ -339,3 +348,5 @@ volumes:
   prometheus_data:
   grafana_data:
   jwt_keys:
+  frontend_node_modules:
+  frontend_next_cache:

@@ -46,7 +46,7 @@ export default function DashboardPage() {
     keyword, currentFolderId,
     PAGE_SIZE,
     setPage, setKeyword, setError, setCurrentFolderId, setTotal,
-    loadFiles,
+    loadFiles, invalidateFiles,
   } = useFileList(category);
 
   const {
@@ -68,6 +68,7 @@ export default function DashboardPage() {
     currentFolderId,
     folderDialog,
     loadFiles,
+    invalidateFiles,
     fetchMe,
     setSelectedIds,
     setError,
@@ -244,7 +245,7 @@ export default function DashboardPage() {
         currentFolderId={currentFolderId}
         onMoved={async () => {
           setSelectedIds(new Set());
-          await loadFiles();
+          await invalidateFiles();
           fetchMe();
         }}
         onError={(msg) => setError(msg)}

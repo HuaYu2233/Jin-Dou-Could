@@ -87,8 +87,8 @@ export function useFileList(category: CategoryId) {
     },
   });
 
-  function invalidateFiles() {
-    queryClient.invalidateQueries({ queryKey: queryKeys.files.all });
+  async function invalidateFiles() {
+    await queryClient.invalidateQueries({ queryKey: queryKeys.files.all });
   }
 
   return {

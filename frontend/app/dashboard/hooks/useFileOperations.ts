@@ -29,6 +29,7 @@ interface UseFileOperationsParams {
   currentFolderId: string | null;
   folderDialog: { mode: "create"; name: string } | { mode: "rename"; folder: FolderItem; name: string } | null;
   loadFiles: (active?: boolean) => Promise<void>;
+  invalidateFiles: () => Promise<void>;
   fetchMe: () => Promise<void>;
   setSelectedIds: (ids: Set<string>) => void;
   setError: (msg: string) => void;
@@ -41,6 +42,7 @@ export function useFileOperations({
   currentFolderId,
   folderDialog,
   loadFiles,
+  invalidateFiles,
   fetchMe,
   setSelectedIds,
   setError,
@@ -86,7 +88,7 @@ export function useFileOperations({
       }
 
       store.updateTask(taskId, { status: "completed", loaded: file.size, progress: 100, fileId: res.id });
-      await loadFiles();
+      await invalidateFiles();
       fetchMe();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "上传失败";
@@ -154,7 +156,7 @@ export function useFileOperations({
     try {
       await Promise.all([...selectedIds].map((id) => deleteFile(id)));
       setSelectedIds(new Set());
-      await loadFiles();
+      await invalidateFiles();
       fetchMe();
     } catch (err) {
       setError(err instanceof Error ? err.message : "删除失败");
@@ -166,7 +168,7 @@ export function useFileOperations({
     try {
       await Promise.all([...selectedIds].map((id) => restoreFile(id)));
       setSelectedIds(new Set());
-      await loadFiles();
+      await invalidateFiles();
       fetchMe();
     } catch (err) {
       setError(err instanceof Error ? err.message : "恢复失败");
@@ -179,7 +181,7 @@ export function useFileOperations({
     try {
       await Promise.all([...selectedIds].map((id) => purgeFile(id)));
       setSelectedIds(new Set());
-      await loadFiles();
+      await invalidateFiles();
       fetchMe();
     } catch (err) {
       setError(err instanceof Error ? err.message : "彻底删除失败");
@@ -195,7 +197,7 @@ export function useFileOperations({
         results.push(res);
       }
       setSelectedIds(new Set());
-      await loadFiles();
+      await invalidateFiles();
       setSharesReloadKey((k) => k + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "创建分享失败");
@@ -216,7 +218,7 @@ export function useFileOperations({
     try {
       await moveFiles(ids, folderId ?? undefined);
       setSelectedIds(new Set());
-      await loadFiles();
+      await invalidateFiles();
       fetchMe();
     } catch (err) {
       setError(err instanceof Error ? err.message : "移动失败");
@@ -235,7 +237,7 @@ export function useFileOperations({
         await renameFolder(folderDialog.folder.id, name);
       }
       setFolderDialog(null);
-      await loadFiles();
+      await invalidateFiles();
     } catch (err) {
       setError(err instanceof Error ? err.message : "操作失败");
     }
@@ -246,7 +248,7 @@ export function useFileOperations({
     setError("");
     try {
       await deleteFolder(folder.id);
-      await loadFiles();
+      await invalidateFiles();
     } catch (err) {
       setError(err instanceof Error ? err.message : "删除文件夹失败");
     }
@@ -256,7 +258,7 @@ export function useFileOperations({
     setError("");
     try {
       await restoreFolder(folder.id);
-      await loadFiles();
+      await invalidateFiles();
       fetchMe();
     } catch (err) {
       setError(err instanceof Error ? err.message : "恢复文件夹失败");
@@ -268,7 +270,7 @@ export function useFileOperations({
     setError("");
     try {
       await purgeFolder(folder.id);
-      await loadFiles();
+      await invalidateFiles();
       fetchMe();
     } catch (err) {
       setError(err instanceof Error ? err.message : "彻底删除文件夹失败");
