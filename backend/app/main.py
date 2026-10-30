@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -6,7 +7,7 @@ from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 from app.api.v1.api import api_router
 from app.api.v1.endpoints import health
 from app.core.storage import init_s3_clients, ensure_bucket, close_s3_clients
-from app.core.redis import close_redis, close_redis_pubsub
+from app.core.redis import close_redis, close_redis_pubsub, redis_client
 from app.core.ws_manager import ws_manager
 from app.db.base import dispose_engine
 from app.core.config import settings
@@ -56,6 +57,8 @@ async def lifespan(app: FastAPI):
 
     await ws_manager.start_pubsub()
 
+    cleanup_task = asyncio.create_task(_cleanup_orphan_multipart_uploads())
+
     logger.info(
         f"应用启动完成 | env={settings.ENVIRONMENT} | "
         f"algorithm={settings.ALGORITHM} | "
@@ -66,12 +69,52 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
+
     await ws_manager.stop_pubsub()
     await close_s3_clients()
     await close_redis()
     await close_redis_pubsub()
     await dispose_engine()
     logger.info("应用关闭完成，所有资源已释放")
+
+
+async def _cleanup_orphan_multipart_uploads() -> None:
+    from app.core.storage import get_s3_client
+    interval = 3600
+    while True:
+        try:
+            await asyncio.sleep(interval)
+            async with get_s3_client() as client:
+                paginator = client.get_paginator("list_multipart_uploads")
+                async for page in paginator.paginate(Bucket=settings.MINIO_BUCKET):
+                    uploads = page.get("Uploads", [])
+                    for upload in uploads:
+                        key = upload.get("Key", "")
+                        upload_id = upload.get("UploadId", "")
+                        parts = key.split("/")
+                        if len(parts) >= 2:
+                            owner_id = parts[0]
+                            state_key = f"multipart:{owner_id}:{upload_id}"
+                            exists = await redis_client.exists(state_key)
+                            if not exists:
+                                try:
+                                    await client.abort_multipart_upload(
+                                        Bucket=settings.MINIO_BUCKET,
+                                        Key=key,
+                                        UploadId=upload_id,
+                                    )
+                                    logger.info(f"清理孤儿分片上传: key={key} upload_id={upload_id}")
+                                except Exception as e:
+                                    logger.warning(f"清理孤儿分片上传失败: key={key} error={e}")
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.warning(f"孤儿分片清理任务异常: {e}")
 
 
 app = FastAPI(title="Cloud Drive API", lifespan=lifespan)
@@ -98,9 +141,25 @@ app.add_middleware(CSRFMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # CORS（确保错误响应也带 CORS 头）
+_cors_origins = []
+for _origin in settings.CORS_ORIGINS.split(","):
+    _origin = _origin.strip()
+    if not _origin:
+        continue
+    if _origin == "*":
+        _cors_origins.append(_origin)
+        continue
+    if not _origin.startswith(("http://", "https://")):
+        logger.warning(f"CORS origin 缺少协议前缀，已跳过: {_origin}")
+        continue
+    _cors_origins.append(_origin)
+
+if not _cors_origins:
+    logger.warning("CORS_ORIGINS 为空，API 将无法被前端跨域访问")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS.split(","),
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With", "Range", "Origin", "X-CSRF-Token"],

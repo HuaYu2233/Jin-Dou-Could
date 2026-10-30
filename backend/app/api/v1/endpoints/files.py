@@ -16,8 +16,27 @@ from app.schemas.file import (
 )
 from app.core.ws_manager import ws_manager
 from app.core.config import settings
+from app.core.redis import redis_client
 
 router = APIRouter()
+
+
+async def _acquire_concurrent_slot(user_id: UUID, slot_type: str, max_slots: int) -> str:
+    key = f"concurrent:{slot_type}:{user_id}"
+    current = await redis_client.incr(key)
+    if current == 1:
+        await redis_client.expire(key, 3600)
+    if current > max_slots:
+        await redis_client.decr(key)
+        raise HTTPException(
+            status_code=429,
+            detail=f"并发{slot_type}数超过限制（最多 {max_slots} 个），请稍后再试",
+        )
+    return key
+
+
+async def _release_concurrent_slot(key: str) -> None:
+    await redis_client.decr(key)
 
 
 @router.post("", response_model=FileUploadResponse)
@@ -28,41 +47,45 @@ async def upload_file(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    mime_type = file.content_type or "application/octet-stream"
-    filename = file.filename or "unknown"
-    declared_size = file.size
-
-    if declared_size is not None:
-        try:
-            await file_service.prepare_upload(current_user, declared_size, mime_type, filename)
-        except ValueError as e:
-            if "过大" in str(e) or "不足" in str(e):
-                raise HTTPException(status_code=413, detail=str(e))
-            raise HTTPException(status_code=400, detail=str(e))
-
+    slot_key = await _acquire_concurrent_slot(current_user.id, "upload", settings.MAX_CONCURRENT_UPLOADS)
     try:
-        file_record = await file_service.create_file(
-            db, current_user, filename, file, mime_type, declared_size, folder_id
-        )
-    except ValueError as e:
-        msg = str(e)
-        if "过大" in msg or "不足" in msg:
-            raise HTTPException(status_code=413, detail=msg)
-        raise HTTPException(status_code=400, detail=msg)
-    await invalidate_user_cache(current_user.id)
+        mime_type = file.content_type or "application/octet-stream"
+        filename = file.filename or "unknown"
+        declared_size = file.size
 
-    await ws_manager.send_to_user(str(current_user.id), "upload:complete", {
-        "file_id": str(file_record.id),
-        "filename": file_record.filename,
-        "size": file_record.size,
-        "file_type": file_record.file_type,
-    })
-    await ws_manager.send_to_user(str(current_user.id), "storage:changed", {
-        "used_storage": current_user.used_storage + file_record.size,
-        "storage_quota": current_user.storage_quota,
-    })
+        if declared_size is not None:
+            try:
+                await file_service.prepare_upload(current_user, declared_size, mime_type, filename)
+            except ValueError as e:
+                if "过大" in str(e) or "不足" in str(e):
+                    raise HTTPException(status_code=413, detail=str(e))
+                raise HTTPException(status_code=400, detail=str(e))
 
-    return file_record
+        try:
+            file_record = await file_service.create_file(
+                db, current_user, filename, file, mime_type, declared_size, folder_id
+            )
+        except ValueError as e:
+            msg = str(e)
+            if "过大" in msg or "不足" in msg:
+                raise HTTPException(status_code=413, detail=msg)
+            raise HTTPException(status_code=400, detail=msg)
+        await invalidate_user_cache(current_user.id)
+
+        await ws_manager.send_to_user(str(current_user.id), "upload:complete", {
+            "file_id": str(file_record.id),
+            "filename": file_record.filename,
+            "size": file_record.size,
+            "file_type": file_record.file_type,
+        })
+        await ws_manager.send_to_user(str(current_user.id), "storage:changed", {
+            "used_storage": current_user.used_storage + file_record.size,
+            "storage_quota": current_user.storage_quota,
+        })
+
+        return file_record
+    finally:
+        await _release_concurrent_slot(slot_key)
 
 
 @router.get("", response_model=FileListResponse)
@@ -161,11 +184,15 @@ async def download_file(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    file = await file_service.get_file(db, file_id, current_user.id)
-    if not file:
-        raise HTTPException(status_code=404, detail="文件不存在")
-    url = await file_service.get_download_url(file)
-    return {"url": url}
+    slot_key = await _acquire_concurrent_slot(current_user.id, "download", settings.MAX_CONCURRENT_DOWNLOADS)
+    try:
+        file = await file_service.get_file(db, file_id, current_user.id)
+        if not file:
+            raise HTTPException(status_code=404, detail="文件不存在")
+        url = await file_service.get_download_url(file)
+        return {"url": url}
+    finally:
+        await _release_concurrent_slot(slot_key)
 
 
 @router.delete("/{file_id}")
@@ -218,6 +245,8 @@ async def multipart_init(
     body: MultipartInitRequest,
     current_user: User = Depends(get_current_user),
 ):
+    await _acquire_concurrent_slot(current_user.id, "upload", settings.MAX_CONCURRENT_UPLOADS)
+
     if current_user.used_storage + body.total_size > current_user.storage_quota:
         raise HTTPException(status_code=413, detail="存储空间不足")
     if body.total_size > settings.MAX_UPLOAD_SIZE:

@@ -632,9 +632,16 @@ async def upload_multipart_part(
     owner_id: uuid.UUID,
 ) -> str:
     state_key = f"multipart:{owner_id}:{upload_id}"
-    exists = await redis_client.exists(state_key)
-    if not exists:
+    state = await redis_client.hgetall(state_key)
+    if not state:
         raise ValueError("上传会话不存在或已过期，请重新初始化上传")
+
+    if state.get("storage_key") != storage_key:
+        raise ValueError("storage_key 与上传会话不匹配")
+
+    max_part_size = settings.UPLOAD_PART_SIZE * 2
+    if len(data) > max_part_size:
+        raise ValueError(f"分片大小超过限制（最大 {max_part_size // (1024*1024)}MB）")
 
     etag = await upload_part(storage_key, upload_id, part_number, data)
 
@@ -719,5 +726,8 @@ async def abort_multipart_upload(
     owner_id: uuid.UUID,
 ) -> None:
     state_key = f"multipart:{owner_id}:{upload_id}"
+    state = await redis_client.hgetall(state_key)
+    if state and state.get("storage_key") != storage_key:
+        raise ValueError("storage_key 与上传会话不匹配")
     await redis_client.delete(state_key)
     await abort_multipart(storage_key, upload_id)

@@ -82,8 +82,10 @@ async def authenticate_user(
 
 
 def set_auth_cookies(response: Response, user: User) -> None:
+    import uuid as _uuid
+    family = str(_uuid.uuid4())
     access_token = create_access_token({"sub": str(user.id)})
-    refresh_token = create_refresh_token({"sub": str(user.id)})
+    refresh_token = create_refresh_token({"sub": str(user.id), "family": family})
 
     secure = settings.ENVIRONMENT == "production"
     response.set_cookie(
@@ -98,7 +100,7 @@ def set_auth_cookies(response: Response, user: User) -> None:
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        max_age=7 * 24 * 3600,
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600,
         samesite="lax",
         secure=secure,
     )
@@ -126,7 +128,23 @@ async def refresh_access_token(request: Request, response: Response) -> None:
     if jti and await redis_client.exists(f"token_blacklist:{jti}"):
         raise ValueError("Refresh token 已失效")
 
-    access_token = create_access_token({"sub": payload["sub"]})
+    family = payload.get("family")
+    if family and await redis_client.exists(f"refresh_reuse:{family}"):
+        await _revoke_family(family)
+        raise ValueError("检测到 Refresh Token 重用，该 Token 族已全部撤销，请重新登录")
+
+    if not family:
+        family = str(__import__("uuid").uuid4())
+
+    await revoke_token(refresh)
+
+    user_id = payload["sub"]
+    access_token = create_access_token({"sub": user_id})
+    new_refresh_token = create_refresh_token({"sub": user_id, "family": family})
+
+    family_ttl = settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600
+    await redis_client.setex(f"refresh_family:{family}", family_ttl, user_id)
+
     secure = settings.ENVIRONMENT == "production"
     response.set_cookie(
         key="access_token",
@@ -136,3 +154,23 @@ async def refresh_access_token(request: Request, response: Response) -> None:
         samesite="lax",
         secure=secure,
     )
+    response.set_cookie(
+        key="refresh_token",
+        value=new_refresh_token,
+        httponly=True,
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600,
+        samesite="lax",
+        secure=secure,
+    )
+
+
+async def _revoke_family(family: str) -> None:
+    await redis_client.setex(
+        f"refresh_reuse:{family}",
+        settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600,
+        "1",
+    )
+    user_id = await redis_client.get(f"refresh_family:{family}")
+    if user_id:
+        prefix = f"refresh_family:*"
+        await redis_client.delete(f"refresh_family:{family}")
