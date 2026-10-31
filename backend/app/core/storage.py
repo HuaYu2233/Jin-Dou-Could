@@ -1,7 +1,7 @@
 import asyncio
 import inspect
 import io
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from urllib.parse import quote
 
 import aiobotocore.session
@@ -219,14 +219,12 @@ async def upload_stream_multipart(
                     ContentType=mime_type,
                 )
         except Exception:
-            try:
+            with suppress(Exception):
                 await client.abort_multipart_upload(
                     Bucket=settings.MINIO_BUCKET,
                     Key=storage_key,
                     UploadId=upload_id,
                 )
-            except Exception:
-                pass
             raise
     return uploaded
 
@@ -344,11 +342,9 @@ async def complete_multipart(
 
 async def abort_multipart(storage_key: str, upload_id: str) -> None:
     async with get_s3_client() as client:
-        try:
+        with suppress(Exception):
             await client.abort_multipart_upload(
                 Bucket=settings.MINIO_BUCKET,
                 Key=storage_key,
                 UploadId=upload_id,
             )
-        except Exception:
-            pass

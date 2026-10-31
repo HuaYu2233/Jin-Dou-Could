@@ -1,5 +1,6 @@
 import json
 import shutil
+from contextlib import suppress
 from pathlib import Path
 
 from app.core.config import settings
@@ -15,10 +16,8 @@ def _dir_size(path: Path) -> int:
     total = 0
     for entry in path.rglob("*"):
         if entry.is_file():
-            try:
+            with suppress(OSError):
                 total += entry.stat().st_size
-            except OSError:
-                pass
     return total
 
 def _parse_manifest(dir_path: Path) -> BackupManifest | None:

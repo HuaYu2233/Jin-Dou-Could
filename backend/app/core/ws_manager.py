@@ -1,4 +1,5 @@
 import json
+from contextlib import suppress
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -29,12 +30,10 @@ class ConnectionManager:
         )
         if self._pubsub_enabled and self._pubsub is not None:
             import asyncio
-            try:
+            with suppress(Exception):
                 asyncio.get_event_loop().create_task(
                     self._subscribe_user(user_id)
                 )
-            except Exception:
-                pass
 
     def disconnect(self, user_id: str, ws: WebSocket):
         if user_id in self._connections:
@@ -44,12 +43,10 @@ class ConnectionManager:
                 self._subscribed_users.discard(user_id)
                 if self._pubsub_enabled and self._pubsub is not None:
                     import asyncio
-                    try:
+                    with suppress(Exception):
                         asyncio.get_event_loop().create_task(
                             self._unsubscribe_user(user_id)
                         )
-                    except Exception:
-                        pass
             logger.bind(log_type="ws").info(f"WebSocket 断开: user={user_id}")
 
     async def send_to_user(self, user_id: str, event: str, data: dict):
@@ -121,10 +118,8 @@ class ConnectionManager:
     async def stop_pubsub(self):
         if self._listen_task is not None:
             self._listen_task.cancel()
-            try:
+            with suppress(Exception):
                 await self._listen_task
-            except Exception:
-                pass
             self._listen_task = None
         if self._pubsub is not None:
             try:

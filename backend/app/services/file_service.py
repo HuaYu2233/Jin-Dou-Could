@@ -1,4 +1,5 @@
 import uuid
+from contextlib import suppress
 from datetime import datetime, timezone
 
 from sqlalchemy import func, select
@@ -382,10 +383,8 @@ async def purge_file(
     if not file:
         return False
 
-    try:
+    with suppress(Exception):
         await delete_file(file.storage_key)
-    except Exception:
-        pass
 
     await db.delete(file)
     await db.commit()

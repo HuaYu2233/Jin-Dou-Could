@@ -56,7 +56,7 @@ def send_verification_email(self, to_email: str, code: str) -> None:
         logger.bind(log_type="email").info(f"验证码邮件已发送至 {to_email}")
     except Exception as exc:
         logger.bind(log_type="email").error(f"发送验证码邮件失败: {exc}")
-        raise self.retry(exc=exc)
+        raise self.retry(exc=exc) from exc
 
 
 @celery_app.task(
@@ -101,4 +101,4 @@ def send_alert_email(self, subject: str, text: str) -> None:
             server.quit()
     except Exception as exc:
         logger.bind(log_type="alert").error(f"邮件告警发送失败: {exc}")
-        raise self.retry(exc=exc)
+        raise self.retry(exc=exc) from exc

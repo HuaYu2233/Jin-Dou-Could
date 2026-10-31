@@ -35,7 +35,7 @@ def trigger_backup(self) -> str:
             return "backup triggered via command"
         except Exception as exc:
             logger.bind(log_type="backup").error(f"备份命令执行失败: {exc}")
-            raise self.retry(exc=exc)
+            raise self.retry(exc=exc) from exc
 
     backup_dir = Path(settings.BACKUP_DIR)
     backup_dir.mkdir(parents=True, exist_ok=True)

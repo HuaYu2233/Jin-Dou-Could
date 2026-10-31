@@ -1,5 +1,6 @@
 # /Users/zero/project/JinDou-Cloud/backend/app/services/folder_service.py
 import uuid
+from contextlib import suppress
 from datetime import datetime, timezone
 
 from sqlalchemy import func, select, update
@@ -236,10 +237,8 @@ async def purge_folder(
             await batch_delete_files(storage_keys)
         except Exception:
             for key in storage_keys:
-                try:
+                with suppress(Exception):
                     await s3_delete_file(key)
-                except Exception:
-                    pass
 
     for file in files_to_purge:
         await db.delete(file)

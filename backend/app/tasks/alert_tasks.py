@@ -30,4 +30,4 @@ def send_alert_webhook(self, text: str) -> None:
             resp.read()
     except Exception as exc:
         logger.bind(log_type="alert").error(f"Webhook 告警发送失败: {exc}")
-        raise self.retry(exc=exc)
+        raise self.retry(exc=exc) from exc
