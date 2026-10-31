@@ -1,10 +1,12 @@
 import json
 from datetime import datetime, timezone
+from uuid import uuid4
 from loguru import logger
 from fastapi import WebSocket
 from app.core.config import settings
 
 _WS_CHANNEL_PREFIX = "ws:user:"
+_INSTANCE_ID = uuid4().hex
 
 
 class ConnectionManager:
@@ -74,7 +76,10 @@ class ConnectionManager:
     async def _publish(self, user_id: str, payload: str):
         try:
             from app.core.redis import redis_client
-            await redis_client.publish(f"{_WS_CHANNEL_PREFIX}{user_id}", payload)
+            await redis_client.publish(
+                f"{_WS_CHANNEL_PREFIX}{user_id}",
+                json.dumps({"origin": _INSTANCE_ID, "payload": payload}),
+            )
         except Exception as exc:
             logger.bind(log_type="ws").warning(f"Redis publish 失败: {exc}")
 
@@ -140,13 +145,29 @@ class ConnectionManager:
                 if isinstance(channel, bytes):
                     channel = channel.decode("utf-8")
                 user_id = channel.removeprefix(_WS_CHANNEL_PREFIX)
-                payload = message["data"]
-                if isinstance(payload, bytes):
-                    payload = payload.decode("utf-8")
+                raw = message["data"]
+                if isinstance(raw, bytes):
+                    raw = raw.decode("utf-8")
+                payload = self._unwrap_payload(raw)
+                if payload is None:
+                    continue
                 if user_id in self._connections:
                     await self._send_local(user_id, payload)
         except Exception as exc:
             logger.bind(log_type="ws").warning(f"Redis Pub/Sub 监听异常: {exc}")
+
+    @staticmethod
+    def _unwrap_payload(raw: str) -> str | None:
+        try:
+            envelope = json.loads(raw)
+        except (TypeError, ValueError):
+            return raw
+        if not isinstance(envelope, dict) or "payload" not in envelope:
+            return raw
+        if envelope.get("origin") == _INSTANCE_ID:
+            return None
+        payload = envelope["payload"]
+        return payload if isinstance(payload, str) else json.dumps(payload)
 
 
 ws_manager = ConnectionManager()
