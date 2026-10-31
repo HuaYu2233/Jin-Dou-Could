@@ -4,8 +4,8 @@
 
 | 模块 | 框架   | 测试数量 | 目录            |
 | ---- | ------ | -------- | --------------- |
-| 后端 | pytest | 162      | backend/tests/  |
-| 前端 | vitest | 28       | frontend/tests/ |
+| 后端 | pytest | 202      | backend/tests/  |
+| 前端 | vitest | 33       | frontend/tests/ |
 
 ## 2. 后端测试
 
@@ -44,10 +44,14 @@ uv run python -m tests.test_share_rate_limit
 | test_service_file.py           | Service    | 文件服务单元测试          |
 | test_service_share.py          | Service    | 分享服务单元测试          |
 | test_schemas.py                | Schema     | Pydantic 模型验证测试     |
-| test0test_deps.py              | Deps       | 依赖注入测试              |
+| test_deps.py                   | Deps       | 依赖注入测试              |
 | test_api_auth.py               | API        | 认证 API 集成测试         |
 | test_api_files.py              | API        | 文件/文件夹/分享 API 测试 |
 | test_middleware.py             | Middleware | 中间件测试                |
+| test_request_logging.py        | Middleware | 请求日志中间件测试        |
+| test_exceptions.py             | Exception  | 异常处理与统一响应测试    |
+| test_storage_multipart.py      | Storage    | MinIO 分片上传测试        |
+| test_ws_manager.py             | Core       | WebSocket 连接管理测试    |
 | test_token_type.py             | Security   | Token 类型校验            |
 | test_user_cache_desensitize.py | Security   | 用户缓存脱敏测试          |
 | test_upload_security.py        | Security   | 上传安全（MIME/文件名）   |
@@ -58,10 +62,14 @@ uv run python -m tests.test_share_rate_limit
 
 测试配置位于 `tests/conftest.py`，提供：
 
-- 异步数据库会话 fixture
-- 测试用户 fixture
-- 测试文件 fixture
-- Mock MinIO 客户端
+- `event_loop`（session 级）：独立事件循环
+- `fake_user` / `fake_admin`：测试用户对象（不落库）
+- `auth_headers` / `admin_headers`：对应的 JWT 认证头
+- `mock_db`：AsyncMock 数据库会话
+- `mock_redis`：patch `app.core.redis.redis_client`
+- `api_client`：基于 `ASGITransport` 的异步 HTTP 客户端
+
+conftest 同时通过 `os.environ.setdefault` 兜底测试所需环境变量（`SECRET_KEY`、`DATABASE_URL`、`REDIS_URL`、`MINIO_ACCESS_KEY`、`MINIO_SECRET_KEY`、`ENVIRONMENT`、`CSRF_ENABLED`、`TRUSTED_PROXIES`）。
 
 ### 2.4 CI 环境变量
 
@@ -100,6 +108,7 @@ npx vitest run tests/stores/i18n.test.ts
 | ------------------------------ | ----- | -------------------- |
 | tests/utils/format.test.ts     | 工具  | 格式化函数测试       |
 | tests/lib/i18n.test.ts         | i18n  | 翻译完整性测试       |
+| tests/lib/refresh.test.ts      | Lib   | Token 刷新逻辑测试   |
 | tests/stores/auth.test.ts      | Store | Auth store 测试      |
 | tests/stores/transfers.test.ts | Store | Transfers store 测试 |
 | tests/stores/i18n.test.ts      | Store | i18n store 测试      |
@@ -118,10 +127,10 @@ npx vitest run tests/stores/i18n.test.ts
 
 | 阶段               | 触发条件 | 内容                 |
 | ------------------ | -------- | -------------------- |
-| Backend Test       | push/PR  | pytest 162 个测试    |
+| Backend Test       | push/PR  | pytest 202 个测试    |
 | Frontend Lint      | push/PR  | next lint (ESLint)   |
 | Frontend TypeCheck | push/PR  | tsc --noEmit         |
-| Frontend Test      | push/PR  | vitest run 28 个测试 |
+| Frontend Test      | push/PR  | vitest run 33 个测试 |
 
 ### 4.2 测试服务
 
