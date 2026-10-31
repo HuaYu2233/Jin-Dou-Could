@@ -76,14 +76,19 @@
       }
     },
     {
-      "title": "Active WebSocket Connections",
+      "title": "Active Redis Clients",
       "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 8 },
       "targets": [
         {
-          "expr": "cloud_drive_ws_connections"
+          "expr": "redis_connected_clients",
+          "legendFormat": "Clients"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": []
+      }
     },
     {
       "title": "Memory Usage",
@@ -153,11 +158,11 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
       "targets": [
         {
-          "expr": "minio_cluster_disk_total_bytes",
+          "expr": "minio_cluster_capacity_usable_total_bytes",
           "legendFormat": "Total"
         },
         {
-          "expr": "minio_cluster_disk_used_bytes",
+          "expr": "minio_cluster_capacity_usable_total_bytes - minio_cluster_capacity_usable_free_bytes",
           "legendFormat": "Used"
         }
       ],
