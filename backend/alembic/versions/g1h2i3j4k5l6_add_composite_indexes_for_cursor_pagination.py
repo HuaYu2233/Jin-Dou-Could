@@ -5,8 +5,8 @@ Revises: f6a7b8c9d0e1
 Create Date: 2026-10-22 12:00:00.000000
 
 """
+
 from alembic import op
-import sqlalchemy as sa
 
 revision = "g1h2i3j4k5l6"
 down_revision = "f6a7b8c9d0e1"
@@ -16,6 +16,7 @@ depends_on = None
 
 def upgrade() -> None:
     from sqlalchemy import inspect
+
     conn = op.get_bind()
     existing = {idx["name"] for idx in inspect(conn).get_indexes("files")}
 

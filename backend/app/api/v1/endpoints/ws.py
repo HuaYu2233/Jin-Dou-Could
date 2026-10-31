@@ -23,7 +23,7 @@ async def ws_connect(ws: WebSocket):
             await ws.close(code=4001, reason="认证消息过长")
             return
         msg = json.loads(raw)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         await ws.close(code=4001, reason="认证超时")
         return
     except Exception:

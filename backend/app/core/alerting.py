@@ -47,9 +47,7 @@ class AlertManager:
         text = f"[{level}] {msg}\n时间: {time_str}\n位置: {name}:{func}:{line}"
         if record["exception"]:
             exc = record["exception"]
-            text += "\n" + "".join(
-                traceback.format_exception(type(exc.value), exc.value, exc.traceback)
-            )
+            text += "\n" + "".join(traceback.format_exception(type(exc.value), exc.value, exc.traceback))
         return text
 
     def notify(self, record):
@@ -64,6 +62,7 @@ class AlertManager:
         if settings.ALERT_WEBHOOK_URL:
             try:
                 from app.tasks.alert_tasks import send_alert_webhook
+
                 send_alert_webhook.delay(text)
             except Exception:
                 try:
@@ -76,6 +75,7 @@ class AlertManager:
         if settings.ALERT_EMAIL_ENABLED:
             try:
                 from app.tasks.email_tasks import send_alert_email
+
                 send_alert_email.delay(subject, text)
             except Exception:
                 try:

@@ -1,4 +1,3 @@
-# /Users/zero/project/JinDou-Cloud/backend/alembic/versions/a1b2c3d4e5f6_add_deleted_at_to_files.py
 """add deleted_at to files
 
 Revision ID: a1b2c3d4e5f6
@@ -6,22 +5,27 @@ Revises: 2ebb801da8c6
 Create Date: 2026-09-03 10:00:00.000000
 
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
 
-revision: str = 'a1b2c3d4e5f6'
-down_revision: Union[str, Sequence[str], None] = '2ebb801da8c6'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+from alembic import op
+
+revision: str = "a1b2c3d4e5f6"
+down_revision: str | Sequence[str] | None = "2ebb801da8c6"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
+
 
 def upgrade() -> None:
     from sqlalchemy import inspect
+
     conn = op.get_bind()
     cols = {col["name"] for col in inspect(conn).get_columns("files")}
     if "deleted_at" not in cols:
-        op.add_column('files', sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True))
+        op.add_column("files", sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True))
+
 
 def downgrade() -> None:
-    op.drop_column('files', 'deleted_at')
+    op.drop_column("files", "deleted_at")

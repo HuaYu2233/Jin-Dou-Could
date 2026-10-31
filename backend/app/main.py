@@ -26,7 +26,9 @@ def _check_production_security() -> None:
     errors = []
 
     if settings.ALGORITHM == "HS256":
-        errors.append("JWT 使用 HS256 对称算法，生产环境建议迁移到 RS256（设置 ALGORITHM=RS256 + JWT_PRIVATE_KEY_PATH + JWT_PUBLIC_KEY_PATH）")
+        errors.append(
+            "JWT 使用 HS256 对称算法，生产环境建议迁移到 RS256（设置 ALGORITHM=RS256 + JWT_PRIVATE_KEY_PATH + JWT_PUBLIC_KEY_PATH）"
+        )
 
     if settings.ALGORITHM == "RS256":
         if not settings.JWT_PRIVATE_KEY_PATH:
@@ -86,6 +88,7 @@ async def lifespan(app: FastAPI):
 
 async def _cleanup_orphan_multipart_uploads() -> None:
     from app.core.storage import get_s3_client
+
     interval = 3600
     while True:
         try:
@@ -128,11 +131,14 @@ async def _unhandled_exception_handler(request, exc):
     import traceback
 
     from fastapi.responses import JSONResponse
+
     logger.error(f"未处理异常: {exc}\n{traceback.format_exc()}")
     return JSONResponse(status_code=500, content={"detail": "服务器内部错误"})
 
+
 if settings.PROMETHEUS_ENABLED:
     from prometheus_fastapi_instrumentator import Instrumentator
+
     Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
     logger.info("Prometheus 指标已启用，访问 /metrics")
 

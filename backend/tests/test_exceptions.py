@@ -114,9 +114,7 @@ class TestNoStringMatchingInEndpoints:
     def test_endpoints_do_not_catch_value_error(self):
         import pathlib
 
-        endpoints_dir = (
-            pathlib.Path(__file__).resolve().parent.parent / "app" / "api" / "v1" / "endpoints"
-        )
+        endpoints_dir = pathlib.Path(__file__).resolve().parent.parent / "app" / "api" / "v1" / "endpoints"
         offenders = []
         for path in endpoints_dir.glob("*.py"):
             text = path.read_text(encoding="utf-8")

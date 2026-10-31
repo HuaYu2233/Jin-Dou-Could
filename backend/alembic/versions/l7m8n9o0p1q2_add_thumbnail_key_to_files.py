@@ -4,8 +4,10 @@ Revision ID: l7m8n9o0p1q2
 Revises: k5l6m7n8o9p0
 Create Date: 2026-10-28 12:00:00.000000
 """
-from alembic import op
+
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "l7m8n9o0p1q2"
 down_revision = "k5l6m7n8o9p0"
@@ -15,6 +17,7 @@ depends_on = None
 
 def upgrade() -> None:
     from sqlalchemy import inspect
+
     conn = op.get_bind()
     cols = {col["name"] for col in inspect(conn).get_columns("files")}
     if "thumbnail_key" not in cols:

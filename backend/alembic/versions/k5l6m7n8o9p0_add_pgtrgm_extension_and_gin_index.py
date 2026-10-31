@@ -5,6 +5,7 @@ Revises: j4k5l6m7n8o9
 Create Date: 2026-10-28 13:00:00.000000
 
 """
+
 from alembic import op
 
 revision = "k5l6m7n8o9p0"
@@ -17,8 +18,7 @@ def upgrade() -> None:
     op.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
     with op.get_context().autocommit_block():
         op.execute(
-            'CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_files_filename_trgm '
-            'ON files USING gin (filename gin_trgm_ops)'
+            "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_files_filename_trgm ON files USING gin (filename gin_trgm_ops)"
         )
 
 

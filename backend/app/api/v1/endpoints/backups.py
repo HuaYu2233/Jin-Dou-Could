@@ -8,14 +8,17 @@ from app.services import backup_service
 
 router = APIRouter()
 
+
 @router.get("", response_model=list[BackupInfo])
 async def list_backups(_: User = Depends(get_current_admin)):
     return backup_service.list_backups()
+
 
 @router.post("/trigger", response_model=BackupTriggerResponse)
 async def trigger_backup(_: User = Depends(get_current_admin)):
     await backup_service.trigger_backup()
     return BackupTriggerResponse(detail="备份已触发", timestamp=None)
+
 
 @router.get("/{timestamp}/download")
 async def download_backup(
@@ -31,6 +34,7 @@ async def download_backup(
         filename=path.name,
         media_type="application/octet-stream",
     )
+
 
 @router.delete("/{timestamp}")
 async def delete_backup(

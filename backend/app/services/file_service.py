@@ -1,6 +1,6 @@
 import uuid
 from contextlib import suppress
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -65,9 +65,7 @@ async def create_file(
     storage_key = f"{owner.id}/{file_id}"
 
     if size is None:
-        actual_size = await upload_stream_multipart(
-            storage_key, fileobj, mime_type, max_size=settings.MAX_UPLOAD_SIZE
-        )
+        actual_size = await upload_stream_multipart(storage_key, fileobj, mime_type, max_size=settings.MAX_UPLOAD_SIZE)
         if not storage_accounting.has_room(owner, actual_size):
             await delete_file(storage_key)
             storage_accounting.ensure_quota(owner, actual_size)
@@ -96,19 +94,18 @@ async def create_file(
     if file.file_type == "image":
         try:
             from app.tasks.thumbnail_tasks import generate_thumbnail
+
             generate_thumbnail.delay(storage_key, str(file_id))
         except Exception:
             pass
 
     return file
 
-async def get_file(
-    db: AsyncSession, file_id: uuid.UUID, owner_id: uuid.UUID
-) -> File | None:
-    result = await db.execute(
-        select(File).where(File.id == file_id, File.owner_id == owner_id)
-    )
+
+async def get_file(db: AsyncSession, file_id: uuid.UUID, owner_id: uuid.UUID) -> File | None:
+    result = await db.execute(select(File).where(File.id == file_id, File.owner_id == owner_id))
     return result.scalar_one_or_none()
+
 
 async def list_files(
     db: AsyncSession,
@@ -140,13 +137,8 @@ async def list_files(
         await redis_client.expire(_CACHE_HASH_KEY, _COUNT_CACHE_TTL)
 
     if cursor:
-        cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=timezone.utc)
-        query = (
-            select(File)
-            .where(*filters, File.created_at < cursor_dt)
-            .order_by(File.created_at.desc())
-            .limit(limit)
-        )
+        cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=UTC)
+        query = select(File).where(*filters, File.created_at < cursor_dt).order_by(File.created_at.desc()).limit(limit)
     elif skip > 0:
         sub = (
             select(File.created_at)
@@ -164,12 +156,7 @@ async def list_files(
             .limit(limit)
         )
     else:
-        query = (
-            select(File)
-            .where(*filters)
-            .order_by(File.created_at.desc())
-            .limit(limit)
-        )
+        query = select(File).where(*filters).order_by(File.created_at.desc()).limit(limit)
 
     result = await db.execute(query)
     files = list(result.scalars().all())
@@ -180,6 +167,7 @@ async def list_files(
             next_cursor = last_created.isoformat()
 
     return files, total, next_cursor
+
 
 async def search_files(
     db: AsyncSession,
@@ -200,7 +188,7 @@ async def search_files(
         search_filter = File.filename.ilike(f"%{safe_keyword}%", escape="\\")
         order_cols = [File.created_at.desc()]
 
-    filters = base_filters + [search_filter]
+    filters = [*base_filters, search_filter]
 
     next_cursor = None
 
@@ -215,13 +203,8 @@ async def search_files(
         await redis_client.expire(_CACHE_HASH_KEY, _SEARCH_CACHE_TTL)
 
     if cursor:
-        cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=timezone.utc)
-        query = (
-            select(File)
-            .where(*filters, File.created_at < cursor_dt)
-            .order_by(*order_cols)
-            .limit(limit)
-        )
+        cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=UTC)
+        query = select(File).where(*filters, File.created_at < cursor_dt).order_by(*order_cols).limit(limit)
     elif skip > 0:
         sub = (
             select(File.created_at)
@@ -232,19 +215,9 @@ async def search_files(
             .correlate(None)
             .subquery()
         )
-        query = (
-            select(File)
-            .where(*filters, File.created_at <= sub.c.created_at)
-            .order_by(*order_cols)
-            .limit(limit)
-        )
+        query = select(File).where(*filters, File.created_at <= sub.c.created_at).order_by(*order_cols).limit(limit)
     else:
-        query = (
-            select(File)
-            .where(*filters)
-            .order_by(*order_cols)
-            .limit(limit)
-        )
+        query = select(File).where(*filters).order_by(*order_cols).limit(limit)
 
     result = await db.execute(query)
     files = list(result.scalars().all())
@@ -255,6 +228,7 @@ async def search_files(
             next_cursor = last_created.isoformat()
 
     return files, total, next_cursor
+
 
 async def move_files(
     db: AsyncSession,
@@ -274,6 +248,7 @@ async def move_files(
         file.folder_id = target_folder_id
     await db.commit()
     return len(files)
+
 
 async def list_trash_files(
     db: AsyncSession,
@@ -297,13 +272,8 @@ async def list_trash_files(
         await redis_client.expire(_CACHE_HASH_KEY, _COUNT_CACHE_TTL)
 
     if cursor:
-        cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=timezone.utc)
-        query = (
-            select(File)
-            .where(*filters, File.deleted_at < cursor_dt)
-            .order_by(File.deleted_at.desc())
-            .limit(limit)
-        )
+        cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=UTC)
+        query = select(File).where(*filters, File.deleted_at < cursor_dt).order_by(File.deleted_at.desc()).limit(limit)
     elif skip > 0:
         sub = (
             select(File.deleted_at)
@@ -321,12 +291,7 @@ async def list_trash_files(
             .limit(limit)
         )
     else:
-        query = (
-            select(File)
-            .where(*filters)
-            .order_by(File.deleted_at.desc())
-            .limit(limit)
-        )
+        query = select(File).where(*filters).order_by(File.deleted_at.desc()).limit(limit)
 
     result = await db.execute(query)
     files = list(result.scalars().all())
@@ -338,21 +303,19 @@ async def list_trash_files(
 
     return files, total, next_cursor
 
-async def soft_delete_file(
-    db: AsyncSession, file_id: uuid.UUID, owner_id: uuid.UUID
-) -> bool:
+
+async def soft_delete_file(db: AsyncSession, file_id: uuid.UUID, owner_id: uuid.UUID) -> bool:
     file = await get_file(db, file_id, owner_id)
     if not file:
         return False
-    file.deleted_at = datetime.now(timezone.utc)
+    file.deleted_at = datetime.now(UTC)
     await storage_accounting.adjust(db, owner_id, -file.size)
 
     await db.commit()
     return True
 
-async def restore_file(
-    db: AsyncSession, file_id: uuid.UUID, owner_id: uuid.UUID
-) -> bool:
+
+async def restore_file(db: AsyncSession, file_id: uuid.UUID, owner_id: uuid.UUID) -> bool:
     result = await db.execute(
         select(File).where(
             File.id == file_id,
@@ -369,9 +332,8 @@ async def restore_file(
     await db.commit()
     return True
 
-async def purge_file(
-    db: AsyncSession, file_id: uuid.UUID, owner_id: uuid.UUID
-) -> bool:
+
+async def purge_file(db: AsyncSession, file_id: uuid.UUID, owner_id: uuid.UUID) -> bool:
     result = await db.execute(
         select(File).where(
             File.id == file_id,
@@ -391,9 +353,7 @@ async def purge_file(
     return True
 
 
-async def recalculate_used_storage(
-    db: AsyncSession, owner_id: uuid.UUID
-) -> int:
+async def recalculate_used_storage(db: AsyncSession, owner_id: uuid.UUID) -> int:
     return await storage_accounting.recalculate(db, owner_id)
 
 
@@ -416,6 +376,4 @@ async def get_thumbnail_url(thumbnail_key: str) -> str:
 
 
 async def get_download_url(file: File) -> str:
-    return await get_presigned_download_url(
-        file.storage_key, settings.MINIO_DOWNLOAD_EXPIRES, file.filename
-    )
+    return await get_presigned_download_url(file.storage_key, settings.MINIO_DOWNLOAD_EXPIRES, file.filename)

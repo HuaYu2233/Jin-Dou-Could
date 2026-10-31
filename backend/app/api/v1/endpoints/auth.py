@@ -77,9 +77,7 @@ async def reset_password_by_security(
     data: SecurityResetRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    await reset_password_service.reset_password_by_security(
-        db, data.email, data.answer, data.new_password
-    )
+    await reset_password_service.reset_password_by_security(db, data.email, data.answer, data.new_password)
     return {"detail": "密码重置成功"}
 
 

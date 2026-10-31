@@ -5,22 +5,27 @@ Revises: c3d4e5f6a7b8
 Create Date: 2026-09-04 10:00:00.000000
 
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
 
-revision: str = 'd4e5f6a7b8c9'
-down_revision: Union[str, Sequence[str], None] = 'c3d4e5f6a7b8'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+from alembic import op
+
+revision: str = "d4e5f6a7b8c9"
+down_revision: str | Sequence[str] | None = "c3d4e5f6a7b8"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
+
 
 def upgrade() -> None:
     from sqlalchemy import inspect
+
     conn = op.get_bind()
     cols = {col["name"] for col in inspect(conn).get_columns("users")}
     if "is_admin" not in cols:
-        op.add_column('users', sa.Column('is_admin', sa.Boolean(), nullable=False, server_default=sa.text('false')))
+        op.add_column("users", sa.Column("is_admin", sa.Boolean(), nullable=False, server_default=sa.text("false")))
+
 
 def downgrade() -> None:
-    op.drop_column('users', 'is_admin')
+    op.drop_column("users", "is_admin")

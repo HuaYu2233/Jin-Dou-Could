@@ -1,5 +1,3 @@
-
-# /Users/zero/project/JinDou-Cloud/backend/app/schemas/share.py
 from datetime import datetime
 from uuid import UUID
 
@@ -8,6 +6,7 @@ from pydantic import BaseModel
 
 class ShareCreateRequest(BaseModel):
     expires_days: int | None = None
+
 
 class ShareCreateResponse(BaseModel):
     id: UUID
@@ -18,6 +17,7 @@ class ShareCreateResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 class ShareItemResponse(BaseModel):
     id: UUID
@@ -33,9 +33,11 @@ class ShareItemResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 class ShareListResponse(BaseModel):
     items: list[ShareItemResponse]
     total: int
+
 
 class ShareInfoResponse(BaseModel):
     share_token: str
@@ -45,8 +47,10 @@ class ShareInfoResponse(BaseModel):
     has_code: bool
     expires_at: datetime | None
 
+
 class ShareVerifyRequest(BaseModel):
     extract_code: str
+
 
 class ShareVerifyResponse(BaseModel):
     share_token: str

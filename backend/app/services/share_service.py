@@ -1,9 +1,7 @@
-
-# /Users/zero/project/JinDou-Cloud/backend/app/services/share_service.py
 import secrets
 import string
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,12 +16,15 @@ from app.models.share import Share
 SHARE_VERIFY_MAX_ATTEMPTS = 5
 SHARE_VERIFY_LOCK_SECONDS = 900
 
+
 def _generate_token() -> str:
     return secrets.token_urlsafe(24)[:32]
+
 
 def _generate_code() -> str:
     chars = string.ascii_uppercase + string.digits
     return "".join(secrets.choice(chars) for _ in range(6))
+
 
 async def create_share(
     db: AsyncSession,
@@ -54,7 +55,7 @@ async def create_share(
 
     expires_at = None
     if expires_days is not None:
-        expires_at = datetime.now(timezone.utc) + timedelta(days=expires_days)
+        expires_at = datetime.now(UTC) + timedelta(days=expires_days)
 
     share = Share(
         id=uuid.uuid4(),
@@ -70,15 +71,14 @@ async def create_share(
     await db.refresh(share)
     return share
 
+
 async def list_shares(
     db: AsyncSession,
     owner_id: uuid.UUID,
     skip: int = 0,
     limit: int = 20,
 ) -> tuple[list, int]:
-    count_result = await db.execute(
-        select(func.count()).select_from(Share).where(Share.owner_id == owner_id)
-    )
+    count_result = await db.execute(select(func.count()).select_from(Share).where(Share.owner_id == owner_id))
     total = count_result.scalar_one()
 
     result = await db.execute(
@@ -108,18 +108,16 @@ async def list_shares(
         )
     return items, total
 
-async def delete_share(
-    db: AsyncSession, share_id: uuid.UUID, owner_id: uuid.UUID
-) -> bool:
-    result = await db.execute(
-        select(Share).where(Share.id == share_id, Share.owner_id == owner_id)
-    )
+
+async def delete_share(db: AsyncSession, share_id: uuid.UUID, owner_id: uuid.UUID) -> bool:
+    result = await db.execute(select(Share).where(Share.id == share_id, Share.owner_id == owner_id))
     share = result.scalar_one_or_none()
     if not share:
         return False
     await db.delete(share)
     await db.commit()
     return True
+
 
 async def get_share_info(db: AsyncSession, token: str) -> dict | None:
     result = await db.execute(
@@ -132,9 +130,8 @@ async def get_share_info(db: AsyncSession, token: str) -> dict | None:
         return None
     share, filename, file_size, file_type = row
 
-    if share.expires_at is not None:
-        if share.expires_at < datetime.now(timezone.utc):
-            return None
+    if share.expires_at is not None and share.expires_at < datetime.now(UTC):
+        return None
 
     return {
         "share_token": share.share_token,
@@ -145,9 +142,8 @@ async def get_share_info(db: AsyncSession, token: str) -> dict | None:
         "expires_at": share.expires_at,
     }
 
-async def verify_share(
-    db: AsyncSession, token: str, extract_code: str
-) -> dict | None:
+
+async def verify_share(db: AsyncSession, token: str, extract_code: str) -> dict | None:
     result = await db.execute(
         select(Share, File.filename, File.size, File.file_type, File.mime_type, File.storage_key)
         .join(File, Share.file_id == File.id)
@@ -158,9 +154,8 @@ async def verify_share(
         return None
     share, filename, file_size, file_type, mime_type, storage_key = row
 
-    if share.expires_at is not None:
-        if share.expires_at < datetime.now(timezone.utc):
-            return None
+    if share.expires_at is not None and share.expires_at < datetime.now(UTC):
+        return None
 
     if share.extract_code != extract_code:
         return None
@@ -200,9 +195,7 @@ async def clear_share_verify_attempts(token: str) -> None:
     await redis_client.delete(f"share_verify:{token}")
 
 
-async def verify_share_with_rate_limit(
-    db: AsyncSession, token: str, extract_code: str
-) -> dict:
+async def verify_share_with_rate_limit(db: AsyncSession, token: str, extract_code: str) -> dict:
     await check_share_rate_limit(token)
     info = await verify_share(db, token, extract_code)
     if not info:
@@ -212,9 +205,7 @@ async def verify_share_with_rate_limit(
     return info
 
 
-async def download_shared_file(
-    db: AsyncSession, token: str, extract_code: str
-) -> str:
+async def download_shared_file(db: AsyncSession, token: str, extract_code: str) -> str:
     await check_share_rate_limit(token)
     info = await verify_share(db, token, extract_code)
     if not info:
@@ -222,14 +213,10 @@ async def download_shared_file(
         raise Forbidden("提取码错误或分享已过期")
     await clear_share_verify_attempts(token)
 
-    file_result = await db.execute(
-        select(File).where(File.storage_key == info["storage_key"])
-    )
+    file_result = await db.execute(select(File).where(File.storage_key == info["storage_key"]))
     file = file_result.scalar_one_or_none()
     if not file:
         raise NotFound("文件不存在")
 
-    url = await get_presigned_download_url(
-        file.storage_key, settings.MINIO_DOWNLOAD_EXPIRES, file.filename
-    )
+    url = await get_presigned_download_url(file.storage_key, settings.MINIO_DOWNLOAD_EXPIRES, file.filename)
     return url

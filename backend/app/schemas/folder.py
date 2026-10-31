@@ -1,4 +1,3 @@
-# /Users/zero/project/JinDou-Cloud/backend/app/schemas/folder.py
 from datetime import datetime
 from uuid import UUID
 
@@ -11,8 +10,10 @@ class FolderCreateRequest(BaseModel):
     name: str
     parent_id: UUID | None = None
 
+
 class FolderRenameRequest(BaseModel):
     name: str
+
 
 class FolderResponse(BaseModel):
     id: UUID
@@ -24,6 +25,7 @@ class FolderResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 class FolderTrashResponse(BaseModel):
     id: UUID
@@ -37,16 +39,19 @@ class FolderTrashResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 class FolderBreadcrumbItem(BaseModel):
     id: str | None = None
     name: str
     path: str
+
 
 class FolderListResponse(BaseModel):
     folders: list[FolderResponse]
     files: list[FileResponse]
     breadcrumbs: list[FolderBreadcrumbItem]
     total_files: int
+
 
 class FolderTrashListResponse(BaseModel):
     items: list[FolderTrashResponse]

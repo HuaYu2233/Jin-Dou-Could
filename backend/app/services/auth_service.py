@@ -72,9 +72,7 @@ async def clear_login_rate_limit(client_ip: str, email: str) -> None:
     await redis_client.delete(rl_key)
 
 
-async def authenticate_user(
-    db: AsyncSession, email: str, password: str
-) -> User | None:
+async def authenticate_user(db: AsyncSession, email: str, password: str) -> User | None:
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
     if not user or not verify_password(password, user.hashed_password):
@@ -84,6 +82,7 @@ async def authenticate_user(
 
 def set_auth_cookies(response: Response, user: User) -> None:
     import uuid as _uuid
+
     family = str(_uuid.uuid4())
     access_token = create_access_token({"sub": str(user.id)})
     refresh_token = create_refresh_token({"sub": str(user.id), "family": family})

@@ -5,6 +5,7 @@ Revises: h2i3j4k5l6m7
 Create Date: 2026-10-23 11:00:00.000000
 
 """
+
 from alembic import op
 
 revision = "i3j4k5l6m7n8"
@@ -15,6 +16,7 @@ depends_on = None
 
 def upgrade() -> None:
     from sqlalchemy import inspect
+
     conn = op.get_bind()
     file_idxs = {idx["name"] for idx in inspect(conn).get_indexes("files")}
     share_idxs = {idx["name"] for idx in inspect(conn).get_indexes("shares")}

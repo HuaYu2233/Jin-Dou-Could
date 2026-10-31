@@ -30,6 +30,7 @@ try:
 except Exception:
     sync_session_factory = None
 
+
 async def get_db():
     async with AsyncSessionLocal() as session:
         yield session

@@ -5,22 +5,27 @@ Revises: e5f6a7b8c9d0
 Create Date: 2026-09-07 09:00:00.000000
 
 """
-from alembic import op
+
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "f6a7b8c9d0e1"
 down_revision = "e5f6a7b8c9d0"
 branch_labels = None
 depends_on = None
 
+
 def upgrade() -> None:
     from sqlalchemy import inspect
+
     conn = op.get_bind()
     cols = {col["name"] for col in inspect(conn).get_columns("users")}
     if "security_question" not in cols:
         op.add_column("users", sa.Column("security_question", sa.String(length=255), nullable=True))
     if "security_answer" not in cols:
         op.add_column("users", sa.Column("security_answer", sa.String(length=255), nullable=True))
+
 
 def downgrade() -> None:
     op.drop_column("users", "security_answer")

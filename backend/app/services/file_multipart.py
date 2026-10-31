@@ -69,7 +69,7 @@ async def upload_multipart_part(
 
     max_part_size = settings.UPLOAD_PART_SIZE * 2
     if len(data) > max_part_size:
-        raise PayloadTooLarge(f"分片大小超过限制（最大 {max_part_size // (1024*1024)}MB）")
+        raise PayloadTooLarge(f"分片大小超过限制（最大 {max_part_size // (1024 * 1024)}MB）")
 
     etag = await upload_part(storage_key, upload_id, part_number, data)
 
@@ -141,6 +141,7 @@ async def complete_multipart_upload(
     if file.file_type == "image":
         try:
             from app.tasks.thumbnail_tasks import generate_thumbnail
+
             generate_thumbnail.delay(storage_key, str(file_id))
         except Exception:
             pass

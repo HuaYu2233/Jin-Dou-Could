@@ -1,6 +1,6 @@
 import json
 from contextlib import suppress
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from fastapi import WebSocket
@@ -25,15 +25,12 @@ class ConnectionManager:
             self._connections[user_id] = []
         self._connections[user_id].append(ws)
         self._subscribed_users.add(user_id)
-        logger.bind(log_type="ws").info(
-            f"WebSocket 连接: user={user_id}, 当前连接数={len(self._connections[user_id])}"
-        )
+        logger.bind(log_type="ws").info(f"WebSocket 连接: user={user_id}, 当前连接数={len(self._connections[user_id])}")
         if self._pubsub_enabled and self._pubsub is not None:
             import asyncio
+
             with suppress(Exception):
-                asyncio.get_event_loop().create_task(
-                    self._subscribe_user(user_id)
-                )
+                asyncio.get_event_loop().create_task(self._subscribe_user(user_id))
 
     def disconnect(self, user_id: str, ws: WebSocket):
         if user_id in self._connections:
@@ -43,18 +40,19 @@ class ConnectionManager:
                 self._subscribed_users.discard(user_id)
                 if self._pubsub_enabled and self._pubsub is not None:
                     import asyncio
+
                     with suppress(Exception):
-                        asyncio.get_event_loop().create_task(
-                            self._unsubscribe_user(user_id)
-                        )
+                        asyncio.get_event_loop().create_task(self._unsubscribe_user(user_id))
             logger.bind(log_type="ws").info(f"WebSocket 断开: user={user_id}")
 
     async def send_to_user(self, user_id: str, event: str, data: dict):
-        payload = json.dumps({
-            "event": event,
-            "data": data,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        payload = json.dumps(
+            {
+                "event": event,
+                "data": data,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+        )
 
         if self._pubsub_enabled:
             await self._publish(user_id, payload)
@@ -75,6 +73,7 @@ class ConnectionManager:
     async def _publish(self, user_id: str, payload: str):
         try:
             from app.core.redis import redis_client
+
             await redis_client.publish(
                 f"{_WS_CHANNEL_PREFIX}{user_id}",
                 json.dumps({"origin": _INSTANCE_ID, "payload": payload}),
@@ -107,8 +106,10 @@ class ConnectionManager:
             return
         try:
             from app.core.redis import redis_pubsub
+
             self._pubsub = redis_pubsub.pubsub()
             import asyncio
+
             self._listen_task = asyncio.create_task(self._listen_loop())
             logger.bind(log_type="ws").info("WebSocket Redis Pub/Sub 已启动（按需订阅模式）")
         except Exception as exc:

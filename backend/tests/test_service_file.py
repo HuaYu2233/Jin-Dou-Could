@@ -105,8 +105,13 @@ class TestCategorizeFileType:
 class TestAllowedMimeTypes:
     def test_common_types_present(self):
         expected = {
-            "image/jpeg", "image/png", "video/mp4", "audio/mpeg",
-            "application/pdf", "text/plain", "application/zip",
+            "image/jpeg",
+            "image/png",
+            "video/mp4",
+            "audio/mpeg",
+            "application/pdf",
+            "text/plain",
+            "application/zip",
         }
         assert expected.issubset(ALLOWED_MIME_TYPES)
 

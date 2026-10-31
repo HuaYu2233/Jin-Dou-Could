@@ -16,23 +16,27 @@ except Exception:
     user_id_ctx = None
 
 SENSITIVE_KEYS = {
-    "password", "token", "authorization", "secret",
-    "refresh_token", "access_token", "cookie",
+    "password",
+    "token",
+    "authorization",
+    "secret",
+    "refresh_token",
+    "access_token",
+    "cookie",
 }
+
 
 def _sanitize(obj, depth=0):
     if depth > 5:
         return "<truncated>"
     if isinstance(obj, dict):
-        return {
-            k: "***" if k.lower() in SENSITIVE_KEYS else _sanitize(v, depth + 1)
-            for k, v in obj.items()
-        }
+        return {k: "***" if k.lower() in SENSITIVE_KEYS else _sanitize(v, depth + 1) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
         return [_sanitize(v, depth + 1) for v in obj]
     if isinstance(obj, (str, int, float, bool, type(None))):
         return obj
     return str(obj)
+
 
 def _json_patcher(record):
     try:
@@ -56,17 +60,20 @@ def _json_patcher(record):
                 payload["user_id"] = uid
         if record["exception"]:
             exc = record["exception"]
-            payload["exception"] = "".join(
-                traceback.format_exception(type(exc.value), exc.value, exc.traceback)
-            )
+            payload["exception"] = "".join(traceback.format_exception(type(exc.value), exc.value, exc.traceback))
         record["extra"]["_json_line"] = json.dumps(payload, ensure_ascii=False, default=str)
     except Exception:
-        record["extra"]["_json_line"] = json.dumps({
-            "time": str(record["time"]),
-            "level": record["level"].name,
-            "message": str(record["message"]),
-            "error": "patcher_failed"
-        }, ensure_ascii=False, default=str)
+        record["extra"]["_json_line"] = json.dumps(
+            {
+                "time": str(record["time"]),
+                "level": record["level"].name,
+                "message": str(record["message"]),
+                "error": "patcher_failed",
+            },
+            ensure_ascii=False,
+            default=str,
+        )
+
 
 def setup_logging():
     logger.remove()
@@ -135,9 +142,7 @@ def setup_logging():
             while frame and frame.f_code.co_filename == logging.__file__:
                 frame = frame.f_back
                 depth += 1
-            logger.opt(depth=depth, exception=record.exc_info).log(
-                level, record.getMessage()
-            )
+            logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
 
     logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
 

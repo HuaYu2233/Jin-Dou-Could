@@ -96,6 +96,7 @@ class TestRecordLoginFailure:
     @pytest.mark.asyncio
     async def test_lock_at_max_attempts(self):
         from app.core.config import settings
+
         with patch("app.services.auth_service.redis_client") as mock_redis:
             mock_redis.incr = AsyncMock(return_value=settings.LOGIN_RATE_LIMIT_MAX_ATTEMPTS)
             mock_redis.expire = AsyncMock()

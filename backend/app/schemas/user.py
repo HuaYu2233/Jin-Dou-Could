@@ -14,6 +14,7 @@ def _validate_password_complexity(v: str) -> str:
         raise ValueError("密码必须包含数字")
     return v
 
+
 class UserCreate(BaseModel):
     email: EmailStr
     username: str
@@ -30,6 +31,7 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+
 class UserResponse(BaseModel):
     id: UUID
     email: str
@@ -45,12 +47,15 @@ class UserResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 class ProfileUpdate(BaseModel):
     username: str | None = None
+
 
 class SecurityQuestionUpdate(BaseModel):
     security_question: str
     security_answer: str
+
 
 class PasswordChange(BaseModel):
     old_password: str
@@ -61,11 +66,13 @@ class PasswordChange(BaseModel):
     def _validate_new_password(cls, v: str) -> str:
         return _validate_password_complexity(v)
 
+
 class UserUpdate(BaseModel):
     username: str | None = None
     storage_quota: int | None = None
     is_active: bool | None = None
     is_admin: bool | None = None
+
 
 class UserListItem(BaseModel):
     id: UUID
@@ -79,6 +86,7 @@ class UserListItem(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 class AdminStats(BaseModel):
     total_users: int

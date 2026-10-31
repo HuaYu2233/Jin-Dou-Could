@@ -17,6 +17,7 @@
     或
     pytest tests/test_upload_security.py -v
 """
+
 import os
 import sys
 
@@ -42,6 +43,7 @@ def _assert(condition: bool, message: str) -> bool:
     print(f"  ❌ {message}")
     return False
 
+
 def test_sanitize_truncates_long_name():
     print("\n[测试 1] 超长文件名截断到 255")
     long_name = "a" * 300 + ".txt"
@@ -51,6 +53,7 @@ def test_sanitize_truncates_long_name():
         f"截断后长度={len(result)} (期望 255)",
     )
 
+
 def test_sanitize_strips_control_chars():
     print("\n[测试 2] 去除控制字符")
     result = sanitize_filename("file\x00\x01\x1f\x7f.txt")
@@ -58,6 +61,7 @@ def test_sanitize_strips_control_chars():
         result == "file.txt",
         f"结果='{result}' (期望 'file.txt')",
     )
+
 
 def test_sanitize_blocks_path_traversal():
     print("\n[测试 3] 去除路径分隔符(防目录穿越)")
@@ -69,6 +73,7 @@ def test_sanitize_blocks_path_traversal():
         f"结果='{result}' (无路径分隔符,无目录穿越)",
     )
 
+
 def test_sanitize_strips_leading_trailing_dots_spaces():
     print("\n[测试 4] 去除首尾空格和点(防 dotfile 滥用)")
     result = sanitize_filename("  .hidden.  ")
@@ -77,6 +82,7 @@ def test_sanitize_strips_leading_trailing_dots_spaces():
         f"结果='{result}' (无首尾点/空格)",
     )
 
+
 def test_sanitize_empty_name_fallback():
     print("\n[测试 5] 空文件名回退为 unknown")
     result = sanitize_filename("")
@@ -84,6 +90,7 @@ def test_sanitize_empty_name_fallback():
         result == "unknown",
         f"结果='{result}' (期望 'unknown')",
     )
+
 
 def test_detect_real_mime_png():
     print("\n[测试 6] 探测 PNG 真实类型")
@@ -103,6 +110,7 @@ def test_detect_real_mime_png():
         f"探测结果='{detected}' (期望 'image/png')",
     )
 
+
 def test_detect_real_mime_pdf():
     print("\n[测试 7] 探测 PDF 真实类型")
     pdf_header = b"%PDF-1.4\n" + b"\x00" * 100
@@ -113,6 +121,7 @@ def test_detect_real_mime_pdf():
         f"探测结果='{detected}' (期望 'application/pdf')",
     )
 
+
 def test_validate_rejects_disallowed_type():
     print("\n[测试 8] 拒绝非白名单类型")
     try:
@@ -120,6 +129,7 @@ def test_validate_rejects_disallowed_type():
         return _assert(False, "未拒绝非白名单类型")
     except AppError as e:
         return _assert(True, f"正确拒绝: {e}")
+
 
 def test_validate_rejects_mismatch():
     print("\n[测试 9] 拒绝声明与实际不符")
@@ -129,6 +139,7 @@ def test_validate_rejects_mismatch():
     except AppError as e:
         return _assert(True, f"正确拒绝: {e}")
 
+
 def test_validate_accepts_compatible():
     print("\n[测试 10] 兼容 octet-stream 声明")
     try:
@@ -136,6 +147,7 @@ def test_validate_accepts_compatible():
         return _assert(True, "兼容 octet-stream 声明")
     except AppError as e:
         return _assert(False, f"误拒兼容类型: {e}")
+
 
 def test_allowed_mime_covers_common_types():
     print("\n[测试 11] 白名单覆盖常见类型")
@@ -145,6 +157,7 @@ def test_allowed_mime_covers_common_types():
         not missing,
         f"缺失: {missing or '无'}",
     )
+
 
 def run_all():
     print("=" * 60)
@@ -178,6 +191,7 @@ def run_all():
     print("     执行: pip install python-magic")
     print("     macOS 需额外: brew install libmagic")
     return 1
+
 
 if __name__ == "__main__":
     sys.exit(run_all())

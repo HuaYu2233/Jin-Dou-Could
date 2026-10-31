@@ -55,9 +55,7 @@ async def change_password(
     db: AsyncSession = Depends(get_db),
 ):
     access_token = request.cookies.get("access_token")
-    user = await user_service.change_password(
-        db, current_user, data.old_password, data.new_password, access_token
-    )
+    user = await user_service.change_password(db, current_user, data.old_password, data.new_password, access_token)
     await invalidate_user_cache(current_user.id)
     return user
 
@@ -68,8 +66,6 @@ async def update_security_question(
     current_user: User = Depends(get_full_user),
     db: AsyncSession = Depends(get_db),
 ):
-    user = await user_service.update_security_question(
-        db, current_user, data.security_question, data.security_answer
-    )
+    user = await user_service.update_security_question(db, current_user, data.security_question, data.security_answer)
     await invalidate_user_cache(current_user.id)
     return user

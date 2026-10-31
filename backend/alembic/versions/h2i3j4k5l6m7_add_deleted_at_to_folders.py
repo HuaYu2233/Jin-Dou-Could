@@ -5,8 +5,10 @@ Revises: g1h2i3j4k5l6
 Create Date: 2026-10-23 10:00:00.000000
 
 """
-from alembic import op
+
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "h2i3j4k5l6m7"
 down_revision = "g1h2i3j4k5l6"
@@ -16,6 +18,7 @@ depends_on = None
 
 def upgrade() -> None:
     from sqlalchemy import inspect
+
     conn = op.get_bind()
     cols = {col["name"] for col in inspect(conn).get_columns("folders")}
     if "deleted_at" not in cols:

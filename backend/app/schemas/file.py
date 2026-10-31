@@ -19,10 +19,12 @@ class FileResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 class FileListResponse(BaseModel):
     items: list[FileResponse]
     total: int
     next_cursor: str | None = None
+
 
 class FileUploadResponse(BaseModel):
     id: UUID
@@ -32,9 +34,11 @@ class FileUploadResponse(BaseModel):
     file_type: str
     status: str
 
+
 class FileMoveRequest(BaseModel):
     file_ids: list[UUID]
     target_folder_id: UUID | None = None
+
 
 class MultipartInitRequest(BaseModel):
     filename: str
@@ -42,15 +46,18 @@ class MultipartInitRequest(BaseModel):
     total_size: int
     folder_id: UUID | None = None
 
+
 class MultipartInitResponse(BaseModel):
     upload_id: str
     storage_key: str
     part_size: int
     total_parts: int
 
+
 class MultipartPartRequest(BaseModel):
     part_number: int
     etag: str
+
 
 class MultipartCompleteRequest(BaseModel):
     upload_id: str

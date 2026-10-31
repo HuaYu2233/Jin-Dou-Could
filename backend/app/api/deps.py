@@ -16,19 +16,23 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=F
 
 USER_CACHE_TTL = 60
 
+
 def _serialize_user(user: User) -> str:
-    return json.dumps({
-        "id": str(user.id),
-        "email": user.email,
-        "username": user.username,
-        "is_active": user.is_active,
-        "is_admin": user.is_admin,
-        "avatar_key": user.avatar_key,
-        "storage_quota": user.storage_quota,
-        "used_storage": user.used_storage,
-        "created_at": user.created_at.isoformat() if user.created_at else None,
-        "updated_at": user.updated_at.isoformat() if user.updated_at else None,
-    })
+    return json.dumps(
+        {
+            "id": str(user.id),
+            "email": user.email,
+            "username": user.username,
+            "is_active": user.is_active,
+            "is_admin": user.is_admin,
+            "avatar_key": user.avatar_key,
+            "storage_quota": user.storage_quota,
+            "used_storage": user.used_storage,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "updated_at": user.updated_at.isoformat() if user.updated_at else None,
+        }
+    )
+
 
 def _deserialize_user(data: str) -> User:
     d = json.loads(data)
@@ -50,6 +54,7 @@ def _deserialize_user(data: str) -> User:
     user._cache_incomplete = True
     return user
 
+
 async def invalidate_user_cache(user_id: UUID | str) -> None:
     uid = str(user_id)
     pipe = redis_client.pipeline()
@@ -70,6 +75,7 @@ async def invalidate_user_cache(user_id: UUID | str) -> None:
             await redis_client.delete(*keys[i : i + 500])
     except Exception:
         pass
+
 
 async def get_current_user(
     request: Request,
@@ -98,16 +104,16 @@ async def get_current_user(
         cached = await redis_client.get(cache_key)
         if cached:
             return _deserialize_user(cached)
-    
+
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
-    
+
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
 
     if request.method == "GET":
         await redis_client.setex(cache_key, USER_CACHE_TTL, _serialize_user(user))
-    
+
     return user
 
 
@@ -122,6 +128,7 @@ async def get_full_user(
             raise HTTPException(status_code=401, detail="User not found")
         return full_user
     return user
+
 
 async def get_current_admin(
     current_user: User = Depends(get_current_user),

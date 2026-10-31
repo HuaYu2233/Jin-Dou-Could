@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     DATABASE_URL_DIRECT: str = ""
     REDIS_URL: str = "redis://redis:6379/0"
     REDIS_PASSWORD: str = ""
-    
+
     SECRET_KEY: str
 
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
@@ -130,8 +130,10 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
 
+
 @lru_cache
-def get_settings(): 
+def get_settings():
     return Settings()
+
 
 settings = get_settings()

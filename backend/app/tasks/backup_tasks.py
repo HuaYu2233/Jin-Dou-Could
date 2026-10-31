@@ -19,6 +19,7 @@ from app.core.config import settings
 def trigger_backup(self) -> str:
     if settings.BACKUP_TRIGGER_CMD:
         import subprocess
+
         try:
             result = subprocess.run(
                 settings.BACKUP_TRIGGER_CMD,
@@ -28,9 +29,7 @@ def trigger_backup(self) -> str:
                 timeout=600,
             )
             if result.returncode != 0:
-                raise RuntimeError(
-                    f"备份命令执行失败 (exit={result.returncode}): {result.stderr}"
-                )
+                raise RuntimeError(f"备份命令执行失败 (exit={result.returncode}): {result.stderr}")
             logger.bind(log_type="backup").info("备份命令执行成功")
             return "backup triggered via command"
         except Exception as exc:

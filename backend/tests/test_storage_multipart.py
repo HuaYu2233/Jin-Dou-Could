@@ -64,9 +64,7 @@ class TestUnknownSizeUpload:
         fake = FakeS3Client()
         data = b"a" * 100
         with _patch_client(fake):
-            total = await storage.upload_stream_multipart(
-                "user/obj", io.BytesIO(data), "text/plain", chunk_size=40
-            )
+            total = await storage.upload_stream_multipart("user/obj", io.BytesIO(data), "text/plain", chunk_size=40)
         assert total == 100
         assert len(fake.uploaded) == 3
         assert len(fake.completed) == 1
@@ -76,9 +74,7 @@ class TestUnknownSizeUpload:
     async def test_parts_carry_incrementing_numbers(self):
         fake = FakeS3Client()
         with _patch_client(fake):
-            await storage.upload_stream_multipart(
-                "user/obj", io.BytesIO(b"b" * 30), "text/plain", chunk_size=10
-            )
+            await storage.upload_stream_multipart("user/obj", io.BytesIO(b"b" * 30), "text/plain", chunk_size=10)
         numbers = [call["PartNumber"] for call in fake.uploaded]
         assert numbers == [1, 2, 3]
         assert fake.completed[0]["MultipartUpload"]["Parts"][0]["ETag"] == "etag-1"
@@ -88,9 +84,7 @@ class TestUnknownSizeUpload:
         fake = FakeS3Client()
         data = b"c" * 50
         with _patch_client(fake):
-            total = await storage.upload_stream_multipart(
-                "user/obj", AsyncStream(data), "text/plain", chunk_size=25
-            )
+            total = await storage.upload_stream_multipart("user/obj", AsyncStream(data), "text/plain", chunk_size=25)
         assert total == 50
         assert len(fake.uploaded) == 2
 
@@ -98,9 +92,7 @@ class TestUnknownSizeUpload:
     async def test_empty_stream_stores_empty_object(self):
         fake = FakeS3Client()
         with _patch_client(fake):
-            total = await storage.upload_stream_multipart(
-                "user/obj", io.BytesIO(b""), "text/plain"
-            )
+            total = await storage.upload_stream_multipart("user/obj", io.BytesIO(b""), "text/plain")
         assert total == 0
         assert len(fake.put_objects) == 1
         assert fake.put_objects[0]["Body"] == b""
@@ -111,8 +103,11 @@ class TestUnknownSizeUpload:
         fake = FakeS3Client()
         with _patch_client(fake), pytest.raises(PayloadTooLarge):
             await storage.upload_stream_multipart(
-                "user/obj", io.BytesIO(b"d" * 100), "text/plain",
-                chunk_size=10, max_size=50,
+                "user/obj",
+                io.BytesIO(b"d" * 100),
+                "text/plain",
+                chunk_size=10,
+                max_size=50,
             )
         assert len(fake.aborted) == 1
         assert fake.completed == []
@@ -124,8 +119,11 @@ class TestKnownSizeUpload:
         fake = FakeS3Client()
         with _patch_client(fake):
             total = await storage.upload_stream_multipart(
-                "user/obj", io.BytesIO(b"e" * 200), "text/plain",
-                total_size=100, chunk_size=40,
+                "user/obj",
+                io.BytesIO(b"e" * 200),
+                "text/plain",
+                total_size=100,
+                chunk_size=40,
             )
         assert total == 100
         assert len(fake.uploaded) == 3
@@ -136,8 +134,11 @@ class TestKnownSizeUpload:
         fake = FakeS3Client()
         with _patch_client(fake):
             total = await storage.upload_stream_multipart(
-                "user/obj", io.BytesIO(b"f" * 30), "text/plain",
-                total_size=100, chunk_size=40,
+                "user/obj",
+                io.BytesIO(b"f" * 30),
+                "text/plain",
+                total_size=100,
+                chunk_size=40,
             )
         assert total == 30
         assert len(fake.uploaded) == 1

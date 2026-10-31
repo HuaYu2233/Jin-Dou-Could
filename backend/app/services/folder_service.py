@@ -1,7 +1,6 @@
-# /Users/zero/project/JinDou-Cloud/backend/app/services/folder_service.py
 import uuid
 from contextlib import suppress
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -48,9 +47,7 @@ async def create_folder(
     return folder
 
 
-async def _get_folder(
-    db: AsyncSession, folder_id: uuid.UUID, owner_id: uuid.UUID
-) -> Folder | None:
+async def _get_folder(db: AsyncSession, folder_id: uuid.UUID, owner_id: uuid.UUID) -> Folder | None:
     result = await db.execute(
         select(Folder).where(
             Folder.id == folder_id,
@@ -61,9 +58,7 @@ async def _get_folder(
     return result.scalar_one_or_none()
 
 
-async def _get_trashed_folder(
-    db: AsyncSession, folder_id: uuid.UUID, owner_id: uuid.UUID
-) -> Folder | None:
+async def _get_trashed_folder(db: AsyncSession, folder_id: uuid.UUID, owner_id: uuid.UUID) -> Folder | None:
     result = await db.execute(
         select(Folder).where(
             Folder.id == folder_id,
@@ -74,18 +69,13 @@ async def _get_trashed_folder(
     return result.scalar_one_or_none()
 
 
-async def _collect_subfolder_ids(
-    db: AsyncSession, folder_id: uuid.UUID, owner_id: uuid.UUID
-) -> list[uuid.UUID]:
+async def _collect_subfolder_ids(db: AsyncSession, folder_id: uuid.UUID, owner_id: uuid.UUID) -> list[uuid.UUID]:
     cte = (
         select(Folder.id, Folder.parent_id)
         .where(Folder.id == folder_id, Folder.owner_id == owner_id)
         .cte(name="subfolder_tree", recursive=True)
     )
-    children = (
-        select(Folder.id, Folder.parent_id)
-        .where(Folder.parent_id == cte.c.id, Folder.owner_id == owner_id)
-    )
+    children = select(Folder.id, Folder.parent_id).where(Folder.parent_id == cte.c.id, Folder.owner_id == owner_id)
     cte = cte.union_all(children)
     result = await db.execute(select(cte.c.id))
     return [row[0] for row in result.all()]
@@ -106,20 +96,16 @@ async def rename_folder(
     return folder
 
 
-async def delete_folder(
-    db: AsyncSession, folder_id: uuid.UUID, owner_id: uuid.UUID
-) -> bool:
+async def delete_folder(db: AsyncSession, folder_id: uuid.UUID, owner_id: uuid.UUID) -> bool:
     folder = await _get_folder(db, folder_id, owner_id)
     if not folder:
         return False
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     all_folder_ids = await _collect_subfolder_ids(db, folder_id, owner_id)
 
     await db.execute(
-        update(Folder)
-        .where(Folder.id.in_(all_folder_ids), Folder.deleted_at.is_(None))
-        .values(deleted_at=now)
+        update(Folder).where(Folder.id.in_(all_folder_ids), Folder.deleted_at.is_(None)).values(deleted_at=now)
     )
 
     files_result = await db.execute(
@@ -131,9 +117,7 @@ async def delete_folder(
     total_size = files_result.scalar_one()
 
     await db.execute(
-        update(File)
-        .where(File.folder_id.in_(all_folder_ids), File.deleted_at.is_(None))
-        .values(deleted_at=now)
+        update(File).where(File.folder_id.in_(all_folder_ids), File.deleted_at.is_(None)).values(deleted_at=now)
     )
 
     if total_size > 0:
@@ -150,7 +134,9 @@ async def list_trash_folders(
     limit: int = 20,
 ) -> tuple[list[Folder], int]:
     count_result = await db.execute(
-        select(func.count()).select_from(Folder).where(
+        select(func.count())
+        .select_from(Folder)
+        .where(
             Folder.owner_id == owner_id,
             Folder.deleted_at.is_not(None),
         )
@@ -168,9 +154,7 @@ async def list_trash_folders(
     return folders, total
 
 
-async def restore_folder(
-    db: AsyncSession, folder_id: uuid.UUID, owner_id: uuid.UUID
-) -> bool:
+async def restore_folder(db: AsyncSession, folder_id: uuid.UUID, owner_id: uuid.UUID) -> bool:
     folder = await _get_trashed_folder(db, folder_id, owner_id)
     if not folder:
         return False
@@ -197,14 +181,10 @@ async def restore_folder(
     total_size = files_result.scalar_one()
 
     await db.execute(
-        update(Folder)
-        .where(Folder.id.in_(all_folder_ids), Folder.deleted_at.is_not(None))
-        .values(deleted_at=None)
+        update(Folder).where(Folder.id.in_(all_folder_ids), Folder.deleted_at.is_not(None)).values(deleted_at=None)
     )
     await db.execute(
-        update(File)
-        .where(File.folder_id.in_(all_folder_ids), File.deleted_at.is_not(None))
-        .values(deleted_at=None)
+        update(File).where(File.folder_id.in_(all_folder_ids), File.deleted_at.is_not(None)).values(deleted_at=None)
     )
 
     if total_size > 0:
@@ -214,9 +194,7 @@ async def restore_folder(
     return True
 
 
-async def purge_folder(
-    db: AsyncSession, folder_id: uuid.UUID, owner_id: uuid.UUID
-) -> bool:
+async def purge_folder(db: AsyncSession, folder_id: uuid.UUID, owner_id: uuid.UUID) -> bool:
     folder = await _get_trashed_folder(db, folder_id, owner_id)
     if not folder:
         return False
@@ -265,19 +243,17 @@ async def list_folder_contents(
     skip: int = 0,
     limit: int = 50,
 ) -> dict:
-    folder_filter = (
-        Folder.parent_id == folder_id if folder_id is not None else Folder.parent_id.is_(None)
-    )
-    file_filter = (
-        File.folder_id == folder_id if folder_id is not None else File.folder_id.is_(None)
-    )
+    folder_filter = Folder.parent_id == folder_id if folder_id is not None else Folder.parent_id.is_(None)
+    file_filter = File.folder_id == folder_id if folder_id is not None else File.folder_id.is_(None)
 
     folders_result = await db.execute(
-        select(Folder).where(
+        select(Folder)
+        .where(
             Folder.owner_id == owner_id,
             folder_filter,
             Folder.deleted_at.is_(None),
-        ).order_by(Folder.name.asc())
+        )
+        .order_by(Folder.name.asc())
     )
     folders = folders_result.scalars().all()
 
@@ -307,9 +283,7 @@ async def list_folder_contents(
     }
 
 
-async def _get_breadcrumbs(
-    db: AsyncSession, folder_id: uuid.UUID | None, owner_id: uuid.UUID
-) -> list:
+async def _get_breadcrumbs(db: AsyncSession, folder_id: uuid.UUID | None, owner_id: uuid.UUID) -> list:
     breadcrumbs = [{"id": None, "name": "全部文件", "path": "/"}]
     if folder_id is None:
         return breadcrumbs

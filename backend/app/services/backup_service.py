@@ -12,6 +12,7 @@ def _backup_root() -> Path:
     root.mkdir(parents=True, exist_ok=True)
     return root
 
+
 def _dir_size(path: Path) -> int:
     total = 0
     for entry in path.rglob("*"):
@@ -20,16 +21,18 @@ def _dir_size(path: Path) -> int:
                 total += entry.stat().st_size
     return total
 
+
 def _parse_manifest(dir_path: Path) -> BackupManifest | None:
     manifest_path = dir_path / "manifest.json"
     if not manifest_path.exists():
         return None
     try:
-        with open(manifest_path, "r", encoding="utf-8") as f:
+        with open(manifest_path, encoding="utf-8") as f:
             data = json.load(f)
         return BackupManifest(**data)
     except (json.JSONDecodeError, ValueError):
         return None
+
 
 def list_backups() -> list[BackupInfo]:
     root = _backup_root()
@@ -74,6 +77,7 @@ def list_backups() -> list[BackupInfo]:
     items.sort(key=lambda x: x.timestamp, reverse=True)
     return items
 
+
 def get_backup_dir(timestamp: str) -> Path | None:
     if not timestamp or "/" in timestamp or "\\" in timestamp or ".." in timestamp:
         return None
@@ -81,6 +85,7 @@ def get_backup_dir(timestamp: str) -> Path | None:
     if not dir_path.is_dir():
         return None
     return dir_path
+
 
 def get_backup_file_path(timestamp: str, filename: str) -> Path | None:
     dir_path = get_backup_dir(timestamp)
@@ -93,10 +98,13 @@ def get_backup_file_path(timestamp: str, filename: str) -> Path | None:
         return None
     return file_path
 
+
 async def trigger_backup() -> str:
     from app.tasks.backup_tasks import trigger_backup as celery_trigger_backup
+
     celery_trigger_backup.delay()
     return "backup triggered"
+
 
 def delete_backup(timestamp: str) -> bool:
     dir_path = get_backup_dir(timestamp)

@@ -27,16 +27,18 @@ async def create_share(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    share = await share_service.create_share(
-        db, file_id, current_user.id, body.expires_days
-    )
+    share = await share_service.create_share(db, file_id, current_user.id, body.expires_days)
 
-    await ws_manager.send_to_user(str(current_user.id), "share:created", {
-        "share_id": str(share.id),
-        "file_id": str(file_id),
-        "share_token": share.share_token,
-        "extract_code": share.extract_code,
-    })
+    await ws_manager.send_to_user(
+        str(current_user.id),
+        "share:created",
+        {
+            "share_id": str(share.id),
+            "file_id": str(file_id),
+            "share_token": share.share_token,
+            "extract_code": share.extract_code,
+        },
+    )
 
     return share
 

@@ -14,8 +14,10 @@ from app.services.email_service import send_verification_code_async
 CODE_KEY = "reset_password_code:{email}"
 SEND_LIMIT_KEY = "reset_password_send_limit:{email}"
 
+
 def _generate_code() -> str:
     return "".join(secrets.choice(string.digits) for _ in range(settings.RESET_PASSWORD_CODE_LENGTH))
+
 
 async def send_code(db: AsyncSession, email: str) -> None:
     result = await db.execute(select(User).where(User.email == email))
@@ -35,6 +37,7 @@ async def send_code(db: AsyncSession, email: str) -> None:
         code,
     )
     send_verification_code_async(email, code)
+
 
 async def reset_password(db: AsyncSession, email: str, code: str, new_password: str) -> None:
     key = CODE_KEY.format(email=email)
@@ -61,9 +64,7 @@ async def get_security_question(db: AsyncSession, email: str) -> str | None:
     return user.security_question
 
 
-async def reset_password_by_security(
-    db: AsyncSession, email: str, answer: str, new_password: str
-) -> None:
+async def reset_password_by_security(db: AsyncSession, email: str, answer: str, new_password: str) -> None:
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
     if not user:

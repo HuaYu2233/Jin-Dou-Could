@@ -14,6 +14,7 @@
     或
     pytest tests/test_token_type.py -v
 """
+
 import os
 import sys
 
@@ -36,6 +37,7 @@ def _assert(condition: bool, message: str) -> bool:
         print(f"  ❌ {message}")
         return False
 
+
 def test_access_token_has_type_field():
     print("\n[测试 1] access token 应含 type='access' 字段")
     token = create_access_token({"sub": "user-123"})
@@ -44,6 +46,7 @@ def test_access_token_has_type_field():
         payload is not None and payload.get("type") == "access",
         f"payload.type == 'access' (实际: {payload.get('type') if payload else 'None'})",
     )
+
 
 def test_refresh_token_has_type_field():
     print("\n[测试 2] refresh token 应含 type='refresh' 字段")
@@ -54,6 +57,7 @@ def test_refresh_token_has_type_field():
         f"payload.type == 'refresh' (实际: {payload.get('type') if payload else 'None'})",
     )
 
+
 def test_access_and_refresh_have_different_types():
     print("\n[测试 3] access 与 refresh token 的 type 字段应不同")
     access = decode_token(create_access_token({"sub": "user-123"}))
@@ -63,6 +67,7 @@ def test_access_and_refresh_have_different_types():
         f"access.type={access.get('type')} ≠ refresh.type={refresh.get('type')}",
     )
 
+
 def test_tokens_carry_sub_and_jti():
     print("\n[测试 4] token 应保留 sub 与 jti 字段")
     payload = decode_token(create_access_token({"sub": "user-456"}))
@@ -71,11 +76,13 @@ def test_tokens_carry_sub_and_jti():
         f"sub={payload.get('sub')}, jti={'有' if payload.get('jti') else '无'}",
     )
 
+
 def test_token_with_no_type_is_rejected_by_logic():
     print("\n[测试 5] 无 type 字段的伪造 token 应被业务逻辑拒绝")
     from jose import jwt
 
     from app.core.config import settings
+
     fake_token = jwt.encode(
         {"sub": "user-789", "jti": "fake-jti"},
         settings.SECRET_KEY,
@@ -89,6 +96,7 @@ def test_token_with_no_type_is_rejected_by_logic():
         "无 type 的 token 在 access/refresh 校验中均被拒",
     )
 
+
 def test_refresh_cannot_be_used_as_access():
     print("\n[测试 6] refresh token 不能通过 access 校验")
     refresh_token = create_refresh_token({"sub": "user-123"})
@@ -99,6 +107,7 @@ def test_refresh_cannot_be_used_as_access():
         f"refresh.type={payload.get('type')} ≠ 'access' → 被 access 校验拒绝",
     )
 
+
 def test_access_cannot_be_used_as_refresh():
     print("\n[测试 7] access token 不能通过 refresh 校验")
     access_token = create_access_token({"sub": "user-123"})
@@ -108,6 +117,7 @@ def test_access_cannot_be_used_as_refresh():
         is_blocked,
         f"access.type={payload.get('type')} ≠ 'refresh' → 被 refresh 校验拒绝",
     )
+
 
 def run_all():
     print("=" * 60)
@@ -137,6 +147,7 @@ def run_all():
         print("\n提示:若测试 1/2 失败,请确认已接受 security.py 的 diff")
         print("     (在 IDE 中查看 security.py 是否含 token_type 参数)")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(run_all())

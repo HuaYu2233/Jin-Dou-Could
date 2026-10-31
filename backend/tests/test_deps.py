@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-verification-only-at-least-32-chars!!")
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
@@ -23,9 +23,16 @@ from app.models.user import User
 
 SENSITIVE_FIELDS = ("hashed_password", "security_question", "security_answer")
 REQUIRED_FIELDS = (
-    "id", "email", "username", "is_active", "is_admin",
-    "avatar_key", "storage_quota", "used_storage",
-    "created_at", "updated_at",
+    "id",
+    "email",
+    "username",
+    "is_active",
+    "is_admin",
+    "avatar_key",
+    "storage_quota",
+    "used_storage",
+    "created_at",
+    "updated_at",
 )
 
 
@@ -42,8 +49,8 @@ def _make_user(**overrides) -> User:
         "security_answer": hash_password("小花"),
         "storage_quota": 3221225472,
         "used_storage": 1024,
-        "created_at": datetime.now(timezone.utc),
-        "updated_at": datetime.now(timezone.utc),
+        "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC),
     }
     defaults.update(overrides)
     user = User()
@@ -149,6 +156,4 @@ class TestInvalidateUserCache:
             mock_redis.delete = AsyncMock()
             await invalidate_user_cache(uid)
 
-        mock_redis.delete.assert_awaited_once_with(
-            f"file_count:{uid}:all", f"file_count:{uid}:image"
-        )
+        mock_redis.delete.assert_awaited_once_with(f"file_count:{uid}:all", f"file_count:{uid}:image")

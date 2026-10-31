@@ -8,9 +8,21 @@ _CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]")
 _PATH_SEP_RE = re.compile(r"[\\/]+")
 
 ALLOWED_MIME_TYPES = {
-    "image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp", "image/svg+xml",
-    "video/mp4", "video/webm", "video/x-msvideo", "video/quicktime",
-    "audio/mpeg", "audio/wav", "audio/ogg", "audio/x-m4a", "audio/flac",
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "image/bmp",
+    "image/svg+xml",
+    "video/mp4",
+    "video/webm",
+    "video/x-msvideo",
+    "video/quicktime",
+    "audio/mpeg",
+    "audio/wav",
+    "audio/ogg",
+    "audio/x-m4a",
+    "audio/flac",
     "application/pdf",
     "application/msword",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -18,8 +30,12 @@ ALLOWED_MIME_TYPES = {
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "application/vnd.ms-powerpoint",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    "text/plain", "text/csv", "text/html",
-    "application/zip", "application/x-rar-compressed", "application/x-7z-compressed",
+    "text/plain",
+    "text/csv",
+    "text/html",
+    "application/zip",
+    "application/x-rar-compressed",
+    "application/x-7z-compressed",
     "application/octet-stream",
 }
 
@@ -50,6 +66,7 @@ def sanitize_filename(name: str) -> str:
 async def detect_real_mime_type(fileobj, declared: str) -> str:
     try:
         import magic
+
         try:
             if hasattr(fileobj, "seek"):
                 fileobj.seek(0)
@@ -72,9 +89,13 @@ async def detect_real_mime_type(fileobj, declared: str) -> str:
 def validate_mime_type(declared: str, detected: str) -> None:
     if detected not in ALLOWED_MIME_TYPES:
         raise ValidationFailed(f"不允许的文件类型: {detected}")
-    if declared and declared in ALLOWED_MIME_TYPES and declared != detected:
-        if not _is_compatible_mime(declared, detected):
-            raise ValidationFailed(f"文件类型与声明不符: 声明 {declared}, 实际 {detected}")
+    if (
+        declared
+        and declared in ALLOWED_MIME_TYPES
+        and declared != detected
+        and not _is_compatible_mime(declared, detected)
+    ):
+        raise ValidationFailed(f"文件类型与声明不符: 声明 {declared}, 实际 {detected}")
 
 
 def _is_compatible_mime(declared: str, detected: str) -> bool:

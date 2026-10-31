@@ -38,9 +38,7 @@ async def create_user(db: AsyncSession, data: UserCreate) -> User:
     return user
 
 
-async def upload_avatar(
-    db: AsyncSession, user: User, content: bytes, mime_type: str
-) -> User:
+async def upload_avatar(db: AsyncSession, user: User, content: bytes, mime_type: str) -> User:
     if len(content) > MAX_AVATAR_SIZE:
         raise PayloadTooLarge("头像大小不能超过 2MB")
     if mime_type not in ALLOWED_AVATAR_TYPES:
@@ -84,9 +82,7 @@ async def change_password(
     return user
 
 
-async def update_security_question(
-    db: AsyncSession, user: User, question: str, answer: str
-) -> User:
+async def update_security_question(db: AsyncSession, user: User, question: str, answer: str) -> User:
     if len(question.strip()) < 2:
         raise ValidationFailed("密保问题至少 2 个字符")
     if len(answer.strip()) < 1:

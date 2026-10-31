@@ -56,6 +56,7 @@ class TestSecurityModule:
         from jose import jwt
 
         from app.core.config import settings
+
         fake = jwt.encode({"sub": "u", "jti": "x"}, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
         payload = decode_token(fake)
         assert payload.get("type") != "access"
@@ -140,6 +141,7 @@ class TestAuthEndpoints:
 class TestAuthDeps:
     def test_get_client_ip_from_xff(self):
         from app.services.auth_service import get_client_ip
+
         request = MagicMock()
         request.headers = {"x-forwarded-for": "1.2.3.4, 5.6.7.8"}
         request.client = MagicMock()
@@ -148,6 +150,7 @@ class TestAuthDeps:
 
     def test_get_client_ip_from_x_real_ip(self):
         from app.services.auth_service import get_client_ip
+
         request = MagicMock()
         request.headers = {"x-real-ip": "10.0.0.1"}
         request.client = MagicMock()
@@ -156,6 +159,7 @@ class TestAuthDeps:
 
     def test_get_client_ip_fallback(self):
         from app.services.auth_service import get_client_ip
+
         request = MagicMock()
         request.headers = {}
         request.client = MagicMock()
@@ -164,6 +168,7 @@ class TestAuthDeps:
 
     def test_get_client_ip_no_client(self):
         from app.services.auth_service import get_client_ip
+
         request = MagicMock()
         request.headers = {}
         request.client = None

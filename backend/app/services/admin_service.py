@@ -13,12 +13,8 @@ from app.models.user import User
 
 async def get_stats(db: AsyncSession) -> dict:
     total_users = await db.scalar(select(func.count(User.id)))
-    active_users = await db.scalar(
-        select(func.count(User.id)).where(User.is_active == True)
-    )
-    admin_users = await db.scalar(
-        select(func.count(User.id)).where(User.is_admin == True)
-    )
+    active_users = await db.scalar(select(func.count(User.id)).where(User.is_active.is_(True)))
+    admin_users = await db.scalar(select(func.count(User.id)).where(User.is_admin.is_(True)))
     total_quota = await db.scalar(select(func.coalesce(func.sum(User.storage_quota), 0)))
     total_used = await db.scalar(select(func.coalesce(func.sum(User.used_storage), 0)))
     return {
@@ -30,12 +26,8 @@ async def get_stats(db: AsyncSession) -> dict:
     }
 
 
-async def list_users(
-    db: AsyncSession, skip: int = 0, limit: int = 20
-) -> list[User]:
-    result = await db.execute(
-        select(User).order_by(User.created_at.desc()).offset(skip).limit(limit)
-    )
+async def list_users(db: AsyncSession, skip: int = 0, limit: int = 20) -> list[User]:
+    result = await db.execute(select(User).order_by(User.created_at.desc()).offset(skip).limit(limit))
     return result.scalars().all()
 
 
@@ -57,9 +49,7 @@ async def update_user(
         raise ValidationFailed("不能取消自己的管理员权限")
 
     if target.is_admin and is_admin is False:
-        admin_count = await db.scalar(
-            select(func.count(User.id)).where(User.is_admin == True)
-        )
+        admin_count = await db.scalar(select(func.count(User.id)).where(User.is_admin.is_(True)))
         if admin_count <= 1:
             raise Conflict("系统至少保留一个管理员")
 
@@ -77,9 +67,7 @@ async def update_user(
     return target
 
 
-async def delete_user(
-    db: AsyncSession, target_id: uuid.UUID, admin_id: uuid.UUID
-) -> None:
+async def delete_user(db: AsyncSession, target_id: uuid.UUID, admin_id: uuid.UUID) -> None:
     result = await db.execute(select(User).where(User.id == target_id))
     target = result.scalar_one_or_none()
     if not target:
@@ -89,9 +77,7 @@ async def delete_user(
         raise ValidationFailed("不能删除自己")
 
     if target.is_admin:
-        admin_count = await db.scalar(
-            select(func.count(User.id)).where(User.is_admin == True)
-        )
+        admin_count = await db.scalar(select(func.count(User.id)).where(User.is_admin.is_(True)))
         if admin_count <= 1:
             raise Conflict("系统至少保留一个管理员")
 

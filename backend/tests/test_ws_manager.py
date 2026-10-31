@@ -80,15 +80,15 @@ class TestSendToUser:
 
 class TestUnwrapPayload:
     def test_own_message_is_skipped(self):
-        raw = json.dumps({"origin": ws_module._INSTANCE_ID, "payload": "{\"event\":\"x\"}"})
+        raw = json.dumps({"origin": ws_module._INSTANCE_ID, "payload": '{"event":"x"}'})
         assert ConnectionManager._unwrap_payload(raw) is None
 
     def test_foreign_message_is_unwrapped(self):
-        raw = json.dumps({"origin": "other-instance", "payload": "{\"event\":\"x\"}"})
-        assert ConnectionManager._unwrap_payload(raw) == "{\"event\":\"x\"}"
+        raw = json.dumps({"origin": "other-instance", "payload": '{"event":"x"}'})
+        assert ConnectionManager._unwrap_payload(raw) == '{"event":"x"}'
 
     def test_legacy_plain_payload_passes_through(self):
-        assert ConnectionManager._unwrap_payload("{\"event\":\"x\"}") == "{\"event\":\"x\"}"
+        assert ConnectionManager._unwrap_payload('{"event":"x"}') == '{"event":"x"}'
 
     def test_invalid_json_passes_through(self):
         assert ConnectionManager._unwrap_payload("not-json") == "not-json"
@@ -131,7 +131,7 @@ class TestListenLoopNoDuplicate:
             yield {
                 "type": "message",
                 "channel": b"ws:user:u1",
-                "data": json.dumps({"origin": "other", "payload": "{\"event\":\"x\"}"}),
+                "data": json.dumps({"origin": "other", "payload": '{"event":"x"}'}),
             }
 
         mgr._pubsub = MagicMock()

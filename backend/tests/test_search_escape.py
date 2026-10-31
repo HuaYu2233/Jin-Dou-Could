@@ -14,6 +14,7 @@
     或
     pytest tests/test_search_escape.py -v
 """
+
 import os
 import sys
 

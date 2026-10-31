@@ -20,7 +20,7 @@ def _get_cookie_from_scope(scope: Scope, name: str) -> str | None:
     for part in cookie_str.split(";"):
         part = part.strip()
         if part.startswith(f"{name}="):
-            return part[len(name) + 1:]
+            return part[len(name) + 1 :]
     return None
 
 
@@ -107,9 +107,7 @@ class CSRFMiddleware:
             cookie = f"{_CSRF_COOKIE_NAME}={token}; Path=/; SameSite=Lax"
         return cookie
 
-    async def _run_with_cookie(
-        self, scope: Scope, receive: Receive, send: Send, token: str
-    ) -> None:
+    async def _run_with_cookie(self, scope: Scope, receive: Receive, send: Send, token: str) -> None:
         inner_send = send
 
         async def send_with_cookie(message: dict) -> None:

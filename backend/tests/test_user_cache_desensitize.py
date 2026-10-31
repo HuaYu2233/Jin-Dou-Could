@@ -13,6 +13,7 @@
     或
     pytest tests/test_user_cache_desensitize.py -v
 """
+
 import os
 import sys
 
@@ -21,7 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-verification-only")
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.api.deps import (
     USER_CACHE_TTL,
@@ -33,10 +34,18 @@ from app.models.user import User
 
 SENSITIVE_FIELDS = ("hashed_password", "security_question", "security_answer")
 REQUIRED_FIELDS = (
-    "id", "email", "username", "is_active", "is_admin",
-    "avatar_key", "storage_quota", "used_storage",
-    "created_at", "updated_at",
+    "id",
+    "email",
+    "username",
+    "is_active",
+    "is_admin",
+    "avatar_key",
+    "storage_quota",
+    "used_storage",
+    "created_at",
+    "updated_at",
 )
+
 
 def _make_fake_user() -> User:
     user = User()
@@ -51,9 +60,10 @@ def _make_fake_user() -> User:
     user.security_answer = "$2b$12$FAKE_ANSWER_HASH_SHOULD_NOT_LEAK"
     user.storage_quota = 3221225472
     user.used_storage = 1024
-    user.created_at = datetime.now(timezone.utc)
-    user.updated_at = datetime.now(timezone.utc)
+    user.created_at = datetime.now(UTC)
+    user.updated_at = datetime.now(UTC)
     return user
+
 
 def _assert(condition: bool, message: str) -> bool:
     if condition:
@@ -62,10 +72,12 @@ def _assert(condition: bool, message: str) -> bool:
     print(f"  ❌ {message}")
     return False
 
+
 def test_serialize_excludes_sensitive_fields():
     print("\n[测试 1] 序列化结果不含敏感字段")
     user = _make_fake_user()
     import json
+
     data = json.loads(_serialize_user(user))
     leaked = [f for f in SENSITIVE_FIELDS if f in data]
     return _assert(
@@ -73,16 +85,19 @@ def test_serialize_excludes_sensitive_fields():
         f"无敏感字段泄露 (泄露字段: {leaked or '无'})",
     )
 
+
 def test_serialize_keeps_required_fields():
     print("\n[测试 2] 序列化结果保留鉴权必需字段")
     user = _make_fake_user()
     import json
+
     data = json.loads(_serialize_user(user))
     missing = [f for f in REQUIRED_FIELDS if f not in data]
     return _assert(
         not missing,
         f"必需字段齐全 (缺失: {missing or '无'})",
     )
+
 
 def test_deserialize_sensitive_fields_are_none():
     print("\n[测试 3] 反序列化后敏感字段为 None(防御性)")
@@ -91,10 +106,13 @@ def test_deserialize_sensitive_fields_are_none():
     restored = _deserialize_user(cached)
     results = [
         _assert(restored.hashed_password is None, f"hashed_password is None (实际: {restored.hashed_password!r})"),
-        _assert(restored.security_question is None, f"security_question is None (实际: {restored.security_question!r})"),
+        _assert(
+            restored.security_question is None, f"security_question is None (实际: {restored.security_question!r})"
+        ),
         _assert(restored.security_answer is None, f"security_answer is None (实际: {restored.security_answer!r})"),
     ]
     return all(results)
+
 
 def test_deserialize_preserves_required_fields():
     print("\n[测试 4] 反序列化后必需字段正确还原")
@@ -112,6 +130,7 @@ def test_deserialize_preserves_required_fields():
     ]
     return all(_assert(c, m) for c, m in checks)
 
+
 def test_invalidate_cache_helper_exists():
     print("\n[测试 5] invalidate_user_cache helper 存在且可调用")
     return _assert(
@@ -119,12 +138,14 @@ def test_invalidate_cache_helper_exists():
         f"invalidate_user_cache 是可调用对象 (类型: {type(invalidate_user_cache).__name__})",
     )
 
+
 def test_cache_ttl_is_reasonable():
     print("\n[测试 6] 缓存 TTL 合理(>0 且 ≤300)")
     return _assert(
         0 < USER_CACHE_TTL <= 300,
         f"USER_CACHE_TTL={USER_CACHE_TTL}s (合理范围 1-300)",
     )
+
 
 def run_all():
     print("=" * 60)
@@ -152,6 +173,6 @@ def run_all():
     print("\n提示:若测试 1/3 失败,请确认已接受 deps.py 的脱敏 diff")
     return 1
 
+
 if __name__ == "__main__":
     sys.exit(run_all())
-    

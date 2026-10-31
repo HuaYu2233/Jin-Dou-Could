@@ -96,13 +96,9 @@ class RequestLoggingMiddleware:
         )
 
         if duration_ms > SLOW_REQUEST_THRESHOLD_MS:
-            logger.bind(**bind_data).warning(
-                f"SLOW {method} {path} {status_code} {duration_ms}ms"
-            )
+            logger.bind(**bind_data).warning(f"SLOW {method} {path} {status_code} {duration_ms}ms")
         else:
-            logger.bind(**bind_data).info(
-                f"{method} {path} {status_code} {duration_ms}ms"
-            )
+            logger.bind(**bind_data).info(f"{method} {path} {status_code} {duration_ms}ms")
 
     @staticmethod
     async def _send_fallback_500(send: Send, request_id: str, correlation_id: str | None) -> None:

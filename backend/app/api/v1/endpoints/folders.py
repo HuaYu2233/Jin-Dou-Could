@@ -1,4 +1,3 @@
-# /Users/zero/project/JinDou-Cloud/backend/app/api/v1/endpoints/folders.py
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -20,16 +19,16 @@ from app.services import folder_service
 
 router = APIRouter()
 
+
 @router.post("", response_model=FolderResponse)
 async def create_folder(
     body: FolderCreateRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    folder = await folder_service.create_folder(
-        db, current_user.id, body.name, body.parent_id
-    )
+    folder = await folder_service.create_folder(db, current_user.id, body.name, body.parent_id)
     return folder
+
 
 @router.get("", response_model=FolderListResponse)
 async def list_folder_contents(
@@ -39,15 +38,14 @@ async def list_folder_contents(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    result = await folder_service.list_folder_contents(
-        db, current_user.id, folder_id, skip, limit
-    )
+    result = await folder_service.list_folder_contents(db, current_user.id, folder_id, skip, limit)
     return {
         "folders": [FolderResponse.model_validate(f) for f in result["folders"]],
         "files": [FileResponse.model_validate(f) for f in result["files"]],
         "breadcrumbs": result["breadcrumbs"],
         "total_files": result["total_files"],
     }
+
 
 @router.put("/{folder_id}", response_model=FolderResponse)
 async def rename_folder(
@@ -61,6 +59,7 @@ async def rename_folder(
         raise HTTPException(status_code=404, detail="文件夹不存在")
     return folder
 
+
 @router.delete("/{folder_id}")
 async def delete_folder(
     folder_id: UUID,
@@ -73,6 +72,7 @@ async def delete_folder(
     await invalidate_user_cache(current_user.id)
     return {"message": "文件夹已移入回收站"}
 
+
 @router.get("/trash", response_model=FolderTrashListResponse)
 async def list_trash_folders(
     skip: int = Query(0, ge=0),
@@ -80,13 +80,12 @@ async def list_trash_folders(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    folders, total = await folder_service.list_trash_folders(
-        db, current_user.id, skip, limit
-    )
+    folders, total = await folder_service.list_trash_folders(db, current_user.id, skip, limit)
     return {
         "items": [FolderTrashResponse.model_validate(f) for f in folders],
         "total": total,
     }
+
 
 @router.post("/{folder_id}/restore")
 async def restore_folder(
@@ -99,6 +98,7 @@ async def restore_folder(
         raise HTTPException(status_code=404, detail="文件夹不存在或不在回收站")
     await invalidate_user_cache(current_user.id)
     return {"message": "文件夹已恢复"}
+
 
 @router.delete("/{folder_id}/purge")
 async def purge_folder(

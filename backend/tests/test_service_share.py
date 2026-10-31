@@ -58,6 +58,7 @@ class TestShareRateLimitLogic:
             mock_redis.exists = AsyncMock(return_value=True)
             mock_redis.ttl = AsyncMock(return_value=600)
             from app.services.share_service import check_share_rate_limit
+
             with pytest.raises(RateLimited, match="过多"):
                 await check_share_rate_limit("some-token")
 
@@ -66,6 +67,7 @@ class TestShareRateLimitLogic:
         with patch("app.services.share_service.redis_client") as mock_redis:
             mock_redis.exists = AsyncMock(return_value=False)
             from app.services.share_service import check_share_rate_limit
+
             await check_share_rate_limit("some-token")
 
     @pytest.mark.asyncio
@@ -76,6 +78,7 @@ class TestShareRateLimitLogic:
             mock_redis.setex = AsyncMock()
             mock_redis.delete = AsyncMock()
             from app.services.share_service import record_share_verify_failure
+
             await record_share_verify_failure("some-token")
             mock_redis.incr.assert_called_once()
 
@@ -87,6 +90,7 @@ class TestShareRateLimitLogic:
             mock_redis.setex = AsyncMock()
             mock_redis.delete = AsyncMock()
             from app.services.share_service import record_share_verify_failure
+
             await record_share_verify_failure("some-token")
             mock_redis.setex.assert_called_once()
             mock_redis.delete.assert_called_once()
@@ -96,5 +100,6 @@ class TestShareRateLimitLogic:
         with patch("app.services.share_service.redis_client") as mock_redis:
             mock_redis.delete = AsyncMock()
             from app.services.share_service import clear_share_verify_attempts
+
             await clear_share_verify_attempts("some-token")
             mock_redis.delete.assert_called_once()

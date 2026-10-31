@@ -48,6 +48,29 @@ line-length = 120
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
 ignore = ["E501"]
+allowed-confusables = ["，", "（", "）", "：", "？", "！"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Body",
+    "fastapi.Header",
+    "fastapi.Cookie",
+    "fastapi.Form",
+    "fastapi.File",
+    "fastapi.Security",
+    "fastapi.params.Depends",
+    "fastapi.params.Query",
+    "fastapi.params.Path",
+    "fastapi.params.Body",
+    "fastapi.params.Header",
+    "fastapi.params.Cookie",
+    "fastapi.params.Form",
+    "fastapi.params.File",
+    "fastapi.params.Security",
+]
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]

@@ -193,10 +193,12 @@ async def upload_stream_multipart(
                     PartNumber=part_number,
                     Body=chunk,
                 )
-                parts.append({
-                    "PartNumber": part_number,
-                    "ETag": part_resp["ETag"],
-                })
+                parts.append(
+                    {
+                        "PartNumber": part_number,
+                        "ETag": part_resp["ETag"],
+                    }
+                )
                 part_number += 1
 
             if parts:

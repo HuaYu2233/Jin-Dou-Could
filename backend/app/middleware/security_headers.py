@@ -48,9 +48,7 @@ class SecurityHeadersMiddleware:
 
                 scheme = scope.get("scheme", "http")
                 if settings.ENVIRONMENT == "production" and scheme == "https":
-                    hdrs[b"strict-transport-security"] = (
-                        b"max-age=63072000; includeSubDomains; preload"
-                    )
+                    hdrs[b"strict-transport-security"] = b"max-age=63072000; includeSubDomains; preload"
 
                 csp = (
                     f"default-src 'self'; "
