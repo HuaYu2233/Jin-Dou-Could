@@ -20,7 +20,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-os.environ.setdefault("SECRET_KEY", "test-secret-key-for-verification-only")
+from tests._env import setup_env
+
+setup_env()
 
 
 def _escape_like_keyword(keyword: str) -> str:

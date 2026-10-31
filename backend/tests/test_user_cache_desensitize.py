@@ -19,9 +19,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-os.environ.setdefault("SECRET_KEY", "test-secret-key-for-verification-only")
-os.environ.setdefault("MINIO_ACCESS_KEY", "test-access-key")
-os.environ.setdefault("MINIO_SECRET_KEY", "test-secret-key")
+from tests._env import setup_env
+
+setup_env()
 
 import uuid
 from datetime import UTC, datetime

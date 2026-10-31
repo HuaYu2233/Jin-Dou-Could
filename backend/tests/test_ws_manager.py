@@ -3,7 +3,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-os.environ.setdefault("SECRET_KEY", "test-secret-key-for-verification-only-at-least-32-chars!!")
+from tests._env import setup_env
+
+setup_env()
 
 import json
 from unittest.mock import AsyncMock, MagicMock, patch

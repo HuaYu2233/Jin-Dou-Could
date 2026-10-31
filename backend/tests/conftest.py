@@ -6,14 +6,9 @@ from uuid import uuid4
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-os.environ.setdefault("SECRET_KEY", "test-secret-key-for-verification-only-at-least-32-chars!!")
-os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/test_db")
-os.environ.setdefault("REDIS_URL", "redis://localhost:6379/15")
-os.environ.setdefault("MINIO_ACCESS_KEY", "test-access-key")
-os.environ.setdefault("MINIO_SECRET_KEY", "test-secret-key")
-os.environ.setdefault("ENVIRONMENT", "test")
-os.environ.setdefault("CSRF_ENABLED", "false")
-os.environ.setdefault("TRUSTED_PROXIES", "127.0.0.1,testclient")
+from tests._env import setup_env
+
+setup_env()
 
 import pytest
 from httpx import ASGITransport, AsyncClient
