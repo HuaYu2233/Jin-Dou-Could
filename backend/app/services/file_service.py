@@ -68,9 +68,11 @@ async def detect_real_mime_type(fileobj, declared: str) -> str:
     try:
         import magic
         try:
-            await fileobj.seek(0)
-            head = await fileobj.read(2048)
-            await fileobj.seek(0)
+            if hasattr(fileobj, "seek"):
+                fileobj.seek(0)
+            head = fileobj.read(2048)
+            if hasattr(fileobj, "seek"):
+                fileobj.seek(0)
         except Exception:
             head = None
         if head:
@@ -133,15 +135,18 @@ async def create_file(
         raise ValueError("存储空间不足")
 
     filename = sanitize_filename(filename)
-    real_mime = detect_real_mime_type(fileobj, mime_type)
+    real_mime = await detect_real_mime_type(fileobj, mime_type)
     validate_mime_type(mime_type, real_mime)
     mime_type = real_mime
+
+    if hasattr(fileobj, "seek"):
+        fileobj.seek(0)
 
     file_id = uuid.uuid4()
     storage_key = f"{owner.id}/{file_id}"
 
     if size is None:
-        actual_size = await stream_upload_unknown_size(storage_key, fileobj, mime_type)
+        actual_size = await _stream_upload_unknown_size(storage_key, fileobj, mime_type)
         if owner.used_storage + actual_size > owner.storage_quota:
             from app.core.storage import delete_file as _delete
             await _delete(storage_key)
@@ -176,6 +181,70 @@ async def create_file(
             pass
 
     return file
+
+async def _stream_upload_unknown_size(storage_key: str, fileobj, mime_type: str) -> int:
+    from app.core.storage import get_s3_client
+
+    cs = settings.UPLOAD_CHUNK_SIZE
+    async with get_s3_client() as client:
+        resp = await client.create_multipart_upload(
+            Bucket=settings.MINIO_BUCKET,
+            Key=storage_key,
+            ContentType=mime_type,
+        )
+        upload_id = resp["UploadId"]
+
+        parts = []
+        part_number = 1
+        total = 0
+        try:
+            while True:
+                chunk = fileobj.read(cs) if callable(getattr(fileobj, "read", None)) else await fileobj.read(cs)
+                if not chunk:
+                    break
+                if isinstance(chunk, str):
+                    chunk = chunk.encode("utf-8")
+                part_resp = await client.upload_part(
+                    Bucket=settings.MINIO_BUCKET,
+                    Key=storage_key,
+                    UploadId=upload_id,
+                    PartNumber=part_number,
+                    Body=chunk,
+                )
+                parts.append({
+                    "PartNumber": part_number,
+                    "ETag": part_resp["ETag"],
+                })
+                part_number += 1
+                total += len(chunk)
+
+            if not parts:
+                await client.abort_multipart_upload(
+                    Bucket=settings.MINIO_BUCKET,
+                    Key=storage_key,
+                    UploadId=upload_id,
+                )
+                raise ValueError("空文件")
+
+            await client.complete_multipart_upload(
+                Bucket=settings.MINIO_BUCKET,
+                Key=storage_key,
+                UploadId=upload_id,
+                MultipartUpload={"Parts": parts},
+            )
+        except Exception:
+            try:
+                await client.abort_multipart_upload(
+                    Bucket=settings.MINIO_BUCKET,
+                    Key=storage_key,
+                    UploadId=upload_id,
+                )
+            except Exception:
+                pass
+            raise
+
+    return total
+
 
 async def get_file(
     db: AsyncSession, file_id: uuid.UUID, owner_id: uuid.UUID

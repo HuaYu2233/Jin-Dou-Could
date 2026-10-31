@@ -119,6 +119,14 @@ async def _cleanup_orphan_multipart_uploads() -> None:
 
 app = FastAPI(title="Cloud Drive API", lifespan=lifespan)
 
+
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(request, exc):
+    import traceback
+    from fastapi.responses import JSONResponse
+    logger.error(f"未处理异常: {exc}\n{traceback.format_exc()}")
+    return JSONResponse(status_code=500, content={"detail": "服务器内部错误"})
+
 if settings.PROMETHEUS_ENABLED:
     from prometheus_fastapi_instrumentator import Instrumentator
     Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)

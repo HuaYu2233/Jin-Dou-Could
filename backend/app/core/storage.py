@@ -221,7 +221,7 @@ async def upload_stream_multipart(
             while uploaded < total_size:
                 remaining = total_size - uploaded
                 read_len = min(cs, remaining)
-                chunk = await stream.read(read_len)
+                chunk = stream.read(read_len) if callable(getattr(stream, "read", None)) else await stream.read(read_len)
                 if not chunk:
                     break
                 if isinstance(chunk, str):

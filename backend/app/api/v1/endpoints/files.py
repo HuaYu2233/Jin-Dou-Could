@@ -53,6 +53,11 @@ async def upload_file(
         filename = file.filename or "unknown"
         declared_size = file.size
 
+        await file.seek(0)
+        fileobj = file.file
+        if hasattr(fileobj, "seek"):
+            fileobj.seek(0)
+
         if declared_size is not None:
             try:
                 await file_service.prepare_upload(current_user, declared_size, mime_type, filename)
@@ -63,7 +68,7 @@ async def upload_file(
 
         try:
             file_record = await file_service.create_file(
-                db, current_user, filename, file, mime_type, declared_size, folder_id
+                db, current_user, filename, fileobj, mime_type, declared_size, folder_id
             )
         except ValueError as e:
             msg = str(e)
