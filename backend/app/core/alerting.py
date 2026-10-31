@@ -1,12 +1,13 @@
 import asyncio
-import json
 import threading
 import time
 import traceback
 import urllib.request
-from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
 from loguru import logger
+
 from app.core.config import settings
 from app.core.webhook import build_webhook_payload
 

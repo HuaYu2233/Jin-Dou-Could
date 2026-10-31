@@ -1,7 +1,9 @@
 import smtplib
-from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
 from loguru import logger
+
 from app.core.celery_app import celery_app
 from app.core.config import settings
 from app.core.smtp import resolve_smtp

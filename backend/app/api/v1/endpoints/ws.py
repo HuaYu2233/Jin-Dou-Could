@@ -1,9 +1,11 @@
 import asyncio
 import json
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from loguru import logger
+
 from app.core.security import decode_token
 from app.core.ws_manager import ws_manager
-from loguru import logger
 
 router = APIRouter()
 

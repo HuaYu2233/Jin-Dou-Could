@@ -1,23 +1,25 @@
-from contextlib import asynccontextmanager
 import asyncio
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from loguru import logger
 from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
+
 from app.api.v1.api import api_router
 from app.api.v1.endpoints import health
-from app.core.storage import init_s3_clients, ensure_bucket, close_s3_clients
-from app.core.redis import close_redis, close_redis_pubsub, redis_client
-from app.core.ws_manager import ws_manager
-from app.db.base import dispose_engine
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import setup_logging
+from app.core.redis import close_redis, close_redis_pubsub, redis_client
+from app.core.storage import close_s3_clients, ensure_bucket, init_s3_clients
+from app.core.ws_manager import ws_manager
+from app.db.base import dispose_engine
+from app.middleware.csrf import CSRFMiddleware
+from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.request_logging import RequestLoggingMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
-from app.middleware.rate_limit import RateLimitMiddleware
-from app.middleware.csrf import CSRFMiddleware
-from loguru import logger
 
 
 def _check_production_security() -> None:
@@ -126,6 +128,7 @@ register_exception_handlers(app)
 @app.exception_handler(Exception)
 async def _unhandled_exception_handler(request, exc):
     import traceback
+
     from fastapi.responses import JSONResponse
     logger.error(f"未处理异常: {exc}\n{traceback.format_exc()}")
     return JSONResponse(status_code=500, content={"detail": "服务器内部错误"})

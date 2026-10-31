@@ -1,5 +1,7 @@
 import io
+
 from loguru import logger
+
 from app.core.celery_app import celery_app
 from app.core.config import settings
 
@@ -68,9 +70,10 @@ def generate_thumbnail(self, storage_key: str, file_id: str) -> str | None:
 
 def _update_thumbnail_key(file_id: str, thumb_key: str) -> None:
     try:
+        from sqlalchemy import update
+
         from app.db.base import sync_session_factory
         from app.models.file import File
-        from sqlalchemy import update
 
         with sync_session_factory() as session:
             stmt = update(File).where(File.id == file_id).values(thumbnail_key=thumb_key)

@@ -1,18 +1,18 @@
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-verification-only-at-least-32-chars!!")
 
-import pytest
 from unittest.mock import AsyncMock, patch
-from starlette.testclient import TestClient
-from app.main import app
-from app.core.security import create_access_token
-from app.models.user import User
-from app.core.security import hash_password
 from uuid import uuid4
+
+from starlette.testclient import TestClient
+
+from app.core.security import hash_password
+from app.main import app
+from app.models.user import User
 
 
 def _make_user(**overrides) -> User:
@@ -122,7 +122,7 @@ class TestShareEndpoints:
 
     def test_public_share_info_not_found(self):
         with patch("app.api.deps.redis_client") as mock_redis, \
-             patch("app.db.base.engine") as mock_engine:
+             patch("app.db.base.engine"):
             mock_redis.get = AsyncMock(return_value=None)
             mock_redis.exists = AsyncMock(return_value=False)
             client = TestClient(app, raise_server_exceptions=False)

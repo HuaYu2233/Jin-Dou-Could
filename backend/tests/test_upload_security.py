@@ -17,21 +17,23 @@
     或
     pytest tests/test_upload_security.py -v
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-verification-only")
 
 import io
+
 from app.core.exceptions import AppError
 from app.services.file_validation import (
-    sanitize_filename,
-    detect_real_mime_type,
-    validate_mime_type,
     ALLOWED_MIME_TYPES,
+    detect_real_mime_type,
+    sanitize_filename,
+    validate_mime_type,
 )
+
 
 def _assert(condition: bool, message: str) -> bool:
     if condition:

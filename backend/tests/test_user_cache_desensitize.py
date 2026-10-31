@@ -13,8 +13,8 @@
     或
     pytest tests/test_user_cache_desensitize.py -v
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -22,13 +22,14 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-for-verification-only")
 
 import uuid
 from datetime import datetime, timezone
-from app.models.user import User
+
 from app.api.deps import (
-    _serialize_user,
-    _deserialize_user,
-    invalidate_user_cache,
     USER_CACHE_TTL,
+    _deserialize_user,
+    _serialize_user,
+    invalidate_user_cache,
 )
+from app.models.user import User
 
 SENSITIVE_FIELDS = ("hashed_password", "security_question", "security_answer")
 REQUIRED_FIELDS = (

@@ -1,8 +1,9 @@
 import time
-from starlette.types import ASGIApp, Receive, Scope, Send
-from starlette.requests import Request
-from starlette.responses import Response, JSONResponse
+
 from loguru import logger
+from starlette.responses import JSONResponse
+from starlette.types import ASGIApp, Receive, Scope, Send
+
 from app.core.config import settings
 from app.core.redis import redis_client
 

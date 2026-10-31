@@ -14,8 +14,8 @@
     或
     pytest tests/test_token_type.py -v
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -26,6 +26,7 @@ from app.core.security import (
     create_refresh_token,
     decode_token,
 )
+
 
 def _assert(condition: bool, message: str) -> bool:
     if condition:
@@ -73,6 +74,7 @@ def test_tokens_carry_sub_and_jti():
 def test_token_with_no_type_is_rejected_by_logic():
     print("\n[测试 5] 无 type 字段的伪造 token 应被业务逻辑拒绝")
     from jose import jwt
+
     from app.core.config import settings
     fake_token = jwt.encode(
         {"sub": "user-789", "jti": "fake-jti"},

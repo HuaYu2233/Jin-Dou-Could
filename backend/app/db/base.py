@@ -1,8 +1,8 @@
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy import create_engine as _create_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import sessionmaker
+
 from app.core.config import settings
-from app.db.base_class import Base
 
 _pool_size = settings.DB_POOL_SIZE
 _max_overflow = settings.DB_MAX_OVERFLOW

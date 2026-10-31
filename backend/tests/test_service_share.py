@@ -1,21 +1,20 @@
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-verification-only-at-least-32-chars!!")
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
-from datetime import datetime, timedelta, timezone
 
 from app.core.exceptions import RateLimited
 from app.services.share_service import (
-    _generate_token,
-    _generate_code,
-    SHARE_VERIFY_MAX_ATTEMPTS,
     SHARE_VERIFY_LOCK_SECONDS,
+    SHARE_VERIFY_MAX_ATTEMPTS,
+    _generate_code,
+    _generate_token,
 )
 
 

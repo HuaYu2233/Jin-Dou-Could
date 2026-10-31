@@ -1,9 +1,11 @@
 import asyncio
 import time
+
 from sqlalchemy import text
-from app.db.base import engine
-from app.core.storage import get_s3_client
+
 from app.core.redis import ping_redis
+from app.core.storage import get_s3_client
+from app.db.base import engine
 
 
 async def check_postgres() -> dict:

@@ -1,7 +1,9 @@
 import re
-from pydantic import BaseModel, EmailStr, field_validator
-from uuid import UUID
 from datetime import datetime
+from uuid import UUID
+
+from pydantic import BaseModel, EmailStr, field_validator
+
 
 def _validate_password_complexity(v: str) -> str:
     if len(v) < 8:

@@ -2,8 +2,10 @@ import json
 import time
 import uuid
 from contextvars import ContextVar
-from starlette.types import ASGIApp, Receive, Scope, Send
+
 from loguru import logger
+from starlette.types import ASGIApp, Receive, Scope, Send
+
 from app.core.security import decode_token
 
 SLOW_REQUEST_THRESHOLD_MS = 3000

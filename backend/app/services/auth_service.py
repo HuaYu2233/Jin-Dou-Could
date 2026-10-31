@@ -1,18 +1,18 @@
 from fastapi import Request, Response
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from app.models.user import User
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.config import settings
+from app.core.exceptions import RateLimited, Unauthorized
+from app.core.redis import redis_client
 from app.core.security import (
-    verify_password,
     create_access_token,
     create_refresh_token,
     decode_token,
     revoke_token,
+    verify_password,
 )
-from app.core.redis import redis_client
-from app.core.config import settings
-from app.core.exceptions import RateLimited, Unauthorized
-
+from app.models.user import User
 
 _TRUSTED_PROXIES: set[str] | None = None
 

@@ -1,22 +1,24 @@
 from uuid import UUID
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query, Request
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.api.deps import get_current_user, invalidate_user_cache
-from app.db.base import get_db
-from app.models.user import User
-from app.services import file_service, file_multipart
-from app.schemas.file import (
-    FileResponse,
-    FileListResponse,
-    FileUploadResponse,
-    FileMoveRequest,
-    MultipartInitRequest,
-    MultipartInitResponse,
-    MultipartCompleteRequest,
-)
-from app.core.ws_manager import ws_manager
 from app.core.config import settings
 from app.core.redis import redis_client
+from app.core.ws_manager import ws_manager
+from app.db.base import get_db
+from app.models.user import User
+from app.schemas.file import (
+    FileListResponse,
+    FileMoveRequest,
+    FileResponse,
+    FileUploadResponse,
+    MultipartCompleteRequest,
+    MultipartInitRequest,
+    MultipartInitResponse,
+)
+from app.services import file_multipart, file_service
 
 router = APIRouter()
 
@@ -59,7 +61,7 @@ async def upload_file(
             fileobj.seek(0)
 
         if declared_size is not None:
-            await file_service.prepare_upload(current_user, declared_size, mime_type, filename)
+            await file_service.prepare_upload(current_user, declared_size)
 
         file_record = await file_service.create_file(
             db, current_user, filename, fileobj, mime_type, declared_size, folder_id
@@ -241,7 +243,7 @@ async def multipart_init(
 ):
     await _acquire_concurrent_slot(current_user.id, "upload", settings.MAX_CONCURRENT_UPLOADS)
 
-    await file_service.prepare_upload(current_user, body.total_size, body.mime_type, body.filename)
+    await file_service.prepare_upload(current_user, body.total_size)
 
     part_size = settings.UPLOAD_PART_SIZE
     total_parts = (body.total_size + part_size - 1) // part_size

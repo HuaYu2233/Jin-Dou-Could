@@ -1,8 +1,11 @@
 # /Users/zero/project/JinDou-Cloud/backend/app/schemas/folder.py
-from pydantic import BaseModel
-from uuid import UUID
 from datetime import datetime
+from uuid import UUID
+
+from pydantic import BaseModel
+
 from app.schemas.file import FileResponse
+
 
 class FolderCreateRequest(BaseModel):
     name: str

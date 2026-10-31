@@ -1,9 +1,12 @@
 import uuid
-import bcrypt
-from pathlib import Path
 from datetime import datetime, timedelta, timezone
-from jose import jwt, JWTError
+from pathlib import Path
+
+import bcrypt
+from jose import JWTError, jwt
+
 from app.core.config import settings
+
 
 # ========== 密码 ==========
 def hash_password(password: str) -> str:

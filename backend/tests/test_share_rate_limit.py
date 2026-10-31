@@ -11,8 +11,8 @@
     cd /Users/zero/project/JinDou-Cloud/backend
     uv run python -m tests.test_share_rate_limit
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

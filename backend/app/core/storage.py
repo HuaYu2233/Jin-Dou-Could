@@ -1,13 +1,15 @@
 import asyncio
 import inspect
-import aiobotocore.session
-from botocore.config import Config
-from app.core.config import settings
-from app.core.exceptions import PayloadTooLarge
+import io
 from contextlib import asynccontextmanager
 from urllib.parse import quote
+
+import aiobotocore.session
+from botocore.config import Config
 from loguru import logger
-import io
+
+from app.core.config import settings
+from app.core.exceptions import PayloadTooLarge
 
 _s3_config = Config(
     signature_version="s3v4",

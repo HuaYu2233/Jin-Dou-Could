@@ -1,5 +1,7 @@
 import urllib.request
+
 from loguru import logger
+
 from app.core.celery_app import celery_app
 from app.core.config import settings
 from app.core.webhook import build_webhook_payload

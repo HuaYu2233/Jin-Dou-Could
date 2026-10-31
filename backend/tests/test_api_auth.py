@@ -1,15 +1,16 @@
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-verification-only-at-least-32-chars!!")
 
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
+
 from starlette.testclient import TestClient
-from app.main import app
+
 from app.core.security import create_access_token, create_refresh_token, decode_token, hash_password, verify_password
+from app.main import app
 
 
 class TestSecurityModule:
@@ -53,6 +54,7 @@ class TestSecurityModule:
 
     def test_token_without_type_rejected_by_logic(self):
         from jose import jwt
+
         from app.core.config import settings
         fake = jwt.encode({"sub": "u", "jti": "x"}, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
         payload = decode_token(fake)

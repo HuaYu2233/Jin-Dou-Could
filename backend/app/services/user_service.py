@@ -1,10 +1,11 @@
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from app.models.user import User
-from app.core.security import hash_password, verify_password, hash_security_answer, revoke_token
+
 from app.core.config import settings
-from app.core.storage import upload_file, get_presigned_download_url
 from app.core.exceptions import Conflict, Forbidden, PayloadTooLarge, ValidationFailed
+from app.core.security import hash_password, hash_security_answer, revoke_token, verify_password
+from app.core.storage import get_presigned_download_url, upload_file
+from app.models.user import User
 from app.schemas.user import UserCreate
 
 ALLOWED_AVATAR_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}

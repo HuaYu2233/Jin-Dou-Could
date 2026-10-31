@@ -1,25 +1,27 @@
 import uuid
 from datetime import datetime, timezone
+
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from app.models.file import File
-from app.models.user import User
-from app.core.storage import (
-    upload_fileobj,
-    upload_stream_multipart,
-    delete_file,
-    get_presigned_download_url,
-    get_presigned_preview_url,
-)
+
 from app.core.config import settings
 from app.core.exceptions import PayloadTooLarge
 from app.core.redis import redis_client
+from app.core.storage import (
+    delete_file,
+    get_presigned_download_url,
+    get_presigned_preview_url,
+    upload_fileobj,
+    upload_stream_multipart,
+)
+from app.models.file import File
+from app.models.user import User
 from app.services import storage_accounting
 from app.services.file_validation import (
-    sanitize_filename,
-    detect_real_mime_type,
-    validate_mime_type,
     categorize_file_type,
+    detect_real_mime_type,
+    sanitize_filename,
+    validate_mime_type,
 )
 
 _COUNT_CACHE_TTL = 120
@@ -396,9 +398,7 @@ async def recalculate_used_storage(
     return await storage_accounting.recalculate(db, owner_id)
 
 
-async def prepare_upload(
-    user: User, file_size: int, declared_mime: str, filename: str
-) -> None:
+async def prepare_upload(user: User, file_size: int) -> None:
     if file_size > settings.MAX_UPLOAD_SIZE:
         raise PayloadTooLarge("文件过大，单文件上限 100MB")
     storage_accounting.ensure_quota(user, file_size)

@@ -1,11 +1,14 @@
 import uuid
+
 from loguru import logger
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from app.models.user import User
-from app.models.file import File
-from app.core.storage import delete_file as s3_delete_file, batch_delete_files
+
 from app.core.exceptions import Conflict, NotFound, ValidationFailed
+from app.core.storage import batch_delete_files
+from app.core.storage import delete_file as s3_delete_file
+from app.models.file import File
+from app.models.user import User
 
 
 async def get_stats(db: AsyncSession) -> dict:

@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Request
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.api.deps import get_current_user, get_full_user, invalidate_user_cache
 from app.db.base import get_db
 from app.models.user import User
-from app.schemas.user import UserResponse, ProfileUpdate, PasswordChange, SecurityQuestionUpdate
+from app.schemas.user import PasswordChange, ProfileUpdate, SecurityQuestionUpdate, UserResponse
 from app.services import user_service
 
 router = APIRouter()

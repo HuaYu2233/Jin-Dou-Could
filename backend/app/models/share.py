@@ -2,10 +2,13 @@
 # /Users/zero/project/JinDou-Cloud/backend/app/models/share.py
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Integer, DateTime, ForeignKey, func, Index
+
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
+
 from app.db.base_class import Base
+
 
 class Share(Base):
     __tablename__ = "shares"

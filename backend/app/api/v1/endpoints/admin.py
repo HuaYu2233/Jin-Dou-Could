@@ -1,10 +1,12 @@
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.deps import get_current_admin, invalidate_user_cache
 from app.db.base import get_db
 from app.models.user import User
-from app.api.deps import get_current_admin, invalidate_user_cache
-from app.schemas.user import UserListItem, UserUpdate, AdminStats
+from app.schemas.user import AdminStats, UserListItem, UserUpdate
 from app.services import admin_service, file_service
 
 router = APIRouter()

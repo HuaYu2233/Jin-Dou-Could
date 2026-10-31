@@ -1,6 +1,7 @@
 from celery import Celery
-from app.core.config import settings
 from loguru import logger
+
+from app.core.config import settings
 
 
 def _build_celery_url(base_url: str, db: int) -> str:

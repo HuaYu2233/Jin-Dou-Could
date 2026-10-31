@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends
+
 from app.api.deps import get_current_admin
-from app.models.user import User
 from app.core.celery_app import celery_app
+from app.models.user import User
 
 router = APIRouter()
 

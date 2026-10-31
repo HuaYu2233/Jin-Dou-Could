@@ -1,28 +1,23 @@
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-verification-only-at-least-32-chars!!")
 
-import pytest
 import io
-from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
-from datetime import datetime, timezone
 
-from app.services.file_validation import (
-    sanitize_filename,
-    detect_real_mime_type,
-    validate_mime_type,
-    categorize_file_type,
-    ALLOWED_MIME_TYPES,
-    _FILENAME_MAX_LEN,
-)
+import pytest
+
 from app.core.exceptions import ValidationFailed
-from app.models.user import User
-from app.models.file import File
-from app.core.security import hash_password
+from app.services.file_validation import (
+    _FILENAME_MAX_LEN,
+    ALLOWED_MIME_TYPES,
+    categorize_file_type,
+    detect_real_mime_type,
+    sanitize_filename,
+    validate_mime_type,
+)
 
 
 class TestSanitizeFilename:

@@ -1,28 +1,26 @@
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-verification-only-at-least-32-chars!!")
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
-from app.core.exceptions import PayloadTooLarge, ValidationFailed
+import pytest
 
+from app.core.exceptions import PayloadTooLarge, ValidationFailed
+from app.core.security import hash_password, verify_password
+from app.models.user import User
 from app.services.user_service import (
-    create_user,
-    upload_avatar,
-    update_profile,
-    change_password,
-    update_security_question,
     ALLOWED_AVATAR_TYPES,
     MAX_AVATAR_SIZE,
+    change_password,
+    update_profile,
+    update_security_question,
+    upload_avatar,
 )
-from app.models.user import User
-from app.schemas.user import UserCreate
-from app.core.security import hash_password, verify_password
 
 
 def _make_user(**overrides) -> User:

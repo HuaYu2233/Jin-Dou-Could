@@ -1,16 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.base import get_db
-from app.schemas.user import UserCreate, UserLogin, UserResponse
-from app.schemas.token import LoginResponse
 from app.schemas.reset_password import (
     ForgotPasswordRequest,
     ResetPasswordRequest,
     SecurityQuestionRequest,
     SecurityResetRequest,
 )
-from app.services.user_service import create_user
+from app.schemas.token import LoginResponse
+from app.schemas.user import UserCreate, UserLogin, UserResponse
 from app.services import auth_service, reset_password_service
+from app.services.user_service import create_user
 
 router = APIRouter()
 

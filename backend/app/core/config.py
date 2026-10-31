@@ -1,6 +1,8 @@
-from pydantic_settings import BaseSettings
-from pydantic import field_validator
 from functools import lru_cache
+
+from pydantic import field_validator
+from pydantic_settings import BaseSettings
+
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://clouduser:cloudpass123@db:5432/clouddrive"

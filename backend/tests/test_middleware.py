@@ -1,13 +1,14 @@
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-verification-only-at-least-32-chars!!")
 
-import pytest
 from unittest.mock import AsyncMock, patch
+
 from starlette.testclient import TestClient
+
 from app.main import app
 
 

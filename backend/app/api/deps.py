@@ -1,14 +1,16 @@
 import json
 from datetime import datetime
 from uuid import UUID
+
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.redis import redis_client
+from app.core.security import decode_token
 from app.db.base import get_db
 from app.models.user import User
-from app.core.security import decode_token
-from app.core.redis import redis_client
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
@@ -54,6 +56,12 @@ async def invalidate_user_cache(user_id: UUID | str) -> None:
     pipe.delete(f"user:{uid}")
     pipe.delete(f"trash_count:{uid}")
     await pipe.execute()
+    try:
+        from app.services.file_service import invalidate_file_caches
+
+        await invalidate_file_caches(user_id)
+    except Exception:
+        pass
     try:
         keys = []
         async for key in redis_client.scan_iter(match=f"file_count:{uid}:*", count=100):

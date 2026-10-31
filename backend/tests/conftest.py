@@ -1,6 +1,6 @@
-import sys
-import os
 import asyncio
+import os
+import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
@@ -16,13 +16,11 @@ os.environ.setdefault("CSRF_ENABLED", "false")
 os.environ.setdefault("TRUSTED_PROXIES", "127.0.0.1,testclient")
 
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
+
+from app.core.security import create_access_token, hash_password
 from app.main import app
-from app.core.security import create_access_token, create_refresh_token, hash_password
 from app.models.user import User
-from app.models.file import File
-from app.models.folder import Folder
-from app.models.share import Share
 
 
 @pytest.fixture(scope="session")

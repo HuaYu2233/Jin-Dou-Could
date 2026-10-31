@@ -1,5 +1,7 @@
 from pydantic import BaseModel, EmailStr, field_validator
+
 from app.schemas.user import _validate_password_complexity
+
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr

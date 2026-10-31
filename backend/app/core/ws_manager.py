@@ -1,8 +1,10 @@
 import json
 from datetime import datetime, timezone
 from uuid import uuid4
-from loguru import logger
+
 from fastapi import WebSocket
+from loguru import logger
+
 from app.core.config import settings
 
 _WS_CHANNEL_PREFIX = "ws:user:"

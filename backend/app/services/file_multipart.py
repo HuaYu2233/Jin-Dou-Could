@@ -2,16 +2,17 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.file import File
-from app.models.user import User
 from app.core.config import settings
 from app.core.exceptions import NotFound, PayloadTooLarge, ValidationFailed
 from app.core.redis import redis_client
 from app.core.storage import (
+    abort_multipart,
+    complete_multipart,
     create_multipart,
     upload_part,
-    complete_multipart,
 )
+from app.models.file import File
+from app.models.user import User
 from app.services import storage_accounting
 from app.services.file_validation import categorize_file_type, sanitize_filename
 
@@ -157,3 +158,4 @@ async def abort_multipart_upload(
     if state and state.get("storage_key") != storage_key:
         raise ValidationFailed("storage_key 与上传会话不匹配")
     await redis_client.delete(state_key)
+    await abort_multipart(storage_key, upload_id)
