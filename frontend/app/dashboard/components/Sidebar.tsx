@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { CategoryId, StorageInfo } from "../types";
 import { useTransferStore } from "@/stores/transfers";
 import { useTranslation, type TranslationKey } from "@/lib/i18n";
+import { formatSize } from "@/lib/utils/format";
 import styles from "./Sidebar.module.css";
 
 interface NavItem {
@@ -31,11 +32,6 @@ interface SidebarProps {
   onCategoryChange: (id: CategoryId) => void;
   storage: StorageInfo;
   isAdmin?: boolean;
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
 export default function Sidebar({ activeCategory, onCategoryChange, storage, isAdmin }: SidebarProps) {

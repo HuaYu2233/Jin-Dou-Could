@@ -1,5 +1,6 @@
 import { useAuthStore } from "@/stores/auth";
 import { API_BASE_URL } from "@/lib/config";
+import { refreshAccessToken } from "./refresh";
 
 type FetchOptions = RequestInit & { skipAuth?: boolean };
 
@@ -53,7 +54,7 @@ export async function client<T>(endpoint: string, options: FetchOptions = {}): P
   }
 
   if (res.status === 401 && !options.skipAuth) {
-    const refreshed = await tryRefreshToken();
+    const refreshed = await refreshAccessToken();
     if (refreshed) {
       const retryRes = await fetch(`${API_BASE_URL}${endpoint}`, {
         ...rest,
@@ -76,21 +77,4 @@ export async function client<T>(endpoint: string, options: FetchOptions = {}): P
   }
 
   return res.json();
-}
-
-let refreshPromise: Promise<boolean> | null = null;
-
-async function tryRefreshToken(): Promise<boolean> {
-  if (!refreshPromise) {
-    refreshPromise = fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
-      method: "POST",
-      credentials: "include",
-    })
-      .then((r) => r.ok)
-      .catch(() => false)
-      .finally(() => {
-        refreshPromise = null;
-      });
-  }
-  return refreshPromise;
 }

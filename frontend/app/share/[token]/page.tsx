@@ -10,6 +10,7 @@ import {
   type ShareInfo,
 } from "@/lib/api/files";
 import { queryKeys } from "@/lib/query/keys";
+import { formatSize } from "@/lib/utils/format";
 
 export default function SharePage() {
   const params = useParams();
@@ -49,13 +50,6 @@ export default function SharePage() {
     } finally {
       setDownloading(false);
     }
-  }
-
-  function formatSize(bytes: number) {
-    if (bytes < 1024) return bytes + " B";
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-    return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB";
   }
 
   if (loading) {

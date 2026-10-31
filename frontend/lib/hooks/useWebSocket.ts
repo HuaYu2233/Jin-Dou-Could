@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNotificationStore } from "@/stores/notifications";
 import { queryKeys } from "@/lib/query/keys";
 import { API_BASE_URL } from "@/lib/config";
+import { refreshAccessToken } from "@/lib/api/refresh";
 
 interface WsMessage {
   event: string;
@@ -24,18 +25,6 @@ function getToken(): string | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(/(?:^|;\s*)access_token=([^;]*)/);
   return match ? match[1] : null;
-}
-
-async function tryRefreshToken(): Promise<boolean> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
-      method: "POST",
-      credentials: "include",
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
 }
 
 export function useWebSocket() {
@@ -100,7 +89,7 @@ export function useWebSocket() {
         const doReconnect = async () => {
           reconnectRef.current += 1;
           if (!getToken()) {
-            const refreshed = await tryRefreshToken();
+            const refreshed = await refreshAccessToken();
             if (!refreshed) return;
           }
           connectRef.current();
