@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 from datetime import datetime, timezone
 
-from app.services.file_service import (
+from app.services.file_validation import (
     sanitize_filename,
     detect_real_mime_type,
     validate_mime_type,

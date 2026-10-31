@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user, invalidate_user_cache
 from app.db.base import get_db
 from app.models.user import User
-from app.services import file_service
+from app.services import file_service, file_multipart
 from app.schemas.file import (
     FileResponse,
     FileListResponse,
@@ -73,7 +73,7 @@ async def upload_file(
             "file_type": file_record.file_type,
         })
         await ws_manager.send_to_user(str(current_user.id), "storage:changed", {
-            "used_storage": current_user.used_storage + file_record.size,
+            "used_storage": current_user.used_storage,
             "storage_quota": current_user.storage_quota,
         })
 
@@ -241,16 +241,12 @@ async def multipart_init(
 ):
     await _acquire_concurrent_slot(current_user.id, "upload", settings.MAX_CONCURRENT_UPLOADS)
 
-    if current_user.used_storage + body.total_size > current_user.storage_quota:
-        raise HTTPException(status_code=413, detail="存储空间不足")
-    if body.total_size > settings.MAX_UPLOAD_SIZE:
-        raise HTTPException(status_code=413, detail="文件过大")
+    await file_service.prepare_upload(current_user, body.total_size, body.mime_type, body.filename)
 
-    from app.core.config import settings as s
-    part_size = s.UPLOAD_PART_SIZE
+    part_size = settings.UPLOAD_PART_SIZE
     total_parts = (body.total_size + part_size - 1) // part_size
 
-    result = await file_service.init_multipart_upload(
+    result = await file_multipart.init_multipart_upload(
         owner=current_user,
         filename=body.filename,
         mime_type=body.mime_type,
@@ -276,7 +272,7 @@ async def multipart_upload_part(
     current_user: User = Depends(get_current_user),
 ):
     data = await part.read()
-    etag = await file_service.upload_multipart_part(
+    etag = await file_multipart.upload_multipart_part(
         storage_key=storage_key,
         upload_id=upload_id,
         part_number=part_number,
@@ -293,7 +289,7 @@ async def multipart_complete(
     current_user: User = Depends(get_current_user),
 ):
     parts = [{"PartNumber": p.part_number, "ETag": p.etag} for p in body.parts]
-    file_record = await file_service.complete_multipart_upload(
+    file_record = await file_multipart.complete_multipart_upload(
         db=db,
         owner=current_user,
         upload_id=body.upload_id,
@@ -313,7 +309,7 @@ async def multipart_complete(
         "file_type": file_record.file_type,
     })
     await ws_manager.send_to_user(str(current_user.id), "storage:changed", {
-        "used_storage": current_user.used_storage + file_record.size,
+        "used_storage": current_user.used_storage,
         "storage_quota": current_user.storage_quota,
     })
 
@@ -326,7 +322,7 @@ async def multipart_abort(
     upload_id: str = Query(...),
     current_user: User = Depends(get_current_user),
 ):
-    await file_service.abort_multipart_upload(
+    await file_multipart.abort_multipart_upload(
         storage_key=storage_key,
         upload_id=upload_id,
         owner_id=current_user.id,

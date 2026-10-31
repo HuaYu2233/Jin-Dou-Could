@@ -26,7 +26,7 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-for-verification-only")
 
 import io
 from app.core.exceptions import AppError
-from app.services.file_service import (
+from app.services.file_validation import (
     sanitize_filename,
     detect_real_mime_type,
     validate_mime_type,
