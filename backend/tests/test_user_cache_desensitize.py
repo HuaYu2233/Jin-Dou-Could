@@ -9,9 +9,9 @@
 
 运行方式:
     cd /Users/zero/project/JinDou-Cloud/backend
-    python -m tests.test_user_cache_desensitize
-    或
     pytest tests/test_user_cache_desensitize.py -v
+    或
+    python -m tests.test_user_cache_desensitize
 """
 
 import os
@@ -20,6 +20,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-verification-only")
+os.environ.setdefault("MINIO_ACCESS_KEY", "test-access-key")
+os.environ.setdefault("MINIO_SECRET_KEY", "test-secret-key")
 
 import uuid
 from datetime import UTC, datetime
@@ -65,53 +67,33 @@ def _make_fake_user() -> User:
     return user
 
 
-def _assert(condition: bool, message: str) -> bool:
-    if condition:
-        print(f"  ✅ {message}")
-        return True
-    print(f"  ❌ {message}")
-    return False
-
-
 def test_serialize_excludes_sensitive_fields():
     print("\n[测试 1] 序列化结果不含敏感字段")
-    user = _make_fake_user()
     import json
 
+    user = _make_fake_user()
     data = json.loads(_serialize_user(user))
     leaked = [f for f in SENSITIVE_FIELDS if f in data]
-    return _assert(
-        not leaked,
-        f"无敏感字段泄露 (泄露字段: {leaked or '无'})",
-    )
+    assert not leaked, f"无敏感字段泄露 (泄露字段: {leaked or '无'})"
 
 
 def test_serialize_keeps_required_fields():
     print("\n[测试 2] 序列化结果保留鉴权必需字段")
-    user = _make_fake_user()
     import json
 
+    user = _make_fake_user()
     data = json.loads(_serialize_user(user))
     missing = [f for f in REQUIRED_FIELDS if f not in data]
-    return _assert(
-        not missing,
-        f"必需字段齐全 (缺失: {missing or '无'})",
-    )
+    assert not missing, f"必需字段齐全 (缺失: {missing or '无'})"
 
 
 def test_deserialize_sensitive_fields_are_none():
     print("\n[测试 3] 反序列化后敏感字段为 None(防御性)")
     user = _make_fake_user()
-    cached = _serialize_user(user)
-    restored = _deserialize_user(cached)
-    results = [
-        _assert(restored.hashed_password is None, f"hashed_password is None (实际: {restored.hashed_password!r})"),
-        _assert(
-            restored.security_question is None, f"security_question is None (实际: {restored.security_question!r})"
-        ),
-        _assert(restored.security_answer is None, f"security_answer is None (实际: {restored.security_answer!r})"),
-    ]
-    return all(results)
+    restored = _deserialize_user(_serialize_user(user))
+    assert restored.hashed_password is None, f"hashed_password is None (实际: {restored.hashed_password!r})"
+    assert restored.security_question is None, f"security_question is None (实际: {restored.security_question!r})"
+    assert restored.security_answer is None, f"security_answer is None (实际: {restored.security_answer!r})"
 
 
 def test_deserialize_preserves_required_fields():
@@ -128,26 +110,23 @@ def test_deserialize_preserves_required_fields():
         (restored.storage_quota == user.storage_quota, "storage_quota 一致"),
         (restored.used_storage == user.used_storage, "used_storage 一致"),
     ]
-    return all(_assert(c, m) for c, m in checks)
+    failed = [m for ok, m in checks if not ok]
+    assert not failed, f"必需字段还原一致 (不一致: {failed or '无'})"
 
 
 def test_invalidate_cache_helper_exists():
     print("\n[测试 5] invalidate_user_cache helper 存在且可调用")
-    return _assert(
-        callable(invalidate_user_cache),
-        f"invalidate_user_cache 是可调用对象 (类型: {type(invalidate_user_cache).__name__})",
+    assert callable(invalidate_user_cache), (
+        f"invalidate_user_cache 是可调用对象 (类型: {type(invalidate_user_cache).__name__})"
     )
 
 
 def test_cache_ttl_is_reasonable():
     print("\n[测试 6] 缓存 TTL 合理(>0 且 ≤300)")
-    return _assert(
-        0 < USER_CACHE_TTL <= 300,
-        f"USER_CACHE_TTL={USER_CACHE_TTL}s (合理范围 1-300)",
-    )
+    assert 0 < USER_CACHE_TTL <= 300, f"USER_CACHE_TTL={USER_CACHE_TTL}s (合理范围 1-300)"
 
 
-def run_all():
+def run_all() -> int:
     print("=" * 60)
     print("阶段四:用户缓存脱敏验证")
     print("=" * 60)
@@ -161,7 +140,16 @@ def run_all():
         test_cache_ttl_is_reasonable,
     ]
 
-    results = [t() for t in tests]
+    results = []
+    for test in tests:
+        try:
+            test()
+        except AssertionError as exc:
+            print(f"  ❌ {test.__name__}: {exc}")
+            results.append(False)
+        else:
+            results.append(True)
+
     passed = sum(results)
     total = len(results)
 
