@@ -12,11 +12,9 @@ from app.core.storage import (
     get_presigned_preview_url,
 )
 from app.core.config import settings
-from app.core.exceptions import (
-    PayloadTooLarge,
-    QuotaExceeded,
-)
+from app.core.exceptions import PayloadTooLarge
 from app.core.redis import redis_client
+from app.services import storage_accounting
 from app.services.file_validation import (
     sanitize_filename,
     detect_real_mime_type,
@@ -49,8 +47,8 @@ async def create_file(
     size: int | None,
     folder_id: uuid.UUID | None = None,
 ) -> File:
-    if size is not None and owner.used_storage + size > owner.storage_quota:
-        raise QuotaExceeded("存储空间不足")
+    if size is not None:
+        storage_accounting.ensure_quota(owner, size)
 
     filename = sanitize_filename(filename)
     real_mime = await detect_real_mime_type(fileobj, mime_type)
@@ -67,9 +65,9 @@ async def create_file(
         actual_size = await upload_stream_multipart(
             storage_key, fileobj, mime_type, max_size=settings.MAX_UPLOAD_SIZE
         )
-        if owner.used_storage + actual_size > owner.storage_quota:
+        if not storage_accounting.has_room(owner, actual_size):
             await delete_file(storage_key)
-            raise QuotaExceeded("存储空间不足")
+            storage_accounting.ensure_quota(owner, actual_size)
         size = actual_size
     elif size >= settings.MULTIPART_THRESHOLD:
         await upload_stream_multipart(storage_key, fileobj, mime_type, size)
@@ -87,7 +85,7 @@ async def create_file(
         file_type=categorize_file_type(mime_type),
     )
 
-    owner.used_storage += size
+    storage_accounting.add(owner, size)
     db.add(file)
     await db.commit()
     await db.refresh(file)
@@ -344,11 +342,7 @@ async def soft_delete_file(
     if not file:
         return False
     file.deleted_at = datetime.now(timezone.utc)
-
-    owner_result = await db.execute(select(User).where(User.id == owner_id))
-    owner = owner_result.scalar_one_or_none()
-    if owner:
-        owner.used_storage = max(0, owner.used_storage - file.size)
+    await storage_accounting.adjust(db, owner_id, -file.size)
 
     await db.commit()
     return True
@@ -367,11 +361,7 @@ async def restore_file(
     if not file:
         return False
     file.deleted_at = None
-
-    owner_result = await db.execute(select(User).where(User.id == owner_id))
-    owner = owner_result.scalar_one_or_none()
-    if owner:
-        owner.used_storage += file.size
+    await storage_accounting.adjust(db, owner_id, file.size, enforce_quota=True)
 
     await db.commit()
     return True
@@ -403,22 +393,7 @@ async def purge_file(
 async def recalculate_used_storage(
     db: AsyncSession, owner_id: uuid.UUID
 ) -> int:
-    result = await db.execute(
-        select(func.coalesce(func.sum(File.size), 0)).where(
-            File.owner_id == owner_id,
-            File.deleted_at.is_(None),
-        )
-    )
-    actual = result.scalar_one()
-
-    owner_result = await db.execute(select(User).where(User.id == owner_id))
-    owner = owner_result.scalar_one_or_none()
-    if owner and owner.used_storage != actual:
-        owner.used_storage = actual
-        await db.commit()
-        await db.refresh(owner)
-
-    return actual
+    return await storage_accounting.recalculate(db, owner_id)
 
 
 async def prepare_upload(
@@ -426,8 +401,7 @@ async def prepare_upload(
 ) -> None:
     if file_size > settings.MAX_UPLOAD_SIZE:
         raise PayloadTooLarge("文件过大，单文件上限 100MB")
-    if user.used_storage + file_size > user.storage_quota:
-        raise QuotaExceeded("存储空间不足，请联系管理员扩容")
+    storage_accounting.ensure_quota(user, file_size)
 
 
 async def get_preview_url(file: File) -> str:

@@ -12,6 +12,7 @@ from app.core.storage import (
     upload_part,
     complete_multipart,
 )
+from app.services import storage_accounting
 from app.services.file_validation import categorize_file_type, sanitize_filename
 
 _UPLOAD_STATE_TTL = 86400
@@ -131,7 +132,7 @@ async def complete_multipart_upload(
         file_type=categorize_file_type(mime_type),
     )
 
-    owner.used_storage += total_size
+    storage_accounting.add(owner, total_size)
     db.add(file)
     await db.commit()
     await db.refresh(file)

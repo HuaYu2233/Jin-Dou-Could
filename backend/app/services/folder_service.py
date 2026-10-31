@@ -5,9 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update
 from app.models.folder import Folder
 from app.models.file import File
-from app.models.user import User
 from app.core.storage import delete_file as s3_delete_file, batch_delete_files
-from app.core.exceptions import Conflict, NotFound, QuotaExceeded
+from app.core.exceptions import Conflict, NotFound
+from app.services import storage_accounting
 
 
 async def create_folder(
@@ -133,10 +133,7 @@ async def delete_folder(
     )
 
     if total_size > 0:
-        owner_result = await db.execute(select(User).where(User.id == owner_id))
-        owner = owner_result.scalar_one_or_none()
-        if owner:
-            owner.used_storage = max(0, owner.used_storage - total_size)
+        await storage_accounting.adjust(db, owner_id, -total_size)
 
     await db.commit()
     return True
@@ -207,12 +204,7 @@ async def restore_folder(
     )
 
     if total_size > 0:
-        owner_result = await db.execute(select(User).where(User.id == owner_id))
-        owner = owner_result.scalar_one_or_none()
-        if owner:
-            if owner.used_storage + total_size > owner.storage_quota:
-                raise QuotaExceeded("存储空间不足，无法恢复文件夹")
-            owner.used_storage += total_size
+        await storage_accounting.adjust(db, owner_id, total_size, enforce_quota=True)
 
     await db.commit()
     return True
