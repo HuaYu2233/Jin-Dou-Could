@@ -59,22 +59,11 @@ async def upload_file(
             fileobj.seek(0)
 
         if declared_size is not None:
-            try:
-                await file_service.prepare_upload(current_user, declared_size, mime_type, filename)
-            except ValueError as e:
-                if "过大" in str(e) or "不足" in str(e):
-                    raise HTTPException(status_code=413, detail=str(e))
-                raise HTTPException(status_code=400, detail=str(e))
+            await file_service.prepare_upload(current_user, declared_size, mime_type, filename)
 
-        try:
-            file_record = await file_service.create_file(
-                db, current_user, filename, fileobj, mime_type, declared_size, folder_id
-            )
-        except ValueError as e:
-            msg = str(e)
-            if "过大" in msg or "不足" in msg:
-                raise HTTPException(status_code=413, detail=msg)
-            raise HTTPException(status_code=400, detail=msg)
+        file_record = await file_service.create_file(
+            db, current_user, filename, fileobj, mime_type, declared_size, folder_id
+        )
         await invalidate_user_cache(current_user.id)
 
         await ws_manager.send_to_user(str(current_user.id), "upload:complete", {

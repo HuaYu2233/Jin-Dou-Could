@@ -18,6 +18,12 @@ from app.core.storage import (
     abort_multipart,
 )
 from app.core.config import settings
+from app.core.exceptions import (
+    NotFound,
+    PayloadTooLarge,
+    QuotaExceeded,
+    ValidationFailed,
+)
 from app.core.redis import redis_client
 
 _FILENAME_MAX_LEN = 255
@@ -88,10 +94,10 @@ async def detect_real_mime_type(fileobj, declared: str) -> str:
 
 def validate_mime_type(declared: str, detected: str) -> None:
     if detected not in ALLOWED_MIME_TYPES:
-        raise ValueError(f"不允许的文件类型: {detected}")
+        raise ValidationFailed(f"不允许的文件类型: {detected}")
     if declared and declared in ALLOWED_MIME_TYPES and declared != detected:
         if not _is_compatible_mime(declared, detected):
-            raise ValueError(f"文件类型与声明不符: 声明 {declared}, 实际 {detected}")
+            raise ValidationFailed(f"文件类型与声明不符: 声明 {declared}, 实际 {detected}")
 
 
 def _is_compatible_mime(declared: str, detected: str) -> bool:
@@ -132,7 +138,7 @@ async def create_file(
     folder_id: uuid.UUID | None = None,
 ) -> File:
     if size is not None and owner.used_storage + size > owner.storage_quota:
-        raise ValueError("存储空间不足")
+        raise QuotaExceeded("存储空间不足")
 
     filename = sanitize_filename(filename)
     real_mime = await detect_real_mime_type(fileobj, mime_type)
@@ -152,7 +158,7 @@ async def create_file(
         if owner.used_storage + actual_size > owner.storage_quota:
             from app.core.storage import delete_file as _delete
             await _delete(storage_key)
-            raise ValueError("存储空间不足")
+            raise QuotaExceeded("存储空间不足")
         size = actual_size
     elif size >= settings.MULTIPART_THRESHOLD:
         await upload_stream_multipart(storage_key, fileobj, mime_type, size)
@@ -508,9 +514,9 @@ async def prepare_upload(
     user: User, file_size: int, declared_mime: str, filename: str
 ) -> None:
     if file_size > settings.MAX_UPLOAD_SIZE:
-        raise ValueError("文件过大，单文件上限 100MB")
+        raise PayloadTooLarge("文件过大，单文件上限 100MB")
     if user.used_storage + file_size > user.storage_quota:
-        raise ValueError("存储空间不足，请联系管理员扩容")
+        raise QuotaExceeded("存储空间不足，请联系管理员扩容")
 
 
 async def get_preview_url(file: File) -> str:
@@ -577,14 +583,14 @@ async def upload_multipart_part(
     state_key = f"multipart:{owner_id}:{upload_id}"
     state = await redis_client.hgetall(state_key)
     if not state:
-        raise ValueError("上传会话不存在或已过期，请重新初始化上传")
+        raise NotFound("上传会话不存在或已过期，请重新初始化上传")
 
     if state.get("storage_key") != storage_key:
-        raise ValueError("storage_key 与上传会话不匹配")
+        raise ValidationFailed("storage_key 与上传会话不匹配")
 
     max_part_size = settings.UPLOAD_PART_SIZE * 2
     if len(data) > max_part_size:
-        raise ValueError(f"分片大小超过限制（最大 {max_part_size // (1024*1024)}MB）")
+        raise PayloadTooLarge(f"分片大小超过限制（最大 {max_part_size // (1024*1024)}MB）")
 
     etag = await upload_part(storage_key, upload_id, part_number, data)
 
@@ -609,7 +615,7 @@ async def complete_multipart_upload(
 
     if not state:
         if not parts:
-            raise ValueError("上传会话不存在或已过期")
+            raise NotFound("上传会话不存在或已过期")
         file_id = uuid.uuid4()
         storage_key = storage_key or f"{owner.id}/{file_id}"
     else:
@@ -630,7 +636,7 @@ async def complete_multipart_upload(
                     parts.append({"PartNumber": i, "ETag": etag})
 
     if not parts:
-        raise ValueError("没有已上传的分片")
+        raise ValidationFailed("没有已上传的分片")
 
     parts.sort(key=lambda p: p["PartNumber"])
     await complete_multipart(storage_key, upload_id, parts)
@@ -671,6 +677,6 @@ async def abort_multipart_upload(
     state_key = f"multipart:{owner_id}:{upload_id}"
     state = await redis_client.hgetall(state_key)
     if state and state.get("storage_key") != storage_key:
-        raise ValueError("storage_key 与上传会话不匹配")
+        raise ValidationFailed("storage_key 与上传会话不匹配")
     await redis_client.delete(state_key)
     await abort_multipart(storage_key, upload_id)

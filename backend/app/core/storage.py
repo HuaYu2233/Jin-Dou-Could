@@ -3,6 +3,7 @@ import inspect
 import aiobotocore.session
 from botocore.config import Config
 from app.core.config import settings
+from app.core.exceptions import PayloadTooLarge
 from contextlib import asynccontextmanager
 from urllib.parse import quote
 from loguru import logger
@@ -182,7 +183,7 @@ async def upload_stream_multipart(
                     break
                 uploaded += len(chunk)
                 if max_size is not None and uploaded > max_size:
-                    raise ValueError("文件过大，超出允许的单文件上限")
+                    raise PayloadTooLarge("文件过大，超出允许的单文件上限")
                 part_resp = await client.upload_part(
                     Bucket=settings.MINIO_BUCKET,
                     Key=storage_key,

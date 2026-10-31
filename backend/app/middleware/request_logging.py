@@ -1,12 +1,10 @@
+import json
 import time
 import uuid
 from contextvars import ContextVar
 from starlette.types import ASGIApp, Receive, Scope, Send
-from starlette.requests import Request
-from starlette.responses import Response
 from loguru import logger
 from app.core.security import decode_token
-from app.core.config import settings
 
 SLOW_REQUEST_THRESHOLD_MS = 3000
 
@@ -48,10 +46,12 @@ class RequestLoggingMiddleware:
 
         status_code_holder = [500]
         exc_holder = [None]
+        response_started = [False]
 
         async def send_with_logging(message: dict) -> None:
             if message["type"] == "http.response.start":
                 status_code_holder[0] = message.get("status", 500)
+                response_started[0] = True
                 headers_list = list(message.get("headers", []))
                 headers_list.append((b"X-Request-ID", request_id.encode("latin-1")))
                 if incoming_request_id:
@@ -75,7 +75,9 @@ class RequestLoggingMiddleware:
                 user_id=user_id,
                 client_ip=client_ip,
             ).exception(f"{method} {path} 500 {duration_ms}ms")
-            raise
+            if not response_started[0]:
+                await self._send_fallback_500(send, request_id, incoming_request_id)
+            return
 
         duration_ms = round((time.perf_counter() - start) * 1000, 2)
         status_code = status_code_holder[0]
@@ -99,3 +101,16 @@ class RequestLoggingMiddleware:
             logger.bind(**bind_data).info(
                 f"{method} {path} {status_code} {duration_ms}ms"
             )
+
+    @staticmethod
+    async def _send_fallback_500(send: Send, request_id: str, correlation_id: str | None) -> None:
+        body = json.dumps({"detail": "服务器内部错误"}, ensure_ascii=False).encode("utf-8")
+        headers = [
+            (b"content-type", b"application/json; charset=utf-8"),
+            (b"content-length", str(len(body)).encode("latin-1")),
+            (b"X-Request-ID", request_id.encode("latin-1")),
+        ]
+        if correlation_id:
+            headers.append((b"X-Correlation-ID", correlation_id.encode("latin-1")))
+        await send({"type": "http.response.start", "status": 500, "headers": headers})
+        await send({"type": "http.response.body", "body": body})

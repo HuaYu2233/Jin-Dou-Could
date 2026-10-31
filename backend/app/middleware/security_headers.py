@@ -1,7 +1,5 @@
 import secrets
 from starlette.types import ASGIApp, Receive, Scope, Send
-from starlette.requests import Request
-from starlette.responses import Response
 from app.core.config import settings
 
 _API_PATHS = ("/api/", "/health", "/docs", "/openapi.json", "/redoc")

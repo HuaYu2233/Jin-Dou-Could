@@ -5,6 +5,7 @@ from sqlalchemy import select, func
 from app.models.user import User
 from app.models.file import File
 from app.core.storage import delete_file as s3_delete_file, batch_delete_files
+from app.core.exceptions import Conflict, NotFound, ValidationFailed
 
 
 async def get_stats(db: AsyncSession) -> dict:
@@ -47,17 +48,17 @@ async def update_user(
     result = await db.execute(select(User).where(User.id == target_id))
     target = result.scalar_one_or_none()
     if not target:
-        raise ValueError("用户不存在")
+        raise NotFound("用户不存在")
 
     if target.id == admin_id and is_admin is False:
-        raise ValueError("不能取消自己的管理员权限")
+        raise ValidationFailed("不能取消自己的管理员权限")
 
     if target.is_admin and is_admin is False:
         admin_count = await db.scalar(
             select(func.count(User.id)).where(User.is_admin == True)
         )
         if admin_count <= 1:
-            raise ValueError("系统至少保留一个管理员")
+            raise Conflict("系统至少保留一个管理员")
 
     if username is not None:
         target.username = username
@@ -79,17 +80,17 @@ async def delete_user(
     result = await db.execute(select(User).where(User.id == target_id))
     target = result.scalar_one_or_none()
     if not target:
-        raise ValueError("用户不存在")
+        raise NotFound("用户不存在")
 
     if target.id == admin_id:
-        raise ValueError("不能删除自己")
+        raise ValidationFailed("不能删除自己")
 
     if target.is_admin:
         admin_count = await db.scalar(
             select(func.count(User.id)).where(User.is_admin == True)
         )
         if admin_count <= 1:
-            raise ValueError("系统至少保留一个管理员")
+            raise Conflict("系统至少保留一个管理员")
 
     files_result = await db.execute(select(File.storage_key).where(File.owner_id == target_id))
     storage_keys = [row[0] for row in files_result.all()]

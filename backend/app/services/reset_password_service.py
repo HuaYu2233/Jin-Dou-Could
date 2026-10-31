@@ -6,6 +6,7 @@ from app.core.config import settings
 from app.core.redis import redis_client
 from app.core.security import hash_password, verify_security_answer
 from app.models.user import User
+from app.core.exceptions import NotFound, RateLimited, ValidationFailed
 from app.services.email_service import send_verification_code_async
 
 CODE_KEY = "reset_password_code:{email}"
@@ -22,7 +23,7 @@ async def send_code(db: AsyncSession, email: str) -> None:
 
     limit_key = SEND_LIMIT_KEY.format(email=email)
     if await redis_client.exists(limit_key):
-        raise ValueError("请求过于频繁，请稍后再试")
+        raise RateLimited("请求过于频繁，请稍后再试")
     await redis_client.setex(limit_key, 60, "1")
 
     code = _generate_code()
@@ -37,12 +38,12 @@ async def reset_password(db: AsyncSession, email: str, code: str, new_password: 
     key = CODE_KEY.format(email=email)
     stored = await redis_client.get(key)
     if not stored or stored != code:
-        raise ValueError("验证码错误或已过期")
+        raise ValidationFailed("验证码错误或已过期")
 
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
     if not user:
-        raise ValueError("用户不存在")
+        raise NotFound("用户不存在")
 
     user.hashed_password = hash_password(new_password)
     await db.commit()
@@ -64,12 +65,12 @@ async def reset_password_by_security(
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
     if not user:
-        raise ValueError("用户不存在")
+        raise NotFound("用户不存在")
     if not user.security_question or not user.security_answer:
-        raise ValueError("未设置密保问题")
+        raise ValidationFailed("未设置密保问题")
 
     if not verify_security_answer(answer, user.security_answer):
-        raise ValueError("密保答案错误")
+        raise ValidationFailed("密保答案错误")
 
     user.hashed_password = hash_password(new_password)
     await db.commit()

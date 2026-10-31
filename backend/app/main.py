@@ -11,6 +11,7 @@ from app.core.redis import close_redis, close_redis_pubsub, redis_client
 from app.core.ws_manager import ws_manager
 from app.db.base import dispose_engine
 from app.core.config import settings
+from app.core.exceptions import register_exception_handlers
 from app.core.logging import setup_logging
 from app.middleware.request_logging import RequestLoggingMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
@@ -119,6 +120,8 @@ async def _cleanup_orphan_multipart_uploads() -> None:
 
 app = FastAPI(title="Cloud Drive API", lifespan=lifespan)
 
+register_exception_handlers(app)
+
 
 @app.exception_handler(Exception)
 async def _unhandled_exception_handler(request, exc):
@@ -173,6 +176,9 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With", "Range", "Origin", "X-CSRF-Token"],
     expose_headers=["Content-Disposition", "Content-Length", "Content-Range", "Accept-Ranges"],
 )
+
+# 请求日志与 X-Request-ID（最外层，覆盖全部中间件与路由）
+app.add_middleware(RequestLoggingMiddleware)
 
 app.include_router(api_router, prefix="/api/v1")
 app.include_router(health.router, tags=["health"])

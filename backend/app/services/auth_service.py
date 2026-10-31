@@ -11,6 +11,7 @@ from app.core.security import (
 )
 from app.core.redis import redis_client
 from app.core.config import settings
+from app.core.exceptions import RateLimited, Unauthorized
 
 
 _TRUSTED_PROXIES: set[str] | None = None
@@ -48,7 +49,7 @@ async def check_login_rate_limit(client_ip: str, email: str) -> None:
     lock_key = f"login_lock:{client_ip}:{email}"
     if await redis_client.exists(lock_key):
         ttl = await redis_client.ttl(lock_key)
-        raise ValueError(f"登录尝试过于频繁，请 {max(ttl, 1)} 秒后再试")
+        raise RateLimited(f"登录尝试过于频繁，请 {max(ttl, 1)} 秒后再试")
 
 
 async def record_login_failure(client_ip: str, email: str) -> None:
@@ -118,20 +119,20 @@ async def logout(request: Request, response: Response) -> None:
 async def refresh_access_token(request: Request, response: Response) -> None:
     refresh = request.cookies.get("refresh_token")
     if not refresh:
-        raise ValueError("无 refresh token")
+        raise Unauthorized("无 refresh token")
     payload = decode_token(refresh)
     if not payload or not payload.get("sub"):
-        raise ValueError("Invalid refresh token")
+        raise Unauthorized("Invalid refresh token")
     if payload.get("type") != "refresh":
-        raise ValueError("Token 类型错误，请使用 refresh token")
+        raise Unauthorized("Token 类型错误，请使用 refresh token")
     jti = payload.get("jti")
     if jti and await redis_client.exists(f"token_blacklist:{jti}"):
-        raise ValueError("Refresh token 已失效")
+        raise Unauthorized("Refresh token 已失效")
 
     family = payload.get("family")
     if family and await redis_client.exists(f"refresh_reuse:{family}"):
         await _revoke_family(family)
-        raise ValueError("检测到 Refresh Token 重用，该 Token 族已全部撤销，请重新登录")
+        raise Unauthorized("检测到 Refresh Token 重用，该 Token 族已全部撤销，请重新登录")
 
     if not family:
         family = str(__import__("uuid").uuid4())
@@ -172,5 +173,4 @@ async def _revoke_family(family: str) -> None:
     )
     user_id = await redis_client.get(f"refresh_family:{family}")
     if user_id:
-        prefix = f"refresh_family:*"
         await redis_client.delete(f"refresh_family:{family}")

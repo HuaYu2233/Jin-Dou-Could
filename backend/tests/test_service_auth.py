@@ -9,6 +9,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
+from app.core.exceptions import RateLimited
 from app.services.auth_service import (
     get_client_ip,
     check_login_rate_limit,
@@ -69,7 +70,7 @@ class TestCheckLoginRateLimit:
         with patch("app.services.auth_service.redis_client") as mock_redis:
             mock_redis.exists = AsyncMock(return_value=True)
             mock_redis.ttl = AsyncMock(return_value=300)
-            with pytest.raises(ValueError, match="频繁"):
+            with pytest.raises(RateLimited, match="频繁"):
                 await check_login_rate_limit("1.2.3.4", "test@example.com")
 
     @pytest.mark.asyncio

@@ -17,11 +17,8 @@ router = APIRouter()
 
 @router.post("/register", response_model=UserResponse)
 async def register(data: UserCreate, db: AsyncSession = Depends(get_db)):
-    try:
-        user = await create_user(db, data)
-        return user
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    user = await create_user(db, data)
+    return user
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -33,10 +30,7 @@ async def login(
 ):
     client_ip = auth_service.get_client_ip(request)
 
-    try:
-        await auth_service.check_login_rate_limit(client_ip, data.email)
-    except ValueError as e:
-        raise HTTPException(status_code=429, detail=str(e))
+    await auth_service.check_login_rate_limit(client_ip, data.email)
 
     user = await auth_service.authenticate_user(db, data.email, data.password)
     if not user:
@@ -53,10 +47,7 @@ async def forgot_password(
     data: ForgotPasswordRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    try:
-        await reset_password_service.send_code(db, data.email)
-    except ValueError as e:
-        raise HTTPException(status_code=429, detail=str(e))
+    await reset_password_service.send_code(db, data.email)
     return {"detail": "验证码已发送"}
 
 
@@ -65,10 +56,7 @@ async def reset_password(
     data: ResetPasswordRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    try:
-        await reset_password_service.reset_password(db, data.email, data.code, data.new_password)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    await reset_password_service.reset_password(db, data.email, data.code, data.new_password)
     return {"detail": "密码重置成功"}
 
 
@@ -88,12 +76,9 @@ async def reset_password_by_security(
     data: SecurityResetRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    try:
-        await reset_password_service.reset_password_by_security(
-            db, data.email, data.answer, data.new_password
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    await reset_password_service.reset_password_by_security(
+        db, data.email, data.answer, data.new_password
+    )
     return {"detail": "密码重置成功"}
 
 
@@ -105,8 +90,5 @@ async def logout(request: Request, response: Response):
 
 @router.post("/refresh")
 async def refresh_token(request: Request, response: Response):
-    try:
-        await auth_service.refresh_access_token(request, response)
-    except ValueError as e:
-        raise HTTPException(status_code=401, detail=str(e))
+    await auth_service.refresh_access_token(request, response)
     return {"detail": "Token 已刷新"}

@@ -22,10 +22,7 @@ async def upload_avatar(
 ):
     content = await file.read()
     mime_type = file.content_type or ""
-    try:
-        user = await user_service.upload_avatar(db, current_user, content, mime_type)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    user = await user_service.upload_avatar(db, current_user, content, mime_type)
     await invalidate_user_cache(current_user.id)
     return user
 
@@ -44,10 +41,7 @@ async def update_profile(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    try:
-        user = await user_service.update_profile(db, current_user, data.username)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    user = await user_service.update_profile(db, current_user, data.username)
     await invalidate_user_cache(current_user.id)
     return user
 
@@ -60,12 +54,9 @@ async def change_password(
     db: AsyncSession = Depends(get_db),
 ):
     access_token = request.cookies.get("access_token")
-    try:
-        user = await user_service.change_password(
-            db, current_user, data.old_password, data.new_password, access_token
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    user = await user_service.change_password(
+        db, current_user, data.old_password, data.new_password, access_token
+    )
     await invalidate_user_cache(current_user.id)
     return user
 
@@ -76,11 +67,8 @@ async def update_security_question(
     current_user: User = Depends(get_full_user),
     db: AsyncSession = Depends(get_db),
 ):
-    try:
-        user = await user_service.update_security_question(
-            db, current_user, data.security_question, data.security_answer
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    user = await user_service.update_security_question(
+        db, current_user, data.security_question, data.security_answer
+    )
     await invalidate_user_cache(current_user.id)
     return user

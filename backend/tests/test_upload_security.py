@@ -25,6 +25,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-verification-only")
 
 import io
+from app.core.exceptions import AppError
 from app.services.file_service import (
     sanitize_filename,
     detect_real_mime_type,
@@ -115,7 +116,7 @@ def test_validate_rejects_disallowed_type():
     try:
         validate_mime_type("application/x-msdownload", "application/x-msdownload")
         return _assert(False, "未拒绝非白名单类型")
-    except ValueError as e:
+    except AppError as e:
         return _assert(True, f"正确拒绝: {e}")
 
 def test_validate_rejects_mismatch():
@@ -123,7 +124,7 @@ def test_validate_rejects_mismatch():
     try:
         validate_mime_type("image/png", "application/pdf")
         return _assert(False, "未拒绝类型不符")
-    except ValueError as e:
+    except AppError as e:
         return _assert(True, f"正确拒绝: {e}")
 
 def test_validate_accepts_compatible():
@@ -131,7 +132,7 @@ def test_validate_accepts_compatible():
     try:
         validate_mime_type("application/octet-stream", "image/png")
         return _assert(True, "兼容 octet-stream 声明")
-    except ValueError as e:
+    except AppError as e:
         return _assert(False, f"误拒兼容类型: {e}")
 
 def test_allowed_mime_covers_common_types():

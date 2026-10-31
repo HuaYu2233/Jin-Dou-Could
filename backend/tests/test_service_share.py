@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 from datetime import datetime, timedelta, timezone
 
+from app.core.exceptions import RateLimited
 from app.services.share_service import (
     _generate_token,
     _generate_code,
@@ -58,7 +59,7 @@ class TestShareRateLimitLogic:
             mock_redis.exists = AsyncMock(return_value=True)
             mock_redis.ttl = AsyncMock(return_value=600)
             from app.services.share_service import check_share_rate_limit
-            with pytest.raises(ValueError, match="过多"):
+            with pytest.raises(RateLimited, match="过多"):
                 await check_share_rate_limit("some-token")
 
     @pytest.mark.asyncio

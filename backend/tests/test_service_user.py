@@ -9,6 +9,8 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
+from app.core.exceptions import PayloadTooLarge, ValidationFailed
+
 from app.services.user_service import (
     create_user,
     upload_avatar,
@@ -50,14 +52,14 @@ class TestUploadAvatar:
         db = AsyncMock()
         user = _make_user()
         big_content = b"x" * (MAX_AVATAR_SIZE + 1)
-        with pytest.raises(ValueError, match="2MB"):
+        with pytest.raises(PayloadTooLarge, match="2MB"):
             await upload_avatar(db, user, big_content, "image/jpeg")
 
     @pytest.mark.asyncio
     async def test_rejects_invalid_mime(self):
         db = AsyncMock()
         user = _make_user()
-        with pytest.raises(ValueError, match="JPG/PNG/WEBP/GIF"):
+        with pytest.raises(ValidationFailed, match="JPG/PNG/WEBP/GIF"):
             await upload_avatar(db, user, b"img", "text/plain")
 
     def test_allowed_avatar_types(self):
@@ -73,7 +75,7 @@ class TestUpdateProfile:
     async def test_rejects_short_username(self):
         db = AsyncMock()
         user = _make_user()
-        with pytest.raises(ValueError, match="2"):
+        with pytest.raises(ValidationFailed, match="2"):
             await update_profile(db, user, "a")
 
     @pytest.mark.asyncio
@@ -101,7 +103,7 @@ class TestChangePassword:
     async def test_rejects_wrong_old_password(self):
         db = AsyncMock()
         user = _make_user()
-        with pytest.raises(ValueError, match="原密码错误"):
+        with pytest.raises(ValidationFailed, match="原密码错误"):
             await change_password(db, user, "WrongPass1", "NewPass1234")
 
     @pytest.mark.asyncio
@@ -121,14 +123,14 @@ class TestUpdateSecurityQuestion:
     async def test_rejects_short_question(self):
         db = AsyncMock()
         user = _make_user()
-        with pytest.raises(ValueError, match="2"):
+        with pytest.raises(ValidationFailed, match="2"):
             await update_security_question(db, user, "a", "answer")
 
     @pytest.mark.asyncio
     async def test_rejects_empty_answer(self):
         db = AsyncMock()
         user = _make_user()
-        with pytest.raises(ValueError, match="不能为空"):
+        with pytest.raises(ValidationFailed, match="不能为空"):
             await update_security_question(db, user, "question", "  ")
 
     @pytest.mark.asyncio

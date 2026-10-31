@@ -12,6 +12,7 @@ from unittest.mock import patch
 import pytest
 
 from app.core import storage
+from app.core.exceptions import PayloadTooLarge
 
 
 class FakeS3Client:
@@ -108,7 +109,7 @@ class TestUnknownSizeUpload:
     @pytest.mark.asyncio
     async def test_max_size_exceeded_aborts(self):
         fake = FakeS3Client()
-        with _patch_client(fake), pytest.raises(ValueError):
+        with _patch_client(fake), pytest.raises(PayloadTooLarge):
             await storage.upload_stream_multipart(
                 "user/obj", io.BytesIO(b"d" * 100), "text/plain",
                 chunk_size=10, max_size=50,

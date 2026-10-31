@@ -25,12 +25,9 @@ async def create_share(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    try:
-        share = await share_service.create_share(
-            db, file_id, current_user.id, body.expires_days
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    share = await share_service.create_share(
+        db, file_id, current_user.id, body.expires_days
+    )
 
     await ws_manager.send_to_user(str(current_user.id), "share:created", {
         "share_id": str(share.id),
@@ -82,12 +79,7 @@ async def verify_share(
     body: ShareVerifyRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    try:
-        info = await share_service.verify_share_with_rate_limit(db, token, body.extract_code)
-    except ValueError as e:
-        if "过多" in str(e):
-            raise HTTPException(status_code=429, detail=str(e))
-        raise HTTPException(status_code=403, detail=str(e))
+    info = await share_service.verify_share_with_rate_limit(db, token, body.extract_code)
     return info
 
 
@@ -97,12 +89,5 @@ async def download_shared_file(
     extract_code: str,
     db: AsyncSession = Depends(get_db),
 ):
-    try:
-        url = await share_service.download_shared_file(db, token, extract_code)
-    except ValueError as e:
-        if "过多" in str(e):
-            raise HTTPException(status_code=429, detail=str(e))
-        if "文件不存在" in str(e):
-            raise HTTPException(status_code=404, detail=str(e))
-        raise HTTPException(status_code=403, detail=str(e))
+    url = await share_service.download_shared_file(db, token, extract_code)
     return {"url": url}

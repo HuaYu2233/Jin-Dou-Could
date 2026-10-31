@@ -7,6 +7,7 @@ from app.models.folder import Folder
 from app.models.file import File
 from app.models.user import User
 from app.core.storage import delete_file as s3_delete_file, batch_delete_files
+from app.core.exceptions import Conflict, NotFound, QuotaExceeded
 
 
 async def create_folder(
@@ -18,7 +19,7 @@ async def create_folder(
     if parent_id is not None:
         parent = await _get_folder(db, parent_id, owner_id)
         if not parent:
-            raise ValueError("父文件夹不存在")
+            raise NotFound("父文件夹不存在")
 
     existing = await db.execute(
         select(Folder).where(
@@ -29,7 +30,7 @@ async def create_folder(
         )
     )
     if existing.scalar_one_or_none():
-        raise ValueError("同名文件夹已存在")
+        raise Conflict("同名文件夹已存在")
 
     folder = Folder(
         id=uuid.uuid4(),
@@ -210,7 +211,7 @@ async def restore_folder(
         owner = owner_result.scalar_one_or_none()
         if owner:
             if owner.used_storage + total_size > owner.storage_quota:
-                raise ValueError("存储空间不足，无法恢复文件夹")
+                raise QuotaExceeded("存储空间不足，无法恢复文件夹")
             owner.used_storage += total_size
 
     await db.commit()

@@ -8,6 +8,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from loguru import logger
 from app.core.config import settings
+from app.core.webhook import build_webhook_payload
 
 
 class AlertManager:

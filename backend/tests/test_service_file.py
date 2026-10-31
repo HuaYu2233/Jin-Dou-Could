@@ -19,6 +19,7 @@ from app.services.file_service import (
     ALLOWED_MIME_TYPES,
     _FILENAME_MAX_LEN,
 )
+from app.core.exceptions import ValidationFailed
 from app.models.user import User
 from app.models.file import File
 from app.core.security import hash_password
@@ -69,11 +70,11 @@ class TestValidateMimeType:
         validate_mime_type("image/jpeg", "image/jpeg")
 
     def test_disallowed_detected_type_raises(self):
-        with pytest.raises(ValueError, match="不允许的文件类型"):
+        with pytest.raises(ValidationFailed, match="不允许的文件类型"):
             validate_mime_type("image/jpeg", "application/x-shellscript")
 
     def test_mismatch_raises(self):
-        with pytest.raises(ValueError, match="文件类型与声明不符"):
+        with pytest.raises(ValidationFailed, match="文件类型与声明不符"):
             validate_mime_type("image/jpeg", "image/png")
 
     def test_octet_stream_compatible(self):

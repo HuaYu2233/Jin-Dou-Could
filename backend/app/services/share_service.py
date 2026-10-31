@@ -11,6 +11,7 @@ from app.models.file import File
 from app.core.redis import redis_client
 from app.core.storage import get_presigned_download_url
 from app.core.config import settings
+from app.core.exceptions import Forbidden, NotFound, RateLimited
 
 SHARE_VERIFY_MAX_ATTEMPTS = 5
 SHARE_VERIFY_LOCK_SECONDS = 900
@@ -37,7 +38,7 @@ async def create_share(
     )
     file = file_result.scalar_one_or_none()
     if not file:
-        raise ValueError("文件不存在")
+        raise NotFound("文件不存在")
 
     existing = await db.execute(
         select(Share).where(
@@ -179,7 +180,7 @@ async def check_share_rate_limit(token: str) -> None:
     lock_key = f"share_lock:{token}"
     if await redis_client.exists(lock_key):
         ttl = await redis_client.ttl(lock_key)
-        raise ValueError(f"提取码错误次数过多，请 {max(ttl, 1)} 秒后再试")
+        raise RateLimited(f"提取码错误次数过多，请 {max(ttl, 1)} 秒后再试")
 
 
 async def record_share_verify_failure(token: str) -> None:
@@ -204,7 +205,7 @@ async def verify_share_with_rate_limit(
     info = await verify_share(db, token, extract_code)
     if not info:
         await record_share_verify_failure(token)
-        raise ValueError("提取码错误或分享已过期")
+        raise Forbidden("提取码错误或分享已过期")
     await clear_share_verify_attempts(token)
     return info
 
@@ -216,7 +217,7 @@ async def download_shared_file(
     info = await verify_share(db, token, extract_code)
     if not info:
         await record_share_verify_failure(token)
-        raise ValueError("提取码错误或分享已过期")
+        raise Forbidden("提取码错误或分享已过期")
     await clear_share_verify_attempts(token)
 
     file_result = await db.execute(
@@ -224,7 +225,7 @@ async def download_shared_file(
     )
     file = file_result.scalar_one_or_none()
     if not file:
-        raise ValueError("文件不存在")
+        raise NotFound("文件不存在")
 
     url = await get_presigned_download_url(
         file.storage_key, settings.MINIO_DOWNLOAD_EXPIRES, file.filename

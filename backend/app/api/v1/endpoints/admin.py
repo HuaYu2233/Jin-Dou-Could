@@ -1,5 +1,5 @@
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.base import get_db
 from app.models.user import User
@@ -36,18 +36,15 @@ async def update_user(
     current_admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    try:
-        target = await admin_service.update_user(
-            db,
-            user_id,
-            current_admin.id,
-            username=data.username,
-            storage_quota=data.storage_quota,
-            is_active=data.is_active,
-            is_admin=data.is_admin,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    target = await admin_service.update_user(
+        db,
+        user_id,
+        current_admin.id,
+        username=data.username,
+        storage_quota=data.storage_quota,
+        is_active=data.is_active,
+        is_admin=data.is_admin,
+    )
     await invalidate_user_cache(target.id)
     return target
 
@@ -58,10 +55,7 @@ async def delete_user(
     current_admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    try:
-        await admin_service.delete_user(db, user_id, current_admin.id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    await admin_service.delete_user(db, user_id, current_admin.id)
     await invalidate_user_cache(user_id)
     return {"detail": "用户已删除"}
 

@@ -24,12 +24,9 @@ async def create_folder(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    try:
-        folder = await folder_service.create_folder(
-            db, current_user.id, body.name, body.parent_id
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    folder = await folder_service.create_folder(
+        db, current_user.id, body.name, body.parent_id
+    )
     return folder
 
 @router.get("", response_model=FolderListResponse)

@@ -68,7 +68,6 @@ def generate_thumbnail(self, storage_key: str, file_id: str) -> str | None:
 
 def _update_thumbnail_key(file_id: str, thumb_key: str) -> None:
     try:
-        import asyncio
         from app.db.base import sync_session_factory
         from app.models.file import File
         from sqlalchemy import update

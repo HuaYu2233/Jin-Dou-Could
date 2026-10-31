@@ -1,15 +1,15 @@
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from loguru import logger
 from app.core.config import settings
+from app.core.exceptions import ServiceUnavailable
 from app.core.smtp import resolve_smtp
 
 
 def send_verification_code(to_email: str, code: str) -> None:
     host, port, user, password, from_email, use_tls = resolve_smtp()
     if not host or not from_email:
-        raise ValueError("未配置邮件 SMTP 服务，无法发送验证码")
+        raise ServiceUnavailable("未配置邮件 SMTP 服务，无法发送验证码")
 
     subject = f"【{settings.RESET_PASSWORD_FROM_NAME}】找回密码验证码"
     html = f"""
