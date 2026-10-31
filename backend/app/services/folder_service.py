@@ -3,7 +3,6 @@ import uuid
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update
-from sqlalchemy.orm import selectinload
 from app.models.folder import Folder
 from app.models.file import File
 from app.models.user import User

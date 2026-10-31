@@ -1,9 +1,9 @@
 import asyncio
+import inspect
 import aiobotocore.session
 from botocore.config import Config
 from app.core.config import settings
 from contextlib import asynccontextmanager
-from datetime import timedelta
 from urllib.parse import quote
 from loguru import logger
 import io
@@ -139,72 +139,29 @@ async def upload_fileobj(storage_key: str, fileobj, mime_type: str) -> None:
         )
 
 
-async def upload_multipart(
-    storage_key: str,
-    fileobj,
-    mime_type: str,
-    total_size: int,
-    chunk_size: int | None = None,
-) -> None:
-    cs = chunk_size or settings.UPLOAD_CHUNK_SIZE
-    async with get_s3_client() as client:
-        resp = await client.create_multipart_upload(
-            Bucket=settings.MINIO_BUCKET,
-            Key=storage_key,
-            ContentType=mime_type,
-        )
-        upload_id = resp["UploadId"]
+def _is_async_readable(stream) -> bool:
+    read = getattr(stream, "read", None)
+    return read is not None and inspect.iscoroutinefunction(read)
 
-        parts = []
-        part_number = 1
-        offset = 0
-        try:
-            while offset < total_size:
-                read_len = min(cs, total_size - offset)
-                chunk = fileobj.read(read_len) if hasattr(fileobj, "read") else await fileobj.read(read_len)
-                if not chunk:
-                    break
-                if isinstance(chunk, str):
-                    chunk = chunk.encode("utf-8")
-                part_resp = await client.upload_part(
-                    Bucket=settings.MINIO_BUCKET,
-                    Key=storage_key,
-                    UploadId=upload_id,
-                    PartNumber=part_number,
-                    Body=chunk,
-                )
-                parts.append({
-                    "PartNumber": part_number,
-                    "ETag": part_resp["ETag"],
-                })
-                part_number += 1
-                offset += len(chunk)
 
-            await client.complete_multipart_upload(
-                Bucket=settings.MINIO_BUCKET,
-                Key=storage_key,
-                UploadId=upload_id,
-                MultipartUpload={"Parts": parts},
-            )
-        except Exception:
-            try:
-                await client.abort_multipart_upload(
-                    Bucket=settings.MINIO_BUCKET,
-                    Key=storage_key,
-                    UploadId=upload_id,
-                )
-            except Exception:
-                pass
-            raise
+async def _read_chunk(stream, size: int) -> bytes:
+    if _is_async_readable(stream):
+        chunk = await stream.read(size)
+    else:
+        chunk = stream.read(size)
+    if isinstance(chunk, str):
+        chunk = chunk.encode("utf-8")
+    return chunk or b""
 
 
 async def upload_stream_multipart(
     storage_key: str,
     stream,
     mime_type: str,
-    total_size: int,
+    total_size: int | None = None,
     chunk_size: int | None = None,
-) -> None:
+    max_size: int | None = None,
+) -> int:
     cs = chunk_size or settings.UPLOAD_CHUNK_SIZE
     async with get_s3_client() as client:
         resp = await client.create_multipart_upload(
@@ -218,14 +175,14 @@ async def upload_stream_multipart(
         part_number = 1
         uploaded = 0
         try:
-            while uploaded < total_size:
-                remaining = total_size - uploaded
-                read_len = min(cs, remaining)
-                chunk = stream.read(read_len) if callable(getattr(stream, "read", None)) else await stream.read(read_len)
+            while total_size is None or uploaded < total_size:
+                read_len = cs if total_size is None else min(cs, total_size - uploaded)
+                chunk = await _read_chunk(stream, read_len)
                 if not chunk:
                     break
-                if isinstance(chunk, str):
-                    chunk = chunk.encode("utf-8")
+                uploaded += len(chunk)
+                if max_size is not None and uploaded > max_size:
+                    raise ValueError("文件过大，超出允许的单文件上限")
                 part_resp = await client.upload_part(
                     Bucket=settings.MINIO_BUCKET,
                     Key=storage_key,
@@ -238,14 +195,26 @@ async def upload_stream_multipart(
                     "ETag": part_resp["ETag"],
                 })
                 part_number += 1
-                uploaded += len(chunk)
 
-            await client.complete_multipart_upload(
-                Bucket=settings.MINIO_BUCKET,
-                Key=storage_key,
-                UploadId=upload_id,
-                MultipartUpload={"Parts": parts},
-            )
+            if parts:
+                await client.complete_multipart_upload(
+                    Bucket=settings.MINIO_BUCKET,
+                    Key=storage_key,
+                    UploadId=upload_id,
+                    MultipartUpload={"Parts": parts},
+                )
+            else:
+                await client.abort_multipart_upload(
+                    Bucket=settings.MINIO_BUCKET,
+                    Key=storage_key,
+                    UploadId=upload_id,
+                )
+                await client.put_object(
+                    Bucket=settings.MINIO_BUCKET,
+                    Key=storage_key,
+                    Body=b"",
+                    ContentType=mime_type,
+                )
         except Exception:
             try:
                 await client.abort_multipart_upload(
@@ -256,17 +225,7 @@ async def upload_stream_multipart(
             except Exception:
                 pass
             raise
-
-
-async def stream_object(storage_key: str, chunk_size: int = 8192):
-    async with get_s3_client() as client:
-        resp = await client.get_object(
-            Bucket=settings.MINIO_BUCKET,
-            Key=storage_key,
-        )
-        async with resp["Body"] as stream:
-            async for chunk in stream.iter_chunks(chunk_size):
-                yield chunk
+    return uploaded
 
 
 async def delete_file(storage_key: str) -> None:
