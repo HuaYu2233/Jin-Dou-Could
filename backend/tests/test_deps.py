@@ -7,7 +7,7 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-for-verification-only-at-le
 
 import pytest
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 from datetime import datetime, timezone
 
@@ -113,8 +113,42 @@ class TestUserCacheTTL:
 class TestInvalidateUserCache:
     @pytest.mark.asyncio
     async def test_calls_redis_delete(self):
+        async def _empty_scan(*args, **kwargs):
+            for _ in ():
+                yield _
+
+        pipe = MagicMock()
+        pipe.delete = MagicMock()
+        pipe.execute = AsyncMock()
+
         with patch("app.api.deps.redis_client") as mock_redis:
-            mock_redis.delete = AsyncMock()
+            mock_redis.pipeline = MagicMock(return_value=pipe)
+            mock_redis.scan_iter = _empty_scan
             uid = uuid4()
             await invalidate_user_cache(uid)
-            mock_redis.delete.assert_called_once_with(f"user:{uid}")
+
+        deleted = [call.args[0] for call in pipe.delete.call_args_list]
+        assert f"user:{uid}" in deleted
+        assert f"trash_count:{uid}" in deleted
+        pipe.execute.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_purges_file_count_keys(self):
+        async def _scan(*args, **kwargs):
+            for key in (f"file_count:{uid}:all", f"file_count:{uid}:image"):
+                yield key
+
+        uid = uuid4()
+        pipe = MagicMock()
+        pipe.delete = MagicMock()
+        pipe.execute = AsyncMock()
+
+        with patch("app.api.deps.redis_client") as mock_redis:
+            mock_redis.pipeline = MagicMock(return_value=pipe)
+            mock_redis.scan_iter = _scan
+            mock_redis.delete = AsyncMock()
+            await invalidate_user_cache(uid)
+
+        mock_redis.delete.assert_awaited_once_with(
+            f"file_count:{uid}:all", f"file_count:{uid}:image"
+        )
