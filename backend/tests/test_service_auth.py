@@ -149,6 +149,16 @@ class TestAuthenticateUser:
         assert result is not None
         assert result.email == "test@example.com"
 
+    @pytest.mark.asyncio
+    async def test_returns_none_for_inactive_user(self):
+        db = AsyncMock()
+        user = _make_user(is_active=False)
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none = MagicMock(return_value=user)
+        db.execute = AsyncMock(return_value=mock_result)
+        result = await authenticate_user(db, "test@example.com", "Test1234")
+        assert result is None
+
 
 class TestSetAuthCookies:
     def test_sets_cookies(self):

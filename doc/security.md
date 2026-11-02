@@ -20,6 +20,8 @@
 
 **防混用机制**：JWT payload 包含 `type` 字段，access token 不能用于 refresh 接口，反之亦然。
 
+**账号状态校验**：登录、Token 刷新、常规 API 请求（含 Redis 缓存命中路径）与 WebSocket 认证均校验 `is_active`，禁用账号立即拒绝访问；管理员禁用用户时会清除该用户的 Redis 缓存。
+
 ### 2.2 密码安全
 
 - **哈希算法**：bcrypt（cost factor 自动调整）
@@ -74,6 +76,9 @@
 
 - 使用 `python-magic` 检测文件真实 MIME 类型（非依赖客户端声明）
 - 白名单校验：仅允许指定类型上传
+- 检测失败、检测组件不可用或真实类型不在白名单时拒绝上传（fail-closed）
+- 分片上传在第 1 片落盘前探测真实类型，完成合并时以探测结果覆盖客户端声明值；未完成探测的分片会话拒绝合并
+- 常见别名（`audio/mp3`、`application/mp4`）归一化后参与白名单判断
 - 防止 MIME 嗅探：`X-Content-Type-Options: nosniff`
 
 ### 4.2 文件名净化
@@ -93,6 +98,7 @@
 | 认证方式       | 首条消息发送 token（非 URL 参数，防止泄露） |
 | 认证超时       | 5 秒内未认证则断开连接                      |
 | 消息长度限制   | 单条消息最大 4KB                            |
+| 账号状态       | 认证时查库校验 `is_active`，禁用账号断开    |
 | 多 Worker 广播 | Redis Pub/Sub 消息总线                      |
 
 ## 6. 基础设施安全

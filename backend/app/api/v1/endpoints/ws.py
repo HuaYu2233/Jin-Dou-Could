@@ -1,11 +1,15 @@
 import asyncio
 import json
+import uuid
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from loguru import logger
+from sqlalchemy import select
 
 from app.core.security import decode_token
 from app.core.ws_manager import ws_manager
+from app.db.base import AsyncSessionLocal
+from app.models.user import User
 
 router = APIRouter()
 
@@ -42,6 +46,25 @@ async def ws_connect(ws: WebSocket):
     user_id = payload.get("sub")
     if not user_id:
         await ws.close(code=4001, reason="无效令牌")
+        return
+
+    try:
+        user_uuid = uuid.UUID(user_id)
+    except (ValueError, TypeError):
+        await ws.close(code=4001, reason="无效令牌")
+        return
+
+    try:
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(User).where(User.id == user_uuid))
+            user = result.scalar_one_or_none()
+    except Exception as exc:
+        logger.bind(log_type="ws").warning(f"WebSocket 认证查询用户失败: {exc}")
+        await ws.close(code=4001, reason="认证失败")
+        return
+
+    if not user or not user.is_active:
+        await ws.close(code=4001, reason="账号已被禁用")
         return
 
     try:

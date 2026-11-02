@@ -88,6 +88,10 @@ async def logout(request: Request, response: Response):
 
 
 @router.post("/refresh")
-async def refresh_token(request: Request, response: Response):
-    await auth_service.refresh_access_token(request, response)
+async def refresh_token(
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
+    await auth_service.refresh_access_token(request, response, db)
     return {"detail": "Token 已刷新"}

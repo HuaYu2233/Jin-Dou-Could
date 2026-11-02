@@ -52,6 +52,11 @@ _MIME_ALIASES = {
     ("audio/mpeg", "audio/mp3"),
     ("video/mp4", "application/mp4"),
 }
+_ALIAS_TO_CANONICAL = {alias: canonical for canonical, alias in _MIME_ALIASES}
+
+
+def _canonical_mime(mime_type: str) -> str:
+    return _ALIAS_TO_CANONICAL.get(mime_type, mime_type)
 
 
 def sanitize_filename(name: str) -> str:
@@ -66,28 +71,32 @@ def sanitize_filename(name: str) -> str:
 async def detect_real_mime_type(fileobj, declared: str) -> str:
     try:
         import magic
+    except Exception as exc:
+        raise ValidationFailed("文件类型检测组件不可用") from exc
 
-        try:
-            if hasattr(fileobj, "seek"):
-                fileobj.seek(0)
-            head = fileobj.read(2048)
-            if hasattr(fileobj, "seek"):
-                fileobj.seek(0)
-        except Exception:
-            head = None
-        if head:
-            if isinstance(head, str):
-                head = head.encode("utf-8")
-            detected = await asyncio.to_thread(magic.from_buffer, head, True)
-            if detected and detected in ALLOWED_MIME_TYPES:
-                return detected
-    except Exception:
-        pass
-    return declared
+    try:
+        if hasattr(fileobj, "seek"):
+            fileobj.seek(0)
+        head = fileobj.read(2048)
+        if hasattr(fileobj, "seek"):
+            fileobj.seek(0)
+    except Exception as exc:
+        raise ValidationFailed("无法读取文件内容进行类型检测") from exc
+
+    if isinstance(head, str):
+        head = head.encode("utf-8")
+    if not head:
+        return declared
+
+    try:
+        detected = await asyncio.to_thread(magic.from_buffer, head, True)
+    except Exception as exc:
+        raise ValidationFailed("文件类型检测失败") from exc
+    return detected or declared
 
 
 def validate_mime_type(declared: str, detected: str) -> None:
-    if detected not in ALLOWED_MIME_TYPES:
+    if _canonical_mime(detected) not in ALLOWED_MIME_TYPES:
         raise ValidationFailed(f"不允许的文件类型: {detected}")
     if (
         declared

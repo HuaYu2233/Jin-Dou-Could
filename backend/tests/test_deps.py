@@ -13,14 +13,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
+from fastapi import HTTPException
 
 from app.api.deps import (
     USER_CACHE_TTL,
     _deserialize_user,
     _serialize_user,
+    get_current_user,
     invalidate_user_cache,
 )
-from app.core.security import hash_password
+from app.core.security import create_access_token, hash_password
 from app.models.user import User
 
 SENSITIVE_FIELDS = ("hashed_password", "security_question", "security_answer")
@@ -159,3 +161,40 @@ class TestInvalidateUserCache:
             await invalidate_user_cache(uid)
 
         mock_redis.delete.assert_awaited_once_with(f"file_count:{uid}:all", f"file_count:{uid}:image")
+
+
+class TestInactiveUserRejected:
+    @pytest.mark.asyncio
+    async def test_rejects_inactive_cached_user(self):
+        inactive = _make_user(is_active=False)
+        request = MagicMock()
+        request.method = "GET"
+        token = create_access_token({"sub": str(inactive.id)})
+        db = AsyncMock()
+
+        with patch("app.api.deps.redis_client") as mock_redis:
+            mock_redis.exists = AsyncMock(return_value=0)
+            mock_redis.get = AsyncMock(return_value=_serialize_user(inactive))
+            with pytest.raises(HTTPException) as exc_info:
+                await get_current_user(request, token, db)
+
+        assert exc_info.value.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_rejects_inactive_user_from_db(self):
+        inactive = _make_user(is_active=False)
+        request = MagicMock()
+        request.method = "POST"
+        token = create_access_token({"sub": str(inactive.id)})
+
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none = MagicMock(return_value=inactive)
+        db = AsyncMock()
+        db.execute = AsyncMock(return_value=mock_result)
+
+        with patch("app.api.deps.redis_client") as mock_redis:
+            mock_redis.exists = AsyncMock(return_value=0)
+            with pytest.raises(HTTPException) as exc_info:
+                await get_current_user(request, token, db)
+
+        assert exc_info.value.status_code == 403

@@ -1,3 +1,4 @@
+import io
 import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +15,12 @@ from app.core.storage import (
 from app.models.file import File
 from app.models.user import User
 from app.services import storage_accounting
-from app.services.file_validation import categorize_file_type, sanitize_filename
+from app.services.file_validation import (
+    categorize_file_type,
+    detect_real_mime_type,
+    sanitize_filename,
+    validate_mime_type,
+)
 
 _UPLOAD_STATE_TTL = 86400
 
@@ -29,6 +35,7 @@ async def init_multipart_upload(
     total_parts: int = 0,
 ) -> dict:
     filename = sanitize_filename(filename)
+    validate_mime_type(mime_type, mime_type)
     file_id = uuid.uuid4()
     storage_key = f"{owner.id}/{file_id}"
 
@@ -71,6 +78,12 @@ async def upload_multipart_part(
     if len(data) > max_part_size:
         raise PayloadTooLarge(f"分片大小超过限制（最大 {max_part_size // (1024 * 1024)}MB）")
 
+    if part_number == 1:
+        declared = state.get("mime_type", "")
+        real_mime = await detect_real_mime_type(io.BytesIO(data), declared)
+        validate_mime_type(declared, real_mime)
+        await redis_client.hset(state_key, "real_mime_type", real_mime)
+
     etag = await upload_part(storage_key, upload_id, part_number, data)
 
     await redis_client.hset(state_key, f"part_{part_number}", etag)
@@ -95,13 +108,18 @@ async def complete_multipart_upload(
     if not state:
         if not parts:
             raise NotFound("上传会话不存在或已过期")
+        filename = sanitize_filename(filename)
+        validate_mime_type(mime_type, mime_type)
         file_id = uuid.uuid4()
         storage_key = storage_key or f"{owner.id}/{file_id}"
     else:
         file_id = uuid.UUID(state["file_id"])
         storage_key = state["storage_key"]
         filename = state.get("filename", filename)
-        mime_type = state.get("mime_type", mime_type)
+        real_mime = state.get("real_mime_type")
+        if not real_mime:
+            raise ValidationFailed("分片上传未完成文件类型校验，请从第 1 片开始上传")
+        mime_type = real_mime
         total_size = int(state.get("total_size", total_size))
         folder_id_str = state.get("folder_id", "")
         folder_id = uuid.UUID(folder_id_str) if folder_id_str else None

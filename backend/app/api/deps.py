@@ -4,6 +4,7 @@ from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordBearer
+from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -65,16 +66,16 @@ async def invalidate_user_cache(user_id: UUID | str) -> None:
         from app.services.file_service import invalidate_file_caches
 
         await invalidate_file_caches(user_id)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.bind(log_type="cache").warning(f"文件缓存失效失败: user={uid}, {exc}")
     try:
         keys = []
         async for key in redis_client.scan_iter(match=f"file_count:{uid}:*", count=100):
             keys.append(key)
         for i in range(0, len(keys), 500):
             await redis_client.delete(*keys[i : i + 500])
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.bind(log_type="cache").warning(f"文件计数缓存清理失败: user={uid}, {exc}")
 
 
 async def get_current_user(
@@ -103,13 +104,19 @@ async def get_current_user(
     if request.method == "GET":
         cached = await redis_client.get(cache_key)
         if cached:
-            return _deserialize_user(cached)
+            cached_user = _deserialize_user(cached)
+            if not cached_user.is_active:
+                raise HTTPException(status_code=403, detail="账号已被禁用")
+            return cached_user
 
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
 
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="账号已被禁用")
 
     if request.method == "GET":
         await redis_client.setex(cache_key, USER_CACHE_TTL, _serialize_user(user))

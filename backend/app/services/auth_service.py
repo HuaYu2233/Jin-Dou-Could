@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import Request, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -75,18 +77,12 @@ async def clear_login_rate_limit(client_ip: str, email: str) -> None:
 async def authenticate_user(db: AsyncSession, email: str, password: str) -> User | None:
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
-    if not user or not verify_password(password, user.hashed_password):
+    if not user or not user.is_active or not verify_password(password, user.hashed_password):
         return None
     return user
 
 
-def set_auth_cookies(response: Response, user: User) -> None:
-    import uuid as _uuid
-
-    family = str(_uuid.uuid4())
-    access_token = create_access_token({"sub": str(user.id)})
-    refresh_token = create_refresh_token({"sub": str(user.id), "family": family})
-
+def _apply_token_cookies(response: Response, access_token: str, refresh_token: str) -> None:
     secure = settings.ENVIRONMENT == "production"
     response.set_cookie(
         key="access_token",
@@ -106,6 +102,13 @@ def set_auth_cookies(response: Response, user: User) -> None:
     )
 
 
+def set_auth_cookies(response: Response, user: User) -> None:
+    family = str(uuid.uuid4())
+    access_token = create_access_token({"sub": str(user.id)})
+    refresh_token = create_refresh_token({"sub": str(user.id), "family": family})
+    _apply_token_cookies(response, access_token, refresh_token)
+
+
 async def logout(request: Request, response: Response) -> None:
     for name in ("access_token", "refresh_token"):
         token = request.cookies.get(name)
@@ -115,7 +118,7 @@ async def logout(request: Request, response: Response) -> None:
     response.delete_cookie("refresh_token")
 
 
-async def refresh_access_token(request: Request, response: Response) -> None:
+async def refresh_access_token(request: Request, response: Response, db: AsyncSession) -> None:
     refresh = request.cookies.get("refresh_token")
     if not refresh:
         raise Unauthorized("无 refresh token")
@@ -133,35 +136,27 @@ async def refresh_access_token(request: Request, response: Response) -> None:
         await _revoke_family(family)
         raise Unauthorized("检测到 Refresh Token 重用，该 Token 族已全部撤销，请重新登录")
 
+    user_id = payload["sub"]
+    try:
+        user_uuid = uuid.UUID(user_id)
+    except ValueError as exc:
+        raise Unauthorized("Invalid refresh token") from exc
+    user = await db.get(User, user_uuid)
+    if not user or not user.is_active:
+        raise Unauthorized("账号已被禁用")
+
     if not family:
-        family = str(__import__("uuid").uuid4())
+        family = str(uuid.uuid4())
 
     await revoke_token(refresh)
 
-    user_id = payload["sub"]
     access_token = create_access_token({"sub": user_id})
     new_refresh_token = create_refresh_token({"sub": user_id, "family": family})
 
     family_ttl = settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600
     await redis_client.setex(f"refresh_family:{family}", family_ttl, user_id)
 
-    secure = settings.ENVIRONMENT == "production"
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        samesite="lax",
-        secure=secure,
-    )
-    response.set_cookie(
-        key="refresh_token",
-        value=new_refresh_token,
-        httponly=True,
-        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600,
-        samesite="lax",
-        secure=secure,
-    )
+    _apply_token_cookies(response, access_token, new_refresh_token)
 
 
 async def _revoke_family(family: str) -> None:

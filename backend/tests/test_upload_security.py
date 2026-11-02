@@ -30,6 +30,9 @@ setup_env()
 import asyncio
 import inspect
 import io
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from app.core.exceptions import AppError
 from app.services.file_validation import (
@@ -134,6 +137,51 @@ def test_allowed_mime_covers_common_types():
     assert not missing, f"缺失: {missing or '无'}"
 
 
+async def test_detect_keeps_unlisted_type():
+    print("\n[测试 12] 探测到非白名单类型时不回退声明值")
+    with patch("magic.from_buffer", return_value="application/x-msdownload"):
+        detected = await detect_real_mime_type(io.BytesIO(b"MZ" + b"\x00" * 64), "application/octet-stream")
+    assert detected == "application/x-msdownload", f"探测结果='{detected}' (期望保留真实类型)"
+
+
+def test_validate_rejects_unlisted_detected():
+    print("\n[测试 13] 真实类型不在白名单时即使声明合法也拒绝")
+    try:
+        validate_mime_type("text/plain", "text/x-python")
+    except AppError as exc:
+        print(f"  ✅ 正确拒绝: {exc}")
+    else:
+        raise AssertionError("未拒绝非白名单的真实类型")
+
+
+def test_validate_accepts_mime_alias():
+    print("\n[测试 14] 接受白名单别名类型")
+    try:
+        validate_mime_type("audio/mpeg", "audio/mp3")
+    except AppError as exc:
+        raise AssertionError(f"误拒白名单别名: {exc}") from exc
+
+
+async def test_multipart_init_rejects_disallowed_mime():
+    print("\n[测试 15] 分片上传初始化拒绝非白名单 MIME")
+    from app.services import file_multipart
+
+    owner = MagicMock()
+    owner.id = "owner"
+    try:
+        await file_multipart.init_multipart_upload(owner, "evil.exe", "application/x-msdownload", 1024)
+    except AppError as exc:
+        print(f"  ✅ 正确拒绝: {exc}")
+    else:
+        raise AssertionError("分片上传未校验 MIME 白名单")
+
+
+async def test_detect_fails_closed():
+    print("\n[测试 16] 检测组件异常时拒绝而非放行")
+    with patch("magic.from_buffer", side_effect=RuntimeError("boom")), pytest.raises(AppError):
+        await detect_real_mime_type(io.BytesIO(b"%PDF-1.4"), "application/pdf")
+
+
 def run_all() -> int:
     print("=" * 60)
     print("阶段五:上传安全加固验证")
@@ -151,6 +199,11 @@ def run_all() -> int:
         test_validate_rejects_mismatch,
         test_validate_accepts_compatible,
         test_allowed_mime_covers_common_types,
+        test_detect_keeps_unlisted_type,
+        test_validate_rejects_unlisted_detected,
+        test_validate_accepts_mime_alias,
+        test_multipart_init_rejects_disallowed_mime,
+        test_detect_fails_closed,
     ]
 
     results = []
