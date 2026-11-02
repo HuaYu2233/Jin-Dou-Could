@@ -2,6 +2,7 @@ import uuid
 from contextlib import suppress
 from datetime import UTC, datetime
 
+from loguru import logger
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,8 +38,8 @@ async def invalidate_file_caches(owner_id: uuid.UUID) -> None:
         to_delete = [f for f in fields if f.startswith(f"{oid}:")]
         if to_delete:
             await redis_client.hdel(_CACHE_HASH_KEY, *to_delete)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.bind(log_type="cache").warning(f"文件计数缓存清理失败: owner={oid}, {exc}")
 
 
 async def create_file(
@@ -96,8 +97,8 @@ async def create_file(
             from app.tasks.thumbnail_tasks import generate_thumbnail
 
             generate_thumbnail.delay(storage_key, str(file_id))
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.bind(log_type="task").warning(f"缩略图任务入队失败: file={file_id}, {exc}")
 
     return file
 

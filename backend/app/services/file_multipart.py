@@ -1,6 +1,7 @@
 import io
 import uuid
 
+from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -106,31 +107,29 @@ async def complete_multipart_upload(
     state = await redis_client.hgetall(state_key)
 
     if not state:
-        if not parts:
-            raise NotFound("上传会话不存在或已过期")
-        filename = sanitize_filename(filename)
-        validate_mime_type(mime_type, mime_type)
-        file_id = uuid.uuid4()
-        storage_key = storage_key or f"{owner.id}/{file_id}"
-    else:
-        file_id = uuid.UUID(state["file_id"])
-        storage_key = state["storage_key"]
-        filename = state.get("filename", filename)
-        real_mime = state.get("real_mime_type")
-        if not real_mime:
-            raise ValidationFailed("分片上传未完成文件类型校验，请从第 1 片开始上传")
-        mime_type = real_mime
-        total_size = int(state.get("total_size", total_size))
-        folder_id_str = state.get("folder_id", "")
-        folder_id = uuid.UUID(folder_id_str) if folder_id_str else None
+        raise NotFound("上传会话不存在或已过期")
+    if state.get("storage_key") != storage_key:
+        raise ValidationFailed("storage_key 与上传会话不匹配")
 
-        if not parts:
-            parts = []
-            total_parts = int(state.get("total_parts", "0"))
-            for i in range(1, total_parts + 1):
-                etag = state.get(f"part_{i}")
-                if etag:
-                    parts.append({"PartNumber": i, "ETag": etag})
+    file_id = uuid.UUID(state["file_id"])
+    storage_key = state["storage_key"]
+    filename = state.get("filename", filename)
+    real_mime = state.get("real_mime_type")
+    if not real_mime:
+        raise ValidationFailed("分片上传未完成文件类型校验，请从第 1 片开始上传")
+    validate_mime_type(mime_type, real_mime)
+    mime_type = real_mime
+    total_size = int(state.get("total_size", total_size))
+    folder_id_str = state.get("folder_id", "")
+    folder_id = uuid.UUID(folder_id_str) if folder_id_str else None
+
+    if not parts:
+        parts = []
+        total_parts = int(state.get("total_parts", "0"))
+        for i in range(1, total_parts + 1):
+            etag = state.get(f"part_{i}")
+            if etag:
+                parts.append({"PartNumber": i, "ETag": etag})
 
     if not parts:
         raise ValidationFailed("没有已上传的分片")
@@ -161,8 +160,8 @@ async def complete_multipart_upload(
             from app.tasks.thumbnail_tasks import generate_thumbnail
 
             generate_thumbnail.delay(storage_key, str(file_id))
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.bind(log_type="task").warning(f"缩略图任务入队失败: file={file_id}, {exc}")
 
     return file
 

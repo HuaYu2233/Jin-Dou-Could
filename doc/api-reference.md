@@ -159,7 +159,8 @@ POST /api/v1/files?folder_id={uuid}
 
 - 单文件最大 100MB（`MAX_UPLOAD_SIZE`）
 - MIME 类型白名单校验（以 `python-magic` 探测结果为准，检测失败直接拒绝）
-- 分片上传在第 1 片探测真实类型，完成合并时以探测结果覆盖声明值
+- 分片上传在第 1 片探测真实类型，完成合并时以探测结果覆盖声明值；上传会话过期后需重新初始化
+- 文本子类型（`text/x-python`、`text/x-shellscript` 等）按 `text/plain` 参与白名单判断
 - 文件名净化（去除特殊字符）
 - 存储配额检查
 

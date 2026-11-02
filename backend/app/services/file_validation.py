@@ -53,10 +53,14 @@ _MIME_ALIASES = {
     ("video/mp4", "application/mp4"),
 }
 _ALIAS_TO_CANONICAL = {alias: canonical for canonical, alias in _MIME_ALIASES}
+_TEXT_SUBTYPE_FALLBACK = "text/plain"
 
 
 def _canonical_mime(mime_type: str) -> str:
-    return _ALIAS_TO_CANONICAL.get(mime_type, mime_type)
+    canonical = _ALIAS_TO_CANONICAL.get(mime_type, mime_type)
+    if canonical.startswith("text/") and canonical not in ALLOWED_MIME_TYPES:
+        return _TEXT_SUBTYPE_FALLBACK
+    return canonical
 
 
 def sanitize_filename(name: str) -> str:
@@ -96,23 +100,20 @@ async def detect_real_mime_type(fileobj, declared: str) -> str:
 
 
 def validate_mime_type(declared: str, detected: str) -> None:
-    if _canonical_mime(detected) not in ALLOWED_MIME_TYPES:
+    detected_canonical = _canonical_mime(detected)
+    if detected_canonical not in ALLOWED_MIME_TYPES:
         raise ValidationFailed(f"不允许的文件类型: {detected}")
-    if (
-        declared
-        and declared in ALLOWED_MIME_TYPES
-        and declared != detected
-        and not _is_compatible_mime(declared, detected)
-    ):
+    if declared and declared in ALLOWED_MIME_TYPES and not _is_compatible_mime(declared, detected_canonical):
         raise ValidationFailed(f"文件类型与声明不符: 声明 {declared}, 实际 {detected}")
 
 
 def _is_compatible_mime(declared: str, detected: str) -> bool:
-    if declared == detected:
+    declared_canonical = _canonical_mime(declared)
+    if declared_canonical == detected:
         return True
-    if declared == "application/octet-stream":
+    if declared_canonical == "application/octet-stream":
         return True
-    return (declared, detected) in _MIME_ALIASES or (detected, declared) in _MIME_ALIASES
+    return (declared_canonical, detected) in _MIME_ALIASES or (detected, declared_canonical) in _MIME_ALIASES
 
 
 def categorize_file_type(mime_type: str) -> str:

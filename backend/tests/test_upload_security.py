@@ -30,7 +30,8 @@ setup_env()
 import asyncio
 import inspect
 import io
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
 
 import pytest
 
@@ -147,7 +148,7 @@ async def test_detect_keeps_unlisted_type():
 def test_validate_rejects_unlisted_detected():
     print("\n[测试 13] 真实类型不在白名单时即使声明合法也拒绝")
     try:
-        validate_mime_type("text/plain", "text/x-python")
+        validate_mime_type("text/plain", "application/x-msdownload")
     except AppError as exc:
         print(f"  ✅ 正确拒绝: {exc}")
     else:
@@ -182,6 +183,68 @@ async def test_detect_fails_closed():
         await detect_real_mime_type(io.BytesIO(b"%PDF-1.4"), "application/pdf")
 
 
+def test_validate_accepts_text_subtype():
+    print("\n[测试 17] 接受 libmagic 细分的文本子类型")
+    for mime in ("text/x-python", "text/x-shellscript", "text/x-c", "text/xml"):
+        try:
+            validate_mime_type(mime, mime)
+        except AppError as exc:
+            raise AssertionError(f"误拒文本子类型 {mime}: {exc}") from exc
+    try:
+        validate_mime_type("text/plain", "text/x-script.python")
+    except AppError as exc:
+        raise AssertionError(f"误拒声明 text/plain 与实际文本子类型: {exc}") from exc
+
+
+async def test_multipart_complete_requires_session():
+    print("\n[测试 18] 分片上传会话缺失时拒绝合并")
+    from app.services import file_multipart
+
+    owner = MagicMock()
+    owner.id = "owner"
+    with patch.object(file_multipart, "redis_client") as mock_redis:
+        mock_redis.hgetall = AsyncMock(return_value={})
+        with pytest.raises(AppError):
+            await file_multipart.complete_multipart_upload(
+                db=AsyncMock(),
+                owner=owner,
+                upload_id="upload-1",
+                storage_key="owner/key",
+                filename="evil.exe",
+                mime_type="application/x-msdownload",
+                total_size=1024,
+                parts=[{"PartNumber": 1, "ETag": "etag-1"}],
+            )
+
+
+async def test_multipart_complete_rejects_storage_key_mismatch():
+    print("\n[测试 19] 分片上传完成时拒绝 storage_key 与会话不符")
+    from app.services import file_multipart
+
+    owner = MagicMock()
+    owner.id = "owner"
+    state = {
+        "file_id": str(uuid4()),
+        "storage_key": "owner/real",
+        "filename": "a.txt",
+        "real_mime_type": "text/plain",
+        "total_size": "1024",
+    }
+    with patch.object(file_multipart, "redis_client") as mock_redis:
+        mock_redis.hgetall = AsyncMock(return_value=state)
+        with pytest.raises(AppError):
+            await file_multipart.complete_multipart_upload(
+                db=AsyncMock(),
+                owner=owner,
+                upload_id="upload-1",
+                storage_key="owner/other",
+                filename="a.txt",
+                mime_type="text/plain",
+                total_size=1024,
+                parts=[{"PartNumber": 1, "ETag": "etag-1"}],
+            )
+
+
 def run_all() -> int:
     print("=" * 60)
     print("阶段五:上传安全加固验证")
@@ -204,6 +267,9 @@ def run_all() -> int:
         test_validate_accepts_mime_alias,
         test_multipart_init_rejects_disallowed_mime,
         test_detect_fails_closed,
+        test_validate_accepts_text_subtype,
+        test_multipart_complete_requires_session,
+        test_multipart_complete_rejects_storage_key_mismatch,
     ]
 
     results = []

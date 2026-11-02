@@ -78,7 +78,9 @@
 - 白名单校验：仅允许指定类型上传
 - 检测失败、检测组件不可用或真实类型不在白名单时拒绝上传（fail-closed）
 - 分片上传在第 1 片落盘前探测真实类型，完成合并时以探测结果覆盖客户端声明值；未完成探测的分片会话拒绝合并
+- 分片合并要求上传会话存在且 `storage_key` 与会话一致，会话过期后不能凭已上传分片直接合并
 - 常见别名（`audio/mp3`、`application/mp4`）归一化后参与白名单判断
+- libmagic 细分的文本子类型（`text/x-python`、`text/x-shellscript` 等）归一化为 `text/plain` 后参与白名单判断
 - 防止 MIME 嗅探：`X-Content-Type-Options: nosniff`
 
 ### 4.2 文件名净化
