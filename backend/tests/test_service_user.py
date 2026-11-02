@@ -7,7 +7,7 @@ from tests._env import setup_env
 
 setup_env()
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
@@ -59,8 +59,33 @@ class TestUploadAvatar:
     async def test_rejects_invalid_mime(self):
         db = AsyncMock()
         user = _make_user()
-        with pytest.raises(ValidationFailed, match="JPG/PNG/WEBP/GIF"):
+        with pytest.raises(ValidationFailed, match="不允许的文件类型"):
             await upload_avatar(db, user, b"img", "text/plain")
+
+    @pytest.mark.asyncio
+    async def test_rejects_disguised_avatar(self):
+        db = AsyncMock()
+        user = _make_user()
+        with pytest.raises(ValidationFailed, match="不允许的文件类型"):
+            await upload_avatar(db, user, b"plain text pretending to be jpeg", "image/jpeg")
+        assert user.avatar_key is None
+
+    @pytest.mark.asyncio
+    async def test_accepts_real_image_ignoring_declared(self):
+        db = AsyncMock()
+        user = _make_user()
+        png = (
+            b"\x89PNG\r\n\x1a\n"
+            b"\x00\x00\x00\rIHDR"
+            b"\x00\x00\x00\x01"
+            b"\x00\x00\x00\x01"
+            b"\x08\x02\x00\x00\x00\x90w\x53\xde"
+            b"\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N"
+            b"\x00\x00\x00\x00IEND\xaeB`\x82"
+        )
+        with patch("app.services.user_service.upload_file", new=AsyncMock()):
+            await upload_avatar(db, user, png, "text/plain")
+        assert user.avatar_key == f"avatars/{user.id}"
 
     def test_allowed_avatar_types(self):
         assert "image/jpeg" in ALLOWED_AVATAR_TYPES

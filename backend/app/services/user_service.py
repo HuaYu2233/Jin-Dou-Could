@@ -1,3 +1,5 @@
+import io
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -7,6 +9,7 @@ from app.core.security import hash_password, hash_security_answer, revoke_token,
 from app.core.storage import get_presigned_download_url, upload_file
 from app.models.user import User
 from app.schemas.user import UserCreate
+from app.services.file_validation import detect_real_mime_type, ensure_mime_allowed
 
 ALLOWED_AVATAR_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 MAX_AVATAR_SIZE = 2 * 1024 * 1024
@@ -41,8 +44,9 @@ async def create_user(db: AsyncSession, data: UserCreate) -> User:
 async def upload_avatar(db: AsyncSession, user: User, content: bytes, mime_type: str) -> User:
     if len(content) > MAX_AVATAR_SIZE:
         raise PayloadTooLarge("头像大小不能超过 2MB")
-    if mime_type not in ALLOWED_AVATAR_TYPES:
-        raise ValidationFailed("仅支持 JPG/PNG/WEBP/GIF 格式")
+    real_mime = await detect_real_mime_type(io.BytesIO(content), mime_type)
+    ensure_mime_allowed(real_mime, ALLOWED_AVATAR_TYPES)
+    mime_type = real_mime
 
     storage_key = f"avatars/{user.id}"
     await upload_file(storage_key, content, mime_type)

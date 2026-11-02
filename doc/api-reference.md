@@ -130,6 +130,12 @@ POST /api/v1/users/me/avatar
 
 `multipart/form-data`，字段名 `file`
 
+**限制**:
+
+- 最大 2MB（`MAX_AVATAR_SIZE`）
+- 仅接受 JPG/PNG/WEBP/GIF，以 `python-magic` 探测的真实类型为准；声明的 `Content-Type` 不参与放行判断
+- 读取按 2MB 上限截断，超限返回 413
+
 ### 3.5 存储统计
 
 ```
@@ -160,6 +166,8 @@ POST /api/v1/files?folder_id={uuid}
 - 单文件最大 100MB（`MAX_UPLOAD_SIZE`）
 - MIME 类型白名单校验（以 `python-magic` 探测结果为准，检测失败直接拒绝）
 - 分片上传在第 1 片探测真实类型，完成合并时以探测结果覆盖声明值；上传会话过期后需重新初始化
+- 分片序号不得超过声明片数，累计已上传字节不得超过声明大小；合并时校验分片数量与序号连续性
+- 合并后以 MinIO 实际对象大小为准写入记录与配额，超过单文件上限或与声明偏差超过一个分片时删除对象并拒绝
 - 文本子类型（`text/x-python`、`text/x-shellscript` 等）按 `text/plain` 参与白名单判断
 - 文件名净化（去除特殊字符）
 - 存储配额检查
@@ -215,6 +223,8 @@ GET /api/v1/files/{file_id}/preview
 ```
 
 返回 MinIO 预签名 URL
+
+`text/html`、`application/xhtml+xml`、`image/svg+xml` 的预签名 URL 使用 `attachment` 下载语义，其余类型使用 `inline`
 
 ### 4.7 获取缩略图
 

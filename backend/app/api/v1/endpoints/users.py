@@ -21,7 +21,7 @@ async def upload_avatar(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    content = await file.read()
+    content = await file.read(user_service.MAX_AVATAR_SIZE + 1)
     mime_type = file.content_type or ""
     user = await user_service.upload_avatar(db, current_user, content, mime_type)
     await invalidate_user_cache(current_user.id)

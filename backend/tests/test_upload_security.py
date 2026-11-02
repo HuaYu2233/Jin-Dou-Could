@@ -245,6 +245,106 @@ async def test_multipart_complete_rejects_storage_key_mismatch():
             )
 
 
+async def test_multipart_part_rejects_part_number_out_of_range():
+    print("\n[测试 20] 分片序号超出声明片数时拒绝")
+    from app.services import file_multipart
+
+    owner = MagicMock()
+    owner.id = "owner"
+    state = {"storage_key": "owner/key", "total_size": "1024", "total_parts": "1", "mime_type": "text/plain"}
+    with patch.object(file_multipart, "redis_client") as mock_redis:
+        mock_redis.hgetall = AsyncMock(return_value=state)
+        with pytest.raises(AppError):
+            await file_multipart.upload_multipart_part("owner/key", "upload-1", 2, b"x" * 16, owner.id)
+
+
+async def test_multipart_part_rejects_exceeding_declared_size():
+    print("\n[测试 21] 已上传数据超过声明大小时拒绝")
+    from app.services import file_multipart
+
+    owner = MagicMock()
+    owner.id = "owner"
+    state = {
+        "storage_key": "owner/key",
+        "total_size": "100",
+        "total_parts": "1",
+        "mime_type": "text/plain",
+        "uploaded_bytes": "0",
+    }
+    with patch.object(file_multipart, "redis_client") as mock_redis:
+        mock_redis.hgetall = AsyncMock(return_value=state)
+        with pytest.raises(AppError):
+            await file_multipart.upload_multipart_part("owner/key", "upload-1", 1, b"x" * 101, owner.id)
+
+
+async def test_multipart_complete_rejects_part_count_mismatch():
+    print("\n[测试 22] 分片数量与声明不符时拒绝合并")
+    from app.services import file_multipart
+
+    owner = MagicMock()
+    owner.id = "owner"
+    state = {
+        "file_id": str(uuid4()),
+        "storage_key": "owner/real",
+        "filename": "a.txt",
+        "real_mime_type": "text/plain",
+        "total_size": "1024",
+        "part_size": "512",
+        "total_parts": "2",
+        "part_1": "etag-1",
+    }
+    with patch.object(file_multipart, "redis_client") as mock_redis:
+        mock_redis.hgetall = AsyncMock(return_value=state)
+        with pytest.raises(AppError):
+            await file_multipart.complete_multipart_upload(
+                db=AsyncMock(),
+                owner=owner,
+                upload_id="upload-1",
+                storage_key="owner/real",
+                filename="a.txt",
+                mime_type="text/plain",
+                total_size=1024,
+                parts=[{"PartNumber": 1, "ETag": "etag-1"}],
+            )
+
+
+async def test_multipart_complete_rejects_actual_size_mismatch():
+    print("\n[测试 23] 合并后实际大小与声明不符时删除对象并拒绝")
+    from app.services import file_multipart
+
+    owner = MagicMock()
+    owner.id = "owner"
+    state = {
+        "file_id": str(uuid4()),
+        "storage_key": "owner/real",
+        "filename": "a.txt",
+        "real_mime_type": "text/plain",
+        "total_size": "1024",
+        "part_size": "512",
+        "total_parts": "1",
+        "part_1": "etag-1",
+    }
+    with (
+        patch.object(file_multipart, "redis_client") as mock_redis,
+        patch.object(file_multipart, "complete_multipart", new=AsyncMock()),
+        patch.object(file_multipart, "head_object_size", new=AsyncMock(return_value=50 * 1024 * 1024)),
+        patch.object(file_multipart, "delete_file", new=AsyncMock()) as mock_delete,
+    ):
+        mock_redis.hgetall = AsyncMock(return_value=state)
+        with pytest.raises(AppError):
+            await file_multipart.complete_multipart_upload(
+                db=AsyncMock(),
+                owner=owner,
+                upload_id="upload-1",
+                storage_key="owner/real",
+                filename="a.txt",
+                mime_type="text/plain",
+                total_size=1024,
+                parts=[{"PartNumber": 1, "ETag": "etag-1"}],
+            )
+    mock_delete.assert_awaited_once_with("owner/real")
+
+
 def run_all() -> int:
     print("=" * 60)
     print("阶段五:上传安全加固验证")
@@ -270,6 +370,10 @@ def run_all() -> int:
         test_validate_accepts_text_subtype,
         test_multipart_complete_requires_session,
         test_multipart_complete_rejects_storage_key_mismatch,
+        test_multipart_part_rejects_part_number_out_of_range,
+        test_multipart_part_rejects_exceeding_declared_size,
+        test_multipart_complete_rejects_part_count_mismatch,
+        test_multipart_complete_rejects_actual_size_mismatch,
     ]
 
     results = []

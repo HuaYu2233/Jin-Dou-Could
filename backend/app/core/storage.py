@@ -26,6 +26,8 @@ _init_lock = asyncio.Lock()
 
 _ENDPOINT_SCHEME = "https" if settings.MINIO_SECURE else "http"
 
+_UNSAFE_INLINE_MIME_TYPES = {"text/html", "application/xhtml+xml", "image/svg+xml"}
+
 
 async def init_s3_clients():
     global _s3_client, _s3_client_ctx, _presigned_client, _presigned_client_ctx
@@ -287,10 +289,11 @@ async def get_presigned_preview_url(
     expires: int = 3600,
 ) -> str:
     async with get_presigned_s3_client() as client:
+        disposition = "attachment" if mime_type in _UNSAFE_INLINE_MIME_TYPES else "inline"
         params = {
             "Bucket": settings.MINIO_BUCKET,
             "Key": storage_key,
-            "ResponseContentDisposition": f"inline; filename*=UTF-8''{quote(filename)}",
+            "ResponseContentDisposition": f"{disposition}; filename*=UTF-8''{quote(filename)}",
             "ResponseContentType": mime_type,
         }
         url = await client.generate_presigned_url(
@@ -340,6 +343,15 @@ async def complete_multipart(
             UploadId=upload_id,
             MultipartUpload={"Parts": parts},
         )
+
+
+async def head_object_size(storage_key: str) -> int:
+    async with get_s3_client() as client:
+        resp = await client.head_object(
+            Bucket=settings.MINIO_BUCKET,
+            Key=storage_key,
+        )
+        return int(resp["ContentLength"])
 
 
 async def abort_multipart(storage_key: str, upload_id: str) -> None:

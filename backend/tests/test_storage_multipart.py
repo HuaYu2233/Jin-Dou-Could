@@ -150,3 +150,43 @@ class TestRemovedDuplicates:
     def test_dead_helpers_removed(self):
         assert not hasattr(storage, "upload_multipart")
         assert not hasattr(storage, "stream_object")
+
+
+class FakePresignedClient:
+    def __init__(self):
+        self.params = None
+
+    async def generate_presigned_url(self, operation, Params, ExpiresIn):
+        self.params = Params
+        return "https://example.com/object"
+
+
+def _patch_presigned_client(fake: FakePresignedClient):
+    @asynccontextmanager
+    async def _get_client():
+        yield fake
+
+    return patch.object(storage, "get_presigned_s3_client", _get_client)
+
+
+class TestPreviewDisposition:
+    @pytest.mark.asyncio
+    async def test_html_forced_to_attachment(self):
+        fake = FakePresignedClient()
+        with _patch_presigned_client(fake):
+            await storage.get_presigned_preview_url("user/obj", "text/html", "a.html")
+        assert fake.params["ResponseContentDisposition"].startswith("attachment;")
+
+    @pytest.mark.asyncio
+    async def test_svg_forced_to_attachment(self):
+        fake = FakePresignedClient()
+        with _patch_presigned_client(fake):
+            await storage.get_presigned_preview_url("user/obj", "image/svg+xml", "a.svg")
+        assert fake.params["ResponseContentDisposition"].startswith("attachment;")
+
+    @pytest.mark.asyncio
+    async def test_image_kept_inline(self):
+        fake = FakePresignedClient()
+        with _patch_presigned_client(fake):
+            await storage.get_presigned_preview_url("user/obj", "image/png", "a.png")
+        assert fake.params["ResponseContentDisposition"].startswith("inline;")

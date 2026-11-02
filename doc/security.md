@@ -81,6 +81,8 @@
 - 分片合并要求上传会话存在且 `storage_key` 与会话一致，会话过期后不能凭已上传分片直接合并
 - 常见别名（`audio/mp3`、`application/mp4`）归一化后参与白名单判断
 - libmagic 细分的文本子类型（`text/x-python`、`text/x-shellscript` 等）归一化为 `text/plain` 后参与白名单判断
+- 头像上传同样以探测结果为准，仅接受 JPG/PNG/WEBP/GIF，客户端声明的 `Content-Type` 不参与放行判断
+- 预览 `text/html`、`application/xhtml+xml`、`image/svg+xml` 时强制 `attachment` 下载，避免预签名 URL 在浏览器内直接渲染脚本
 - 防止 MIME 嗅探：`X-Content-Type-Options: nosniff`
 
 ### 4.2 文件名净化
@@ -92,6 +94,10 @@
 
 - 默认 100MB（`MAX_UPLOAD_SIZE`）
 - 存储配额检查：上传前校验用户剩余空间
+- 分片上传的片序号不得超过声明片数，累计已上传字节不得超过声明大小
+- 合并时校验分片数量与序号连续性，并对 MinIO 实际对象大小做复核：超过单文件上限或与声明偏差超过一个分片时删除对象并拒绝
+- 文件记录与配额统计使用合并后的实际大小，不信任客户端声明值
+- 上传与分片读取均有字节上限，超限内容不会整体读入内存
 
 ## 5. WebSocket 安全
 

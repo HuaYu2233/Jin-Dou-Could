@@ -99,6 +99,12 @@ async def detect_real_mime_type(fileobj, declared: str) -> str:
     return detected or declared
 
 
+def ensure_mime_allowed(mime_type: str, allowed: set[str] | None = None) -> None:
+    canonical = _canonical_mime(mime_type)
+    if canonical not in (ALLOWED_MIME_TYPES if allowed is None else allowed):
+        raise ValidationFailed(f"不允许的文件类型: {mime_type}")
+
+
 def validate_mime_type(declared: str, detected: str) -> None:
     detected_canonical = _canonical_mime(detected)
     if detected_canonical not in ALLOWED_MIME_TYPES:

@@ -287,7 +287,7 @@ async def multipart_upload_part(
     part: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
 ):
-    data = await part.read()
+    data = await part.read(settings.UPLOAD_PART_SIZE * 2 + 1)
     etag = await file_multipart.upload_multipart_part(
         storage_key=storage_key,
         upload_id=upload_id,
