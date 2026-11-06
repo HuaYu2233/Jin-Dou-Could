@@ -138,3 +138,42 @@ class TestDetectRealMimeType:
         buf = io.BytesIO(b"hello world")
         result = await detect_real_mime_type(buf, "application/octet-stream")
         assert result in ("text/plain", "application/octet-stream")
+
+
+class _FakeResult:
+    def __init__(self, value: int) -> None:
+        self._value = value
+
+    def scalar_one(self) -> int:
+        return self._value
+
+
+class _FakeConn:
+    def __init__(self, value: int) -> None:
+        self._value = value
+
+    async def __aenter__(self) -> "_FakeConn":
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        return None
+
+    async def execute(self, _stmt: object) -> _FakeResult:
+        return _FakeResult(self._value)
+
+
+class _FakeEngine:
+    def __init__(self, value: int) -> None:
+        self._value = value
+
+    def connect(self) -> _FakeConn:
+        return _FakeConn(self._value)
+
+
+class TestCountFiles:
+    @pytest.mark.asyncio
+    async def test_uses_engine_connect(self, monkeypatch: pytest.MonkeyPatch):
+        from app.services import file_service
+
+        monkeypatch.setattr(file_service, "engine", _FakeEngine(7))
+        assert await file_service._count_files([]) == 7

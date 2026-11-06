@@ -33,6 +33,13 @@ _SEARCH_CACHE_TTL = 60
 _CACHE_HASH_KEY = "file_caches"
 
 
+async def _count_files(filters: list) -> int:
+    stmt = select(func.count()).select_from(File).where(*filters)
+    async with engine.connect() as conn:
+        result = await conn.execute(stmt)
+        return result.scalar_one()
+
+
 async def invalidate_file_caches(owner_id: uuid.UUID) -> None:
     oid = str(owner_id)
     try:
@@ -157,12 +164,11 @@ async def list_files(
         result = await db.execute(query)
         files = list(result.scalars().all())
     else:
-        count_stmt = select(func.count()).select_from(File).where(*filters)
         count_result, select_result = await asyncio.gather(
-            engine.execute(count_stmt),
+            _count_files(filters),
             db.execute(query),
         )
-        total = count_result.scalar_one()
+        total = count_result
         files = list(select_result.scalars().all())
         await redis_client.hset(_CACHE_HASH_KEY, cache_field, str(total))
         await redis_client.expire(_CACHE_HASH_KEY, _COUNT_CACHE_TTL)
@@ -222,12 +228,11 @@ async def search_files(
         result = await db.execute(query)
         files = list(result.scalars().all())
     else:
-        count_stmt = select(func.count()).select_from(File).where(*filters)
         count_result, select_result = await asyncio.gather(
-            engine.execute(count_stmt),
+            _count_files(filters),
             db.execute(query),
         )
-        total = count_result.scalar_one()
+        total = count_result
         files = list(select_result.scalars().all())
         await redis_client.hset(_CACHE_HASH_KEY, cache_field, str(total))
         await redis_client.expire(_CACHE_HASH_KEY, _SEARCH_CACHE_TTL)
@@ -300,12 +305,11 @@ async def list_trash_files(
         result = await db.execute(query)
         files = list(result.scalars().all())
     else:
-        count_stmt = select(func.count()).select_from(File).where(*filters)
         count_result, select_result = await asyncio.gather(
-            engine.execute(count_stmt),
+            _count_files(filters),
             db.execute(query),
         )
-        total = count_result.scalar_one()
+        total = count_result
         files = list(select_result.scalars().all())
         await redis_client.hset(_CACHE_HASH_KEY, cache_field, str(total))
         await redis_client.expire(_CACHE_HASH_KEY, _COUNT_CACHE_TTL)
