@@ -89,32 +89,54 @@ async def lifespan(app: FastAPI):
 async def _cleanup_orphan_multipart_uploads() -> None:
     from app.core.storage import get_s3_client
 
+    async def _run_once() -> None:
+        async with get_s3_client() as client:
+            upload_entries: list[tuple[str, str]] = []
+            paginator = client.get_paginator("list_multipart_uploads")
+            async for page in paginator.paginate(Bucket=settings.MINIO_BUCKET):
+                for upload in page.get("Uploads", []):
+                    key = upload.get("Key", "")
+                    upload_id = upload.get("UploadId", "")
+                    if key.count("/") < 1:
+                        continue
+                    owner_id = key.split("/")[0]
+                    upload_entries.append((key, upload_id))
+
+            if not upload_entries:
+                return
+
+            pipeline = redis_client.pipeline(transaction=False)
+            for key, upload_id in upload_entries:
+                owner_id = key.split("/")[0]
+                pipeline.exists(f"multipart:{owner_id}:{upload_id}")
+            results = await pipeline.execute()
+
+            orphans = [
+                (key, upload_id) for (key, upload_id), alive in zip(upload_entries, results, strict=False) if not alive
+            ]
+            if not orphans:
+                return
+
+            async def _abort_one(key: str, upload_id: str) -> None:
+                try:
+                    await client.abort_multipart_upload(
+                        Bucket=settings.MINIO_BUCKET,
+                        Key=key,
+                        UploadId=upload_id,
+                    )
+                    logger.bind(log_type="backup").info(f"清理孤儿分片上传: key={key} upload_id={upload_id}")
+                except Exception as e:
+                    logger.bind(log_type="backup").warning(f"清理孤儿分片上传失败: key={key} error={e}")
+
+            async with asyncio.TaskGroup() as tg:
+                for key, upload_id in orphans:
+                    tg.create_task(_abort_one(key, upload_id))
+
     interval = 3600
     while True:
         try:
             await asyncio.sleep(interval)
-            async with get_s3_client() as client:
-                paginator = client.get_paginator("list_multipart_uploads")
-                async for page in paginator.paginate(Bucket=settings.MINIO_BUCKET):
-                    uploads = page.get("Uploads", [])
-                    for upload in uploads:
-                        key = upload.get("Key", "")
-                        upload_id = upload.get("UploadId", "")
-                        parts = key.split("/")
-                        if len(parts) >= 2:
-                            owner_id = parts[0]
-                            state_key = f"multipart:{owner_id}:{upload_id}"
-                            exists = await redis_client.exists(state_key)
-                            if not exists:
-                                try:
-                                    await client.abort_multipart_upload(
-                                        Bucket=settings.MINIO_BUCKET,
-                                        Key=key,
-                                        UploadId=upload_id,
-                                    )
-                                    logger.info(f"清理孤儿分片上传: key={key} upload_id={upload_id}")
-                                except Exception as e:
-                                    logger.warning(f"清理孤儿分片上传失败: key={key} error={e}")
+            await _run_once()
         except asyncio.CancelledError:
             raise
         except Exception as e:
