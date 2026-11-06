@@ -3,11 +3,6 @@ export const queryKeys = {
     all: ["files"] as const,
     list: (params: { category: string; page: number; folderId: string | null; keyword: string }) =>
       [...queryKeys.files.all, "list", params] as const,
-    trash: (page: number) => [...queryKeys.files.all, "trash", page] as const,
-    trashFolders: (page: number) => [...queryKeys.files.all, "trashFolders", page] as const,
-    search: (keyword: string, page: number) => [...queryKeys.files.all, "search", keyword, page] as const,
-    folderContents: (folderId: string | null, page: number) =>
-      [...queryKeys.files.all, "folderContents", folderId, page] as const,
   },
   shares: {
     all: ["shares"] as const,
