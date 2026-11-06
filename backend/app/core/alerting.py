@@ -9,6 +9,7 @@ from email.mime.text import MIMEText
 from loguru import logger
 
 from app.core.config import settings
+from app.core.smtp import send_smtp_message
 from app.core.webhook import build_webhook_payload
 
 
@@ -120,34 +121,23 @@ class AlertManager:
             logger.bind(log_type="alert").debug(f"Webhook 告警降级发送失败: {e}")
 
     def _fallback_email(self, subject, text):
-        import smtplib
-
         try:
             msg = MIMEMultipart("alternative")
             msg["Subject"] = subject
             msg["From"] = settings.ALERT_EMAIL_FROM
             msg["To"] = settings.ALERT_EMAIL_TO
             msg.attach(MIMEText(text, "plain", "utf-8"))
-            server = smtplib.SMTP(
-                settings.ALERT_EMAIL_SMTP_HOST,
-                settings.ALERT_EMAIL_SMTP_PORT,
+            send_smtp_message(
+                msg,
+                [addr.strip() for addr in settings.ALERT_EMAIL_TO.split(",")],
+                host=settings.ALERT_EMAIL_SMTP_HOST,
+                port=settings.ALERT_EMAIL_SMTP_PORT,
+                user=settings.ALERT_EMAIL_SMTP_USER,
+                password=settings.ALERT_EMAIL_SMTP_PASSWORD,
+                from_email=settings.ALERT_EMAIL_FROM,
+                use_tls=settings.ALERT_EMAIL_USE_TLS,
                 timeout=10,
             )
-            try:
-                if settings.ALERT_EMAIL_USE_TLS:
-                    server.starttls()
-                if settings.ALERT_EMAIL_SMTP_USER:
-                    server.login(
-                        settings.ALERT_EMAIL_SMTP_USER,
-                        settings.ALERT_EMAIL_SMTP_PASSWORD,
-                    )
-                server.sendmail(
-                    settings.ALERT_EMAIL_FROM,
-                    [addr.strip() for addr in settings.ALERT_EMAIL_TO.split(",")],
-                    msg.as_string(),
-                )
-            finally:
-                server.quit()
         except Exception as e:
             logger.bind(log_type="alert").debug(f"邮件告警降级发送失败: {e}")
 

@@ -4,6 +4,7 @@ from fastapi import Request, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.client_ip import get_client_ip as resolve_client_ip
 from app.core.config import settings
 from app.core.exceptions import RateLimited, Unauthorized
 from app.core.redis import redis_client
@@ -16,35 +17,9 @@ from app.core.security import (
 )
 from app.models.user import User
 
-_TRUSTED_PROXIES: set[str] | None = None
-
-
-def _get_trusted_proxies() -> set[str]:
-    global _TRUSTED_PROXIES
-    if _TRUSTED_PROXIES is None:
-        if settings.TRUSTED_PROXIES:
-            _TRUSTED_PROXIES = {p.strip() for p in settings.TRUSTED_PROXIES.split(",") if p.strip()}
-        else:
-            _TRUSTED_PROXIES = set()
-    return _TRUSTED_PROXIES
-
 
 def get_client_ip(request: Request) -> str:
-    direct_ip = request.client.host if request.client else None
-    if not direct_ip:
-        return "unknown"
-
-    trusted = _get_trusted_proxies()
-    if not trusted or direct_ip not in trusted:
-        return direct_ip
-
-    xff = request.headers.get("x-forwarded-for")
-    if xff:
-        return xff.split(",")[0].strip()
-    x_real_ip = request.headers.get("x-real-ip")
-    if x_real_ip:
-        return x_real_ip.strip()
-    return direct_ip
+    return resolve_client_ip(request)
 
 
 async def check_login_rate_limit(client_ip: str, email: str) -> None:

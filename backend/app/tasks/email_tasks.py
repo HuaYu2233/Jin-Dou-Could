@@ -1,4 +1,3 @@
-import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -6,7 +5,7 @@ from loguru import logger
 
 from app.core.celery_app import celery_app
 from app.core.config import settings
-from app.core.smtp import resolve_smtp
+from app.core.smtp import resolve_smtp, send_smtp_message
 
 
 @celery_app.task(
@@ -44,15 +43,17 @@ def send_verification_email(self, to_email: str, code: str) -> None:
     msg.attach(MIMEText(html, "html", "utf-8"))
 
     try:
-        server = smtplib.SMTP(host, port, timeout=15)
-        try:
-            if use_tls:
-                server.starttls()
-            if user:
-                server.login(user, password)
-            server.sendmail(from_email, [to_email], msg.as_string())
-        finally:
-            server.quit()
+        send_smtp_message(
+            msg,
+            [to_email],
+            host=host,
+            port=port,
+            user=user,
+            password=password,
+            from_email=from_email,
+            use_tls=use_tls,
+            timeout=15,
+        )
         logger.bind(log_type="email").info(f"验证码邮件已发送至 {to_email}")
     except Exception as exc:
         logger.bind(log_type="email").error(f"发送验证码邮件失败: {exc}")
@@ -79,26 +80,17 @@ def send_alert_email(self, subject: str, text: str) -> None:
     msg.attach(MIMEText(text, "plain", "utf-8"))
 
     try:
-        server = smtplib.SMTP(
-            settings.ALERT_EMAIL_SMTP_HOST,
-            settings.ALERT_EMAIL_SMTP_PORT,
+        send_smtp_message(
+            msg,
+            [addr.strip() for addr in settings.ALERT_EMAIL_TO.split(",")],
+            host=settings.ALERT_EMAIL_SMTP_HOST,
+            port=settings.ALERT_EMAIL_SMTP_PORT,
+            user=settings.ALERT_EMAIL_SMTP_USER,
+            password=settings.ALERT_EMAIL_SMTP_PASSWORD,
+            from_email=settings.ALERT_EMAIL_FROM,
+            use_tls=settings.ALERT_EMAIL_USE_TLS,
             timeout=10,
         )
-        try:
-            if settings.ALERT_EMAIL_USE_TLS:
-                server.starttls()
-            if settings.ALERT_EMAIL_SMTP_USER:
-                server.login(
-                    settings.ALERT_EMAIL_SMTP_USER,
-                    settings.ALERT_EMAIL_SMTP_PASSWORD,
-                )
-            server.sendmail(
-                settings.ALERT_EMAIL_FROM,
-                [addr.strip() for addr in settings.ALERT_EMAIL_TO.split(",")],
-                msg.as_string(),
-            )
-        finally:
-            server.quit()
     except Exception as exc:
         logger.bind(log_type="alert").error(f"邮件告警发送失败: {exc}")
         raise self.retry(exc=exc) from exc

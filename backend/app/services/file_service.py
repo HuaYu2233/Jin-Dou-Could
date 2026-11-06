@@ -35,6 +35,55 @@ async def _count_files(db: AsyncSession, filters: list) -> int:
     return await db.scalar(stmt) or 0
 
 
+async def _paginate(
+    db: AsyncSession,
+    *,
+    filters: list,
+    order_cols: list,
+    cursor_col,
+    cursor_attr: str,
+    cursor: str | None,
+    skip: int,
+    limit: int,
+    cache_field: str,
+) -> tuple[list[File], int, str | None]:
+    if cursor:
+        cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=UTC)
+        query = select(File).where(*filters, cursor_col < cursor_dt).order_by(*order_cols).limit(limit)
+    elif skip > 0:
+        sub = (
+            select(cursor_col)
+            .where(*filters)
+            .order_by(*order_cols)
+            .offset(skip - 1)
+            .limit(1)
+            .correlate(None)
+            .subquery()
+        )
+        query = select(File).where(*filters, cursor_col <= sub.c[cursor_attr]).order_by(*order_cols).limit(limit)
+    else:
+        query = select(File).where(*filters).order_by(*order_cols).limit(limit)
+
+    cached_total = await redis_client.hget(_CACHE_HASH_KEY, cache_field)
+    if cached_total is not None:
+        total = int(cached_total)
+    else:
+        total = await _count_files(db, filters)
+        await redis_client.hset(_CACHE_HASH_KEY, cache_field, str(total))
+        await redis_client.expire(_CACHE_HASH_KEY, _CACHE_TTL)
+
+    result = await db.execute(query)
+    files = list(result.scalars().all())
+
+    next_cursor = None
+    if files:
+        last_ts = getattr(files[-1], cursor_attr)
+        if last_ts and total > skip + len(files):
+            next_cursor = last_ts.isoformat()
+
+    return files, total, next_cursor
+
+
 async def invalidate_file_caches(owner_id: uuid.UUID) -> None:
     oid = str(owner_id)
     try:
@@ -129,49 +178,17 @@ async def list_files(
     else:
         filters.append(File.folder_id.is_(None))
 
-    if cursor:
-        cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=UTC)
-        query = select(File).where(*filters, File.created_at < cursor_dt).order_by(File.created_at.desc()).limit(limit)
-    elif skip > 0:
-        sub = (
-            select(File.created_at)
-            .where(*filters)
-            .order_by(File.created_at.desc())
-            .offset(skip - 1)
-            .limit(1)
-            .correlate(None)
-            .subquery()
-        )
-        query = (
-            select(File)
-            .where(*filters, File.created_at <= sub.c.created_at)
-            .order_by(File.created_at.desc())
-            .limit(limit)
-        )
-    else:
-        query = select(File).where(*filters).order_by(File.created_at.desc()).limit(limit)
-
-    cache_field = f"{owner_id}:count:{file_type or ''}:{folder_id or 'root'}"
-    cached_total = await redis_client.hget(_CACHE_HASH_KEY, cache_field)
-
-    if cached_total is not None:
-        total = int(cached_total)
-        result = await db.execute(query)
-        files = list(result.scalars().all())
-    else:
-        total = await _count_files(db, filters)
-        result = await db.execute(query)
-        files = list(result.scalars().all())
-        await redis_client.hset(_CACHE_HASH_KEY, cache_field, str(total))
-        await redis_client.expire(_CACHE_HASH_KEY, _CACHE_TTL)
-
-    next_cursor = None
-    if files:
-        last_created = files[-1].created_at
-        if total > skip + len(files):
-            next_cursor = last_created.isoformat()
-
-    return files, total, next_cursor
+    return await _paginate(
+        db,
+        filters=filters,
+        order_cols=[File.created_at.desc()],
+        cursor_col=File.created_at,
+        cursor_attr="created_at",
+        cursor=cursor,
+        skip=skip,
+        limit=limit,
+        cache_field=f"{owner_id}:count:{file_type or ''}:{folder_id or 'root'}",
+    )
 
 
 async def search_files(
@@ -195,44 +212,17 @@ async def search_files(
 
     filters = [*base_filters, search_filter]
 
-    if cursor:
-        cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=UTC)
-        query = select(File).where(*filters, File.created_at < cursor_dt).order_by(*order_cols).limit(limit)
-    elif skip > 0:
-        sub = (
-            select(File.created_at)
-            .where(*filters)
-            .order_by(*order_cols)
-            .offset(skip - 1)
-            .limit(1)
-            .correlate(None)
-            .subquery()
-        )
-        query = select(File).where(*filters, File.created_at <= sub.c.created_at).order_by(*order_cols).limit(limit)
-    else:
-        query = select(File).where(*filters).order_by(*order_cols).limit(limit)
-
-    cache_field = f"{owner_id}:search:{keyword}"
-    cached_total = await redis_client.hget(_CACHE_HASH_KEY, cache_field)
-
-    if cached_total is not None:
-        total = int(cached_total)
-        result = await db.execute(query)
-        files = list(result.scalars().all())
-    else:
-        total = await _count_files(db, filters)
-        result = await db.execute(query)
-        files = list(result.scalars().all())
-        await redis_client.hset(_CACHE_HASH_KEY, cache_field, str(total))
-        await redis_client.expire(_CACHE_HASH_KEY, _CACHE_TTL)
-
-    next_cursor = None
-    if files:
-        last_created = files[-1].created_at
-        if total > skip + len(files):
-            next_cursor = last_created.isoformat()
-
-    return files, total, next_cursor
+    return await _paginate(
+        db,
+        filters=filters,
+        order_cols=order_cols,
+        cursor_col=File.created_at,
+        cursor_attr="created_at",
+        cursor=cursor,
+        skip=skip,
+        limit=limit,
+        cache_field=f"{owner_id}:search:{keyword}",
+    )
 
 
 async def move_files(
@@ -264,49 +254,17 @@ async def list_trash_files(
 ) -> tuple[list[File], int, str | None]:
     filters = [File.owner_id == owner_id, File.deleted_at.is_not(None)]
 
-    if cursor:
-        cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=UTC)
-        query = select(File).where(*filters, File.deleted_at < cursor_dt).order_by(File.deleted_at.desc()).limit(limit)
-    elif skip > 0:
-        sub = (
-            select(File.deleted_at)
-            .where(*filters)
-            .order_by(File.deleted_at.desc())
-            .offset(skip - 1)
-            .limit(1)
-            .correlate(None)
-            .subquery()
-        )
-        query = (
-            select(File)
-            .where(*filters, File.deleted_at <= sub.c.deleted_at)
-            .order_by(File.deleted_at.desc())
-            .limit(limit)
-        )
-    else:
-        query = select(File).where(*filters).order_by(File.deleted_at.desc()).limit(limit)
-
-    cache_field = f"{owner_id}:trash"
-    cached_total = await redis_client.hget(_CACHE_HASH_KEY, cache_field)
-
-    if cached_total is not None:
-        total = int(cached_total)
-        result = await db.execute(query)
-        files = list(result.scalars().all())
-    else:
-        total = await _count_files(db, filters)
-        result = await db.execute(query)
-        files = list(result.scalars().all())
-        await redis_client.hset(_CACHE_HASH_KEY, cache_field, str(total))
-        await redis_client.expire(_CACHE_HASH_KEY, _CACHE_TTL)
-
-    next_cursor = None
-    if files:
-        last_deleted = files[-1].deleted_at
-        if last_deleted and total > skip + len(files):
-            next_cursor = last_deleted.isoformat()
-
-    return files, total, next_cursor
+    return await _paginate(
+        db,
+        filters=filters,
+        order_cols=[File.deleted_at.desc()],
+        cursor_col=File.deleted_at,
+        cursor_attr="deleted_at",
+        cursor=cursor,
+        skip=skip,
+        limit=limit,
+        cache_field=f"{owner_id}:trash",
+    )
 
 
 async def soft_delete_file(db: AsyncSession, file_id: uuid.UUID, owner_id: uuid.UUID) -> bool:

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
+from app.core.client_ip import get_client_ip
 from app.core.ws_manager import ws_manager
 from app.db.base import get_db
 from app.models.user import User
@@ -18,22 +19,6 @@ from app.schemas.share import (
 from app.services import share_service
 
 router = APIRouter()
-
-
-def _extract_client_ip(request: Request) -> str:
-    trusted = request.app.state.trusted_proxies if hasattr(request.app.state, "trusted_proxies") else None
-    direct_ip = request.client.host if request.client else None
-    if not direct_ip:
-        return "unknown"
-    if not trusted or direct_ip not in trusted:
-        return direct_ip
-    xff = request.headers.get("x-forwarded-for")
-    if xff:
-        return xff.split(",")[0].strip()
-    x_real_ip = request.headers.get("x-real-ip")
-    if x_real_ip:
-        return x_real_ip.strip()
-    return direct_ip
 
 
 @router.post("/{file_id}", response_model=ShareCreateResponse)
@@ -100,7 +85,7 @@ async def verify_share(
     body: ShareVerifyRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    info = await share_service.verify_share_with_rate_limit(db, token, body.extract_code, _extract_client_ip(request))
+    info = await share_service.verify_share_with_rate_limit(db, token, body.extract_code, get_client_ip(request))
     return info
 
 
@@ -111,5 +96,5 @@ async def download_shared_file(
     extract_code: str,
     db: AsyncSession = Depends(get_db),
 ):
-    url = await share_service.download_shared_file(db, token, extract_code, _extract_client_ip(request))
+    url = await share_service.download_shared_file(db, token, extract_code, get_client_ip(request))
     return {"url": url}

@@ -4,23 +4,13 @@ from loguru import logger
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from app.core.client_ip import get_client_ip_from_scope
 from app.core.config import settings
 from app.core.redis import redis_client
 
 EXEMPT_PATHS = {"/health", "/docs", "/openapi.json", "/redoc"}
 LOGIN_PATHS = {"/api/v1/auth/login", "/api/v1/auth/register"}
 LOGIN_RATE_LIMIT = settings.LOGIN_RATE_LIMIT_MAX_ATTEMPTS
-_TRUSTED_PROXIES: set[str] | None = None
-
-
-def _get_trusted_proxies() -> set[str]:
-    global _TRUSTED_PROXIES
-    if _TRUSTED_PROXIES is None:
-        if settings.TRUSTED_PROXIES:
-            _TRUSTED_PROXIES = {p.strip() for p in settings.TRUSTED_PROXIES.split(",") if p.strip()}
-        else:
-            _TRUSTED_PROXIES = set()
-    return _TRUSTED_PROXIES
 
 
 class RateLimitMiddleware:
@@ -92,21 +82,4 @@ class RateLimitMiddleware:
 
     @staticmethod
     def _get_client_ip(scope: Scope) -> str:
-        client = scope.get("client")
-        direct_ip = client[0] if client else None
-
-        if not direct_ip:
-            return "unknown"
-
-        trusted = _get_trusted_proxies()
-        if not trusted or direct_ip not in trusted:
-            return direct_ip
-
-        headers = dict(scope.get("headers", []))
-        xff = headers.get(b"x-forwarded-for")
-        if xff:
-            return xff.decode().split(",")[0].strip()
-        x_real_ip = headers.get(b"x-real-ip")
-        if x_real_ip:
-            return x_real_ip.decode().strip()
-        return direct_ip
+        return get_client_ip_from_scope(scope)
