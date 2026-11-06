@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import Header from "./components/Header";
 import NotificationToast from "./components/NotificationToast";
 import { useWebSocket } from "@/lib/hooks/useWebSocket";
@@ -11,14 +12,19 @@ import { useNotificationStore } from "@/stores/notifications";
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   useWebSocket();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isLoading = useAuthStore((s) => s.isLoading);
   const unreadCount = useNotificationStore((s) => s.unreadCount);
 
   useEffect(() => {
     if (isLoading) return;
-    if (!isAuthenticated) router.replace("/login");
-  }, [isAuthenticated, isLoading, router]);
+    if (!isAuthenticated) {
+      queryClient.clear();
+      useNotificationStore.getState().clearAll();
+      router.replace("/login");
+    }
+  }, [isAuthenticated, isLoading, router, queryClient]);
 
   return (
     <div className="flex h-screen flex-col">
