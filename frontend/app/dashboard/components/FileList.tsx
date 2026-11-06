@@ -45,6 +45,35 @@ function getFileIcon(fileType: string, mimeType: string): string {
   return "📦";
 }
 
+const THUMB_URL_TTL = 30 * 60 * 1000;
+const thumbUrlCache = new Map<string, { url: string; expires: number }>();
+const thumbUrlInFlight = new Map<string, Promise<string>>();
+
+function thumbCacheKey(file: FileItem): string {
+  return file.thumbnail_key ? `${file.id}:thumbnail` : `${file.id}:preview`;
+}
+
+function resolveThumbUrl(file: FileItem): Promise<string> {
+  const key = thumbCacheKey(file);
+  const cached = thumbUrlCache.get(key);
+  if (cached && cached.expires > Date.now()) return Promise.resolve(cached.url);
+
+  const pending = thumbUrlInFlight.get(key);
+  if (pending) return pending;
+
+  const request = (file.thumbnail_key ? getFileThumbnailUrl(file.id).then((res) => res.url) : getFilePreviewUrl(file.id))
+    .then((url) => {
+      thumbUrlCache.set(key, { url, expires: Date.now() + THUMB_URL_TTL });
+      return url;
+    })
+    .finally(() => {
+      thumbUrlInFlight.delete(key);
+    });
+
+  thumbUrlInFlight.set(key, request);
+  return request;
+}
+
 function Thumbnail({ file, variant = "grid" }: { file: FileItem; variant?: "grid" | "list" }) {
   const [thumbUrl, setThumbUrl] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -56,28 +85,22 @@ function Thumbnail({ file, variant = "grid" }: { file: FileItem; variant?: "grid
     if (file.file_type !== "image" || failed) return;
     let active = true;
 
-    if (file.thumbnail_key) {
-      getFileThumbnailUrl(file.id)
-        .then(({ url }) => {
-          if (active) setThumbUrl(url);
-        })
-        .catch(() => {
-          if (active) setFailed(true);
-        });
-    } else {
-      getFilePreviewUrl(file.id)
-        .then((url) => {
-          if (active) setThumbUrl(url);
-        })
-        .catch(() => {
-          if (active) setFailed(true);
-        });
-    }
+    resolveThumbUrl(file)
+      .then((url) => {
+        if (active) setThumbUrl(url);
+      })
+      .catch(() => {
+        if (active) setFailed(true);
+      });
 
     return () => { active = false; };
-  }, [file.id, file.file_type, file.thumbnail_key, failed]);
+  }, [file, failed]);
 
   const handleLoad = useCallback(() => setLoaded(true), []);
+  const handleError = useCallback(() => {
+    thumbUrlCache.delete(thumbCacheKey(file));
+    setFailed(true);
+  }, [file]);
 
   if (file.file_type !== "image" || failed) {
     return <span className={isList ? styles.fileIcon : styles.gridIcon}>{getFileIcon(file.file_type, file.mime_type)}</span>;
@@ -236,7 +259,7 @@ export default function FileList({
   return (
     <TableVirtuoso
       data={unifiedItems}
-      fixedItemHeight={48}
+      fixedItemHeight={52}
       className={styles.table}
       components={{
         Table: ({ children, style }: { children?: React.ReactNode; style?: React.CSSProperties }) => (

@@ -1,21 +1,29 @@
 .label {
   display: block;
   font-size: 13px;
-  color: #4b5563;
-  margin-bottom: 4px;
+  color: var(--qk-text-2);
+  margin-bottom: 6px;
 }
 
 .input {
   width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--qk-border-strong);
+  border-radius: 8px;
   font-size: 14px;
+  color: var(--qk-text);
+  background: var(--qk-surface);
   outline: none;
   box-sizing: border-box;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.input::placeholder {
+  color: var(--qk-text-4);
 }
 
 .input:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+  border-color: var(--qk-primary);
+  box-shadow: 0 0 0 3px rgba(30, 111, 255, 0.12);
 }

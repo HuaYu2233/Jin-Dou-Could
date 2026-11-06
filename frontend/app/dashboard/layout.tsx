@@ -30,7 +30,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="flex h-screen flex-col">
       <Header extra={
         unreadCount > 0 ? (
-          <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full bg-red-500 text-white text-xs font-bold">
+          <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full bg-danger text-white text-xs font-bold">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         ) : null

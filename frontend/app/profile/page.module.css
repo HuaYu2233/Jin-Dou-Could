@@ -3,65 +3,73 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  max-width: 640px;
+  max-width: 680px;
   margin: 0 auto;
-  background: #f9fafb;
 }
 
 .avatarSection {
   display: flex;
   align-items: center;
   gap: 20px;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 24px;
+  background: var(--qk-surface);
+  border: 1px solid var(--qk-border);
+  border-radius: var(--qk-radius-lg);
+  padding: 22px;
+  margin-bottom: 8px;
+  box-shadow: var(--qk-shadow-sm);
 }
 
 .avatarInfo {
   flex: 1;
+  min-width: 0;
 }
 
 .avatarEmail {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--qk-text-3);
   margin-top: 4px;
+  word-break: break-all;
 }
 
 .uploadBtn {
-  padding: 6px 16px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  background: #fff;
-  color: #4b5563;
-  font-size: 14px;
+  height: 34px;
+  padding: 0 16px;
+  border: 1px solid var(--qk-border);
+  border-radius: 8px;
+  background: var(--qk-surface);
+  color: var(--qk-text-2);
+  font-size: 13px;
   cursor: pointer;
-  transition: background 0.15s ease;
+  box-shadow: var(--qk-shadow-sm);
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
 }
 
-.uploadBtn:hover {
-  background: #f9fafb;
+.uploadBtn:hover:not(:disabled) {
+  background: var(--qk-surface-2);
+  border-color: var(--qk-border-strong);
+  color: var(--qk-text);
 }
 
 .uploadBtn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .section {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 24px;
+  background: var(--qk-surface);
+  border: 1px solid var(--qk-border);
+  border-radius: var(--qk-radius-lg);
+  padding: 22px;
+  margin-bottom: 8px;
+  box-shadow: var(--qk-shadow-sm);
 }
 
 .sectionTitle {
-  margin: 0 0 16px 0;
+  margin: 0 0 18px;
   font-size: 15px;
   font-weight: 600;
-  color: #374151;
+  color: var(--qk-text);
 }
 
 .field {
@@ -71,75 +79,92 @@
 .label {
   display: block;
   font-size: 13px;
-  color: #4b5563;
+  color: var(--qk-text-2);
   margin-bottom: 6px;
 }
 
 .input {
   width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--qk-border-strong);
+  border-radius: 8px;
   font-size: 14px;
+  color: var(--qk-text);
+  background: var(--qk-surface);
   outline: none;
   box-sizing: border-box;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.input::placeholder {
+  color: var(--qk-text-4);
 }
 
 .input:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+  border-color: var(--qk-primary);
+  box-shadow: 0 0 0 3px rgba(30, 111, 255, 0.12);
 }
 
 .actions {
   display: flex;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 12px;
 }
 
 .cancelBtn {
-  padding: 8px 16px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  background: #fff;
-  color: #4b5563;
-  font-size: 14px;
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid var(--qk-border-strong);
+  border-radius: 8px;
+  background: var(--qk-surface);
+  color: var(--qk-text-2);
+  font-size: 13px;
   cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
 }
 
 .cancelBtn:hover {
-  background: #f9fafb;
+  background: var(--qk-surface-2);
+  color: var(--qk-text);
 }
 
 .saveBtn {
-  padding: 8px 16px;
+  height: 36px;
+  padding: 0 18px;
   border: none;
-  border-radius: 6px;
-  background: #2563eb;
+  border-radius: 8px;
+  background: var(--qk-primary-gradient);
   color: #fff;
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
+  box-shadow: 0 2px 8px rgba(30, 111, 255, 0.24);
+  transition: filter 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
 }
 
 .saveBtn:disabled {
-  background: #93c5fd;
+  opacity: 0.5;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .saveBtn:not(:disabled):hover {
-  background: #1d4ed8;
+  filter: brightness(1.05);
+  box-shadow: 0 4px 14px rgba(30, 111, 255, 0.32);
 }
 
 .message {
   font-size: 13px;
-  margin-top: 8px;
+  margin-top: 10px;
 }
 
 .messageOk {
-  color: #059669;
+  color: var(--qk-success);
 }
 
 .messageErr {
-  color: #dc2626;
+  color: var(--qk-danger);
 }
 
 @media (max-width: 768px) {
@@ -150,5 +175,9 @@
     flex-direction: column;
     text-align: center;
     align-items: center;
+    gap: 14px;
+  }
+  .section {
+    padding: 16px;
   }
 }

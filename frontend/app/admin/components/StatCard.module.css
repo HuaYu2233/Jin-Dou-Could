@@ -1,26 +1,33 @@
 .card {
-  background: #fff;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  background: var(--qk-surface);
+  border-radius: var(--qk-radius-lg);
+  border: 1px solid var(--qk-border);
   padding: 20px;
+  box-shadow: var(--qk-shadow-sm);
+  transition: box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.card:hover {
+  border-color: var(--qk-border-strong);
+  box-shadow: var(--qk-shadow);
 }
 
 .tag {
   display: inline-block;
-  padding: 2px 8px;
-  border-radius: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
   font-size: 12px;
   font-weight: 500;
 }
 
 .tagBlue {
-  background: #eff6ff;
-  color: #1d4ed8;
+  background: var(--qk-primary-soft);
+  color: var(--qk-primary-hover);
 }
 
 .tagGreen {
-  background: #ecfdf5;
-  color: #047857;
+  background: var(--qk-success-soft);
+  color: #009a25;
 }
 
 .tagPurple {
@@ -29,15 +36,16 @@
 }
 
 .value {
-  margin-top: 12px;
+  margin-top: 14px;
   font-size: 30px;
   font-weight: 700;
-  color: #1f2937;
+  color: var(--qk-text);
   line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 .hint {
-  margin-top: 4px;
+  margin-top: 6px;
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--qk-text-4);
 }

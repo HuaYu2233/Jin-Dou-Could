@@ -1,24 +1,24 @@
 .header {
   display: flex;
-  height: 56px;
+  height: var(--qk-header-h);
   align-items: center;
-  border-bottom: 1px solid #e5e7eb;
-  background: #fff;
+  border-bottom: 1px solid var(--qk-border);
+  background: var(--qk-surface);
 }
 
 .brand {
   display: flex;
   height: 100%;
   align-items: center;
-  padding: 0 12px;
-  width: 160px;
+  padding: 0 16px;
+  width: var(--qk-sidebar-w);
   flex-shrink: 0;
 }
 
 .brandText {
   font-size: 16px;
   font-weight: 700;
-  color: #374151;
+  color: var(--qk-text);
 }
 
 .headerRight {
@@ -46,13 +46,13 @@
 
 .username {
   font-size: 14px;
-  color: #4b5563;
+  color: var(--qk-text-2);
 }
 
 .logoutBtn {
   font-size: 14px;
   font-weight: 500;
-  color: #dc2626;
+  color: var(--qk-danger);
   background: none;
   border: none;
   cursor: pointer;
@@ -60,12 +60,12 @@
 }
 
 .logoutBtn:hover {
-  color: #b91c1c;
+  color: var(--qk-danger-hover);
 }
 
 @media (max-width: 768px) {
   .brand {
-    width: 56px;
+    width: 60px;
     padding: 0 4px;
   }
   .headerRight {

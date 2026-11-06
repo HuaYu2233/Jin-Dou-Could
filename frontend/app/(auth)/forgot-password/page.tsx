@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { forgotPassword, resetPassword, getSecurityQuestion, resetPasswordBySecurity } from "@/lib/api/auth";
+import styles from "../auth.module.css";
 
 type Tab = "email" | "security";
 
@@ -105,120 +106,104 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-xl font-semibold">找回密码</h2>
+    <div className={styles.form}>
+      <h2 className={styles.title}>找回密码</h2>
 
-      <div className="flex gap-2 border-b border-gray-200">
+      <div className={styles.tabs}>
         <button
           type="button"
           onClick={() => switchTab("email")}
-          className={`px-3 py-1.5 text-sm font-medium border-b-2 -mb-px ${
-            tab === "email" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500"
-          }`}
+          className={`${styles.tabBtn} ${tab === "email" ? styles.tabBtnActive : ""}`}
         >
           邮箱验证码
         </button>
         <button
           type="button"
           onClick={() => switchTab("security")}
-          className={`px-3 py-1.5 text-sm font-medium border-b-2 -mb-px ${
-            tab === "security" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500"
-          }`}
+          className={`${styles.tabBtn} ${tab === "security" ? styles.tabBtnActive : ""}`}
         >
           密保问题
         </button>
       </div>
 
       {tab === "email" ? (
-      <form onSubmit={sent ? handleReset : handleSendCode} className="space-y-4">
-      {error && <p className="text-sm text-red-500">{error}</p>}
-      {info && <p className="text-sm text-green-600">{info}</p>}
+        <form onSubmit={sent ? handleReset : handleSendCode} className={styles.form}>
+          {error && <p className={styles.alertError}>{error}</p>}
+          {info && <p className={styles.alertSuccess}>{info}</p>}
 
-      <input
-        type="email"
-        placeholder="注册邮箱"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        className="w-full rounded border px-3 py-2"
-        required
-        disabled={sent}
-      />
-
-      {sent && (
-        <>
           <input
-            type="text"
-            placeholder="验证码"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            className="w-full rounded border px-3 py-2"
+            type="email"
+            placeholder="注册邮箱"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={styles.input}
             required
+            disabled={sent}
           />
-          <input
-            type="password"
-            placeholder="新密码（至少 6 位）"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            className="w-full rounded border px-3 py-2"
-            required
-            minLength={6}
-          />
-        </>
-      )}
 
-      {!sent ? (
-        <button
-          type="submit"
-          disabled={sending}
-          className="w-full rounded bg-blue-600 py-2 text-white hover:bg-blue-700 disabled:bg-blue-300"
-        >
-          {sending ? "发送中..." : "发送验证码"}
-        </button>
+          {sent && (
+            <>
+              <input
+                type="text"
+                placeholder="验证码"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                className={styles.input}
+                required
+              />
+              <input
+                type="password"
+                placeholder="新密码（至少 6 位）"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className={styles.input}
+                required
+                minLength={6}
+              />
+            </>
+          )}
+
+          {!sent ? (
+            <button type="submit" disabled={sending} className={styles.submitBtn}>
+              {sending ? "发送中..." : "发送验证码"}
+            </button>
+          ) : (
+            <button type="submit" disabled={resetting} className={styles.submitBtn}>
+              {resetting ? "重置中..." : "重置密码"}
+            </button>
+          )}
+        </form>
       ) : (
-        <button
-          type="submit"
-          disabled={resetting}
-          className="w-full rounded bg-blue-600 py-2 text-white hover:bg-blue-700 disabled:bg-blue-300"
-        >
-          {resetting ? "重置中..." : "重置密码"}
-        </button>
-      )}
-      </form>
-      ) : (
-        <div className="space-y-4">
-          {secError && <p className="text-sm text-red-500">{secError}</p>}
-          {secInfo && <p className="text-sm text-green-600">{secInfo}</p>}
+        <div className={styles.form}>
+          {secError && <p className={styles.alertError}>{secError}</p>}
+          {secInfo && <p className={styles.alertSuccess}>{secInfo}</p>}
 
           {!questionLoaded ? (
-            <form onSubmit={handleLoadQuestion} className="space-y-4">
+            <form onSubmit={handleLoadQuestion} className={styles.form}>
               <input
                 type="email"
                 placeholder="注册邮箱"
                 value={secEmail}
                 onChange={(e) => setSecEmail(e.target.value)}
-                className="w-full rounded border px-3 py-2"
+                className={styles.input}
                 required
               />
-              <button
-                type="submit"
-                disabled={loadingQ}
-                className="w-full rounded bg-blue-600 py-2 text-white hover:bg-blue-700 disabled:bg-blue-300"
-              >
+              <button type="submit" disabled={loadingQ} className={styles.submitBtn}>
                 {loadingQ ? "查询中..." : "获取密保问题"}
               </button>
             </form>
           ) : (
-            <form onSubmit={handleResetBySecurity} className="space-y-4">
-              <div className="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
-                <span className="text-gray-500">密保问题：</span>
-                <span className="text-gray-800">{question}</span>
+            <form onSubmit={handleResetBySecurity} className={styles.form}>
+              <div className={styles.questionBox}>
+                <span className={styles.questionLabel}>密保问题：</span>
+                <span className={styles.questionValue}>{question}</span>
               </div>
               <input
                 type="text"
                 placeholder="密保答案"
                 value={answer}
                 onChange={(e) => setAnswer(e.target.value)}
-                className="w-full rounded border px-3 py-2"
+                className={styles.input}
                 required
               />
               <input
@@ -226,15 +211,11 @@ export default function ForgotPasswordPage() {
                 placeholder="新密码（至少 6 位）"
                 value={secNewPassword}
                 onChange={(e) => setSecNewPassword(e.target.value)}
-                className="w-full rounded border px-3 py-2"
+                className={styles.input}
                 required
                 minLength={6}
               />
-              <button
-                type="submit"
-                disabled={resettingSec}
-                className="w-full rounded bg-blue-600 py-2 text-white hover:bg-blue-700 disabled:bg-blue-300"
-              >
+              <button type="submit" disabled={resettingSec} className={styles.submitBtn}>
                 {resettingSec ? "重置中..." : "重置密码"}
               </button>
               <button
@@ -245,7 +226,7 @@ export default function ForgotPasswordPage() {
                   setAnswer("");
                   setSecNewPassword("");
                 }}
-                className="w-full text-center text-sm text-gray-500 hover:underline"
+                className={styles.ghostBtn}
               >
                 重新输入邮箱
               </button>
@@ -254,8 +235,8 @@ export default function ForgotPasswordPage() {
         </div>
       )}
 
-      <div className="text-center">
-        <Link href="/login" className="text-sm text-blue-600 hover:underline">
+      <div className={styles.centerLinkRow}>
+        <Link href="/login" className={styles.link}>
           返回登录
         </Link>
       </div>

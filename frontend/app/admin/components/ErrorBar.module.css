@@ -2,19 +2,22 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 16px;
-  font-size: 14px;
-  color: #dc2626;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  border-radius: 6px;
+  padding: 10px 16px;
+  font-size: 13px;
+  color: var(--qk-danger);
+  background: var(--qk-danger-soft);
+  border: 1px solid #ffd4cd;
+  border-radius: 10px;
 }
 
 .close {
   border: none;
   background: none;
-  color: #dc2626;
-  font-size: 14px;
+  color: var(--qk-danger);
+  font-size: 13px;
   cursor: pointer;
+}
+
+.close:hover {
   text-decoration: underline;
 }

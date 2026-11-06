@@ -22,12 +22,12 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
     <div className="flex h-screen flex-col">
       <Header
         extra={
-          <Link href="/dashboard" className="text-sm text-gray-600 transition-colors hover:text-gray-900">
+          <Link href="/dashboard" className="text-sm text-ink-2 transition-colors hover:text-brand">
             {t("profile.backToDrive")}
           </Link>
         }
       />
-      <main className="flex-1 min-h-0 overflow-auto bg-gray-50">{children}</main>
+      <main className="flex-1 min-h-0 overflow-auto bg-page">{children}</main>
     </div>
   );
 }

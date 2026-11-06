@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { login } from "@/lib/api/auth";
 import { useAuthStore } from "@/stores/auth";
+import styles from "../auth.module.css";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -33,15 +34,33 @@ export default function LoginPage() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <h2 className="text-xl font-semibold">登录</h2>
-      {infoMsg && <p className="text-sm text-blue-600 bg-blue-50 rounded px-3 py-2">{infoMsg}</p>}
-      {error && <p className="text-sm text-red-500">{error}</p>}
-      <input type="email" placeholder="邮箱" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full rounded border px-3 py-2" required />
-      <input type="password" placeholder="密码" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full rounded border px-3 py-2" required />
-      <button type="submit" disabled={loading} className="w-full rounded bg-blue-600 py-2 text-white hover:bg-blue-700 disabled:bg-blue-300">{loading ? "登录中..." : "登录"}</button>
-      <div className="text-right">
-        <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">忘记密码?</Link>
+    <form onSubmit={handleSubmit} className={styles.form}>
+      <h2 className={styles.title}>登录</h2>
+      {infoMsg && <p className={styles.alertInfo}>{infoMsg}</p>}
+      {error && <p className={styles.alertError}>{error}</p>}
+      <input
+        type="email"
+        placeholder="邮箱"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        className={styles.input}
+        required
+      />
+      <input
+        type="password"
+        placeholder="密码"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        className={styles.input}
+        required
+      />
+      <button type="submit" disabled={loading} className={styles.submitBtn}>
+        {loading ? "登录中..." : "登录"}
+      </button>
+      <div className={styles.linkRow}>
+        <Link href="/forgot-password" className={styles.link}>
+          忘记密码?
+        </Link>
       </div>
     </form>
   );

@@ -1,26 +1,133 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --qk-primary: #1e6fff;
+  --qk-primary-hover: #1659d9;
+  --qk-primary-soft: #eaf2ff;
+  --qk-primary-soft-2: #dbe9ff;
+  --qk-primary-border: #b8d1ff;
+  --qk-primary-gradient: linear-gradient(135deg, #4a8cff 0%, #1e6fff 100%);
+
+  --qk-bg: #f5f6f7;
+  --qk-surface: #ffffff;
+  --qk-surface-2: #f7f8fa;
+  --qk-surface-3: #f2f3f5;
+
+  --qk-border: #ebedf0;
+  --qk-border-strong: #e0e2e6;
+
+  --qk-text: #1d2129;
+  --qk-text-2: #4e5969;
+  --qk-text-3: #86909c;
+  --qk-text-4: #a9aeb8;
+
+  --qk-danger: #f53f3f;
+  --qk-danger-hover: #cb2634;
+  --qk-danger-soft: #ffece8;
+  --qk-success: #00b42a;
+  --qk-success-soft: #e8ffea;
+  --qk-warning: #ff7d00;
+
+  --qk-radius-sm: 6px;
+  --qk-radius: 10px;
+  --qk-radius-lg: 16px;
+
+  --qk-shadow-sm: 0 1px 2px rgba(29, 33, 41, 0.04);
+  --qk-shadow: 0 4px 16px rgba(29, 33, 41, 0.08);
+  --qk-shadow-lg: 0 12px 32px rgba(29, 33, 41, 0.12);
+
+  --qk-header-h: 56px;
+  --qk-sidebar-w: 208px;
+
+  --qk-font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial,
+    sans-serif;
+
+  --background: var(--qk-surface);
+  --foreground: var(--qk-text);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --color-page: var(--qk-bg);
+  --color-surface: var(--qk-surface);
+  --color-surface-2: var(--qk-surface-2);
+  --color-line: var(--qk-border);
+  --color-line-strong: var(--qk-border-strong);
+  --color-ink: var(--qk-text);
+  --color-ink-2: var(--qk-text-2);
+  --color-ink-3: var(--qk-text-3);
+  --color-ink-4: var(--qk-text-4);
+  --color-brand: var(--qk-primary);
+  --color-brand-hover: var(--qk-primary-hover);
+  --color-brand-soft: var(--qk-primary-soft);
+  --color-danger: var(--qk-danger);
+  --color-danger-soft: var(--qk-danger-soft);
+  --color-success: var(--qk-success);
+  --font-sans: var(--qk-font);
   --font-mono: var(--font-geist-mono);
+  --radius-card: var(--qk-radius-lg);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  background: var(--qk-bg);
+  color: var(--qk-text);
+  font-family: var(--qk-font);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+::selection {
+  background: rgba(30, 111, 255, 0.18);
+}
+
+:focus-visible {
+  outline: 2px solid rgba(30, 111, 255, 0.4);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(29, 33, 41, 0.14);
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(29, 33, 41, 0.28);
+  background-clip: content-box;
 }

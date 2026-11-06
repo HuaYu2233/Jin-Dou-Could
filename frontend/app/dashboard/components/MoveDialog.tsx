@@ -66,9 +66,9 @@ export default function MoveDialog({
     <div className={pageStyles.modalOverlay} onClick={() => !moving && onClose()}>
       <div className={pageStyles.modalContent} onClick={(e) => e.stopPropagation()}>
         <h3 className={pageStyles.modalTitle}>移动 {selectedIds.size} 个文件到文件夹</h3>
-        <div className="max-h-72 overflow-y-auto rounded border border-gray-200">
+        <div className="max-h-72 overflow-y-auto rounded-[10px] border border-line">
           <button
-            className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 ${targetId === null ? "bg-blue-50 text-blue-600 font-medium" : "text-gray-700"}`}
+            className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-surface-2 ${targetId === null ? "bg-brand-soft text-brand font-medium" : "text-ink-2"}`}
             onClick={() => setTargetId(null)}
           >
             🏠 根目录
@@ -76,14 +76,14 @@ export default function MoveDialog({
           {targetFolders.map((folder) => (
             <button
               key={folder.id}
-              className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 border-t border-gray-100 ${targetId === folder.id ? "bg-blue-50 text-blue-600 font-medium" : "text-gray-700"}`}
+              className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-surface-2 border-t border-line ${targetId === folder.id ? "bg-brand-soft text-brand font-medium" : "text-ink-2"}`}
               onClick={() => setTargetId(folder.id)}
             >
               📁 {folder.name}
             </button>
           ))}
           {targetFolders.length === 0 && (
-            <div className="px-3 py-4 text-center text-sm text-gray-400 border-t border-gray-100">暂无其他文件夹</div>
+            <div className="px-3 py-4 text-center text-sm text-ink-4 border-t border-line">暂无其他文件夹</div>
           )}
         </div>
         <div className={pageStyles.modalActions}>

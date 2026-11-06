@@ -1,8 +1,9 @@
 .wrapper {
-  background: #fff;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  background: var(--qk-surface);
+  border-radius: var(--qk-radius-lg);
+  border: 1px solid var(--qk-border);
   overflow: hidden;
+  box-shadow: var(--qk-shadow-sm);
 }
 
 .scroll {
@@ -16,16 +17,16 @@
 }
 
 .head {
-  background: #f9fafb;
-  color: #6b7280;
+  background: var(--qk-surface-2);
+  color: var(--qk-text-3);
   font-size: 12px;
-  text-transform: uppercase;
 }
 
 .th {
   padding: 12px 16px;
   text-align: left;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .thCenter {
@@ -37,16 +38,17 @@
 }
 
 .row {
-  border-top: 1px solid #f3f4f6;
+  border-top: 1px solid #f4f5f7;
+  transition: background 0.12s ease;
 }
 
 .row:hover {
-  background: #f9fafb;
+  background: var(--qk-surface-2);
 }
 
 .td {
   padding: 12px 16px;
-  color: #4b5563;
+  color: var(--qk-text-2);
 }
 
 .tdCenter {
@@ -60,39 +62,41 @@
 
 .username {
   font-weight: 500;
-  color: #1f2937;
+  color: var(--qk-text);
 }
 
 .usageText {
   font-size: 12px;
-  color: #6b7280;
-  margin-bottom: 4px;
+  color: var(--qk-text-3);
+  margin-bottom: 5px;
+  font-variant-numeric: tabular-nums;
 }
 
 .usageBar {
   height: 6px;
-  background: #f3f4f6;
-  border-radius: 3px;
+  background: var(--qk-surface-3);
+  border-radius: 99px;
   overflow: hidden;
   width: 128px;
 }
 
 .usageFill {
   height: 100%;
-  border-radius: 3px;
+  border-radius: 99px;
+  transition: width 0.3s ease;
 }
 
 .usageFillNormal {
-  background: #3b82f6;
+  background: var(--qk-primary-gradient);
 }
 
 .usageFillDanger {
-  background: #ef4444;
+  background: linear-gradient(90deg, #ff8a8a, var(--qk-danger));
 }
 
 .badge {
-  padding: 2px 8px;
-  border-radius: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
   font-size: 12px;
   font-weight: 500;
   border: none;
@@ -101,17 +105,17 @@
 }
 
 .badge:hover {
-  opacity: 0.85;
+  opacity: 0.82;
 }
 
 .badgeActive {
-  background: #ecfdf5;
-  color: #047857;
+  background: var(--qk-success-soft);
+  color: #009a25;
 }
 
 .badgeInactive {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--qk-surface-3);
+  color: var(--qk-text-3);
 }
 
 .badgeAdmin {
@@ -120,13 +124,15 @@
 }
 
 .badgeUser {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--qk-surface-3);
+  color: var(--qk-text-3);
 }
 
 .date {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--qk-text-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .actionBtn {
@@ -138,25 +144,25 @@
 }
 
 .actionPrimary {
-  color: #2563eb;
+  color: var(--qk-primary);
 }
 
 .actionPrimary:hover {
-  color: #1d4ed8;
+  color: var(--qk-primary-hover);
 }
 
 .actionDanger {
-  color: #dc2626;
+  color: var(--qk-danger);
   margin-left: 12px;
 }
 
 .actionDanger:hover {
-  color: #b91c1c;
+  color: var(--qk-danger-hover);
 }
 
 .empty,
 .loading {
-  padding: 32px 16px;
+  padding: 36px 16px;
   text-align: center;
-  color: #9ca3af;
+  color: var(--qk-text-4);
 }

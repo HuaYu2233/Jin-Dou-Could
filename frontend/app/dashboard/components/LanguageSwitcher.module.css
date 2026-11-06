@@ -11,17 +11,18 @@
   height: 32px;
   padding: 0 10px;
   font-size: 13px;
-  color: #4b5563;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
+  color: var(--qk-text-2);
+  background: var(--qk-surface-2);
+  border: 1px solid var(--qk-border);
+  border-radius: 8px;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .trigger:hover {
-  background: #f3f4f6;
-  border-color: #d1d5db;
+  background: var(--qk-surface-3);
+  border-color: var(--qk-border-strong);
+  color: var(--qk-text);
 }
 
 .icon {
@@ -41,11 +42,23 @@
   margin: 0;
   padding: 4px;
   list-style: none;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  background: var(--qk-surface);
+  border: 1px solid var(--qk-border);
+  border-radius: var(--qk-radius);
+  box-shadow: var(--qk-shadow);
   z-index: 50;
+  animation: menuIn 0.14s ease-out;
+}
+
+@keyframes menuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .item {
@@ -53,19 +66,21 @@
   text-align: left;
   padding: 8px 10px;
   font-size: 13px;
-  color: #374151;
+  color: var(--qk-text-2);
   background: none;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--qk-radius-sm);
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .item:hover {
-  background: #f3f4f6;
+  background: var(--qk-surface-3);
+  color: var(--qk-text);
 }
 
 .item.active {
-  color: #2563eb;
+  color: var(--qk-primary);
   font-weight: 600;
+  background: var(--qk-primary-soft);
 }

@@ -1,10 +1,7 @@
-/* /Users/zero/project/JinDou-Cloud/frontend/app/dashboard/components/Toolbar.module.css */
 .toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 12px 24px;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 12px 20px 8px;
   gap: 12px;
   flex-wrap: wrap;
 }
@@ -13,6 +10,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .rightGroup {
@@ -24,26 +24,28 @@
 .searchBox {
   display: flex;
   align-items: center;
-  gap: 6px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 0 10px;
-  height: 32px;
-  background: #fff;
-  flex: 1 1 160px;
-  min-width: 120px;
-  max-width: 240px;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0 14px;
+  height: 34px;
+  background: var(--qk-surface);
+  flex: 1 1 180px;
+  min-width: 140px;
+  max-width: 300px;
+  box-shadow: var(--qk-shadow-sm);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .searchBox:focus-within {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+  border-color: var(--qk-primary-border);
+  box-shadow: 0 0 0 3px rgba(30, 111, 255, 0.12);
 }
 
 .searchIcon {
-  width: 16px;
-  height: 16px;
-  color: #9ca3af;
+  width: 15px;
+  height: 15px;
+  color: var(--qk-text-4);
   flex-shrink: 0;
 }
 
@@ -54,32 +56,32 @@
   outline: none;
   font-size: 13px;
   background: transparent;
-  color: #1f2937;
+  color: var(--qk-text);
 }
 
 .searchInput::placeholder {
-  color: #9ca3af;
+  color: var(--qk-text-4);
 }
 
 .searchClear {
-  border: none;
-  background: none;
-  color: #9ca3af;
-  cursor: pointer;
-  font-size: 14px;
-  padding: 0;
   display: flex;
   align-items: center;
+  border: none;
+  background: none;
+  color: var(--qk-text-4);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
   flex-shrink: 0;
 }
 
 .searchClear:hover {
-  color: #4b5563;
+  color: var(--qk-text-2);
 }
 
 .btnIcon {
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
 }
 
 .primaryBtn,
@@ -88,57 +90,69 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
+  height: 34px;
+  padding: 0 16px;
   border-radius: 8px;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
   border: 1px solid transparent;
+  white-space: nowrap;
 }
 
 .primaryBtn {
-  background: #2563eb;
+  background: var(--qk-primary-gradient);
   color: #fff;
-  border-color: #2563eb;
+  box-shadow: 0 2px 8px rgba(30, 111, 255, 0.24);
 }
 
-.primaryBtn:hover {
-  background: #1d4ed8;
+.primaryBtn:hover:not(:disabled) {
+  box-shadow: 0 4px 14px rgba(30, 111, 255, 0.32);
+  filter: brightness(1.04);
 }
 
 .secondaryBtn {
-  background: #fff;
-  color: #4b5563;
-  border-color: #e5e7eb;
+  background: var(--qk-surface);
+  color: var(--qk-text-2);
+  border-color: var(--qk-border);
+  box-shadow: var(--qk-shadow-sm);
 }
 
 .secondaryBtn:hover:not(:disabled) {
-  background: #f9fafb;
-  border-color: #d1d5db;
+  color: var(--qk-text);
+  border-color: var(--qk-border-strong);
+  background: var(--qk-surface-2);
 }
 
 .dangerBtn {
-  background: #fff;
-  color: #ef4444;
-  border-color: #fecaca;
+  background: var(--qk-surface);
+  color: var(--qk-danger);
+  border-color: var(--qk-border);
+  box-shadow: var(--qk-shadow-sm);
 }
 
 .dangerBtn:hover:not(:disabled) {
-  background: #fef2f2;
+  background: var(--qk-danger-soft);
+  border-color: #ffcdc7;
 }
 
 .secondaryBtn:disabled,
-.dangerBtn:disabled {
-  opacity: 0.4;
+.dangerBtn:disabled,
+.primaryBtn:disabled {
+  opacity: 0.45;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .viewSwitch {
   display: flex;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  overflow: hidden;
+  padding: 2px;
+  gap: 2px;
+  border-radius: 9px;
+  background: var(--qk-surface);
+  box-shadow: var(--qk-shadow-sm);
+  border: 1px solid var(--qk-border);
 }
 
 .viewBtn {
@@ -146,37 +160,43 @@
   align-items: center;
   justify-content: center;
   width: 34px;
-  height: 30px;
+  height: 28px;
   border: none;
-  background: #fff;
-  color: #9ca3af;
+  background: transparent;
+  color: var(--qk-text-4);
+  border-radius: 7px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background 0.16s ease, color 0.16s ease;
 }
 
 .viewBtn:hover {
-  background: #f3f4f6;
-  color: #4b5563;
+  background: var(--qk-surface-2);
+  color: var(--qk-text-2);
 }
 
 .viewBtnActive {
-  background: #eff6ff;
-  color: #2563eb;
+  background: var(--qk-primary-soft);
+  color: var(--qk-primary);
+}
+
+.viewBtnActive:hover {
+  background: var(--qk-primary-soft);
+  color: var(--qk-primary);
 }
 
 @media (max-width: 768px) {
   .toolbar {
-    padding: 10px 12px;
+    padding: 10px 12px 6px;
     gap: 8px;
   }
   .actionGroup {
-    flex-wrap: wrap;
     gap: 6px;
   }
   .primaryBtn,
   .secondaryBtn,
   .dangerBtn {
-    padding: 6px 10px;
+    height: 32px;
+    padding: 0 11px;
     font-size: 12px;
   }
   .btnLabel {
@@ -194,42 +214,9 @@
 
 @media (max-width: 480px) {
   .toolbar {
-    padding: 8px 10px;
+    padding: 8px 10px 4px;
   }
   .searchBox {
     height: 36px;
-  }
-}
-
-@media (max-width: 768px) {
-  .toolbar {
-    padding: 10px 12px;
-    gap: 8px;
-  }
-
-  .actionGroup {
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
-  .primaryBtn,
-  .secondaryBtn,
-  .dangerBtn {
-    padding: 6px 10px;
-    font-size: 12px;
-  }
-
-  .btnLabel {
-    display: none;
-  }
-
-  .searchBox {
-    order: 99;
-    flex: 1 1 100%;
-    max-width: none;
-  }
-
-  .rightGroup {
-    gap: 6px;
   }
 }

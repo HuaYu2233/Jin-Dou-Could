@@ -1,33 +1,56 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  background: rgba(29, 33, 41, 0.45);
+  backdrop-filter: blur(2px);
+  animation: overlayIn 0.16s ease-out;
+}
+
+@keyframes overlayIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .content {
-  background: #ffffff;
-  border-radius: 8px;
+  background: var(--qk-surface);
+  border-radius: var(--qk-radius-lg);
   padding: 24px;
   width: 400px;
   max-width: 90vw;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--qk-shadow-lg);
+  animation: modalIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .title {
-  margin: 0 0 8px 0;
+  margin: 0 0 8px;
   font-size: 16px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--qk-text);
 }
 
 .desc {
-  margin: 0 0 16px 0;
+  margin: 0 0 16px;
   font-size: 13px;
-  color: #6b7280;
+  color: var(--qk-text-3);
 }
 
 .actions {
@@ -38,41 +61,50 @@
 }
 
 .cancelBtn {
-  padding: 6px 16px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  background: #ffffff;
-  color: #4b5563;
+  height: 36px;
+  padding: 0 18px;
+  border: 1px solid var(--qk-border-strong);
+  border-radius: 8px;
+  background: var(--qk-surface);
+  color: var(--qk-text-2);
   font-size: 14px;
   cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
 }
 
 .cancelBtn:hover {
-  background: #f9fafb;
+  background: var(--qk-surface-2);
+  color: var(--qk-text);
 }
 
 .confirmBtn {
-  padding: 6px 16px;
+  height: 36px;
+  padding: 0 18px;
   border: none;
-  border-radius: 6px;
-  background: #2563eb;
-  color: #ffffff;
+  border-radius: 8px;
+  background: var(--qk-primary-gradient);
+  color: #fff;
   font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
+  box-shadow: 0 2px 8px rgba(30, 111, 255, 0.24);
+  transition: filter 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
 }
 
 .confirmBtn:disabled {
-  background: #93c5fd;
+  opacity: 0.5;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .confirmBtn:not(:disabled):hover {
-  background: #1d4ed8;
+  filter: brightness(1.05);
+  box-shadow: 0 4px 14px rgba(30, 111, 255, 0.32);
 }
 
 @media (max-width: 768px) {
   .content {
     width: 320px;
-    padding: 16px;
+    padding: 18px;
   }
 }

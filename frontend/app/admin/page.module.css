@@ -3,17 +3,18 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
+  background: var(--qk-bg);
 }
 
 .loading,
 .error {
   padding: 24px;
   font-size: 14px;
-  color: #9ca3af;
+  color: var(--qk-text-4);
 }
 
 .error {
-  color: #dc2626;
+  color: var(--qk-danger);
 }
 
 .cardGrid {
@@ -23,10 +24,17 @@
 }
 
 .section {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  background: var(--qk-surface);
+  border: 1px solid var(--qk-border);
+  border-radius: var(--qk-radius-lg);
   padding: 20px;
+  box-shadow: var(--qk-shadow-sm);
+  transition: box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.section:hover {
+  border-color: var(--qk-border-strong);
+  box-shadow: var(--qk-shadow);
 }
 
 .sectionHead {
@@ -39,27 +47,28 @@
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #374151;
+  color: var(--qk-text);
 }
 
 .link {
   font-size: 14px;
-  color: #2563eb;
+  color: var(--qk-primary);
 }
 
 .link:hover {
-  color: #1d4ed8;
+  color: var(--qk-primary-hover);
 }
 
 .sectionDesc {
-  margin: 8px 0 0 0;
+  margin: 8px 0 0;
   font-size: 14px;
-  color: #6b7280;
+  color: var(--qk-text-3);
 }
 
 @media (max-width: 768px) {
   .page {
     padding: 12px;
+    gap: 16px;
   }
   .cardGrid {
     grid-template-columns: 1fr;

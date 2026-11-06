@@ -3,8 +3,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #60a5fa, #3b82f6);
-  color: #ffffff;
+  background: var(--qk-primary-gradient);
+  color: #fff;
   font-weight: 600;
   flex-shrink: 0;
   overflow: hidden;

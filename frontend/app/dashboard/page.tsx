@@ -167,7 +167,7 @@ export default function DashboardPage() {
         />
         <Breadcrumb items={breadcrumbs} onNavigate={handleBreadcrumbNavigate} />
         {error && (
-          <div className="px-6 py-2 text-sm text-red-600 bg-red-50 border-b border-red-100">
+          <div className="px-6 py-2 text-sm text-danger bg-danger-soft border-b border-line">
             {error}
           </div>
         )}
@@ -176,7 +176,7 @@ export default function DashboardPage() {
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
-          style={dragOver ? { background: "#eff6ff" } : undefined}
+          style={dragOver ? { background: "var(--qk-primary-soft)" } : undefined}
         >
           {category === "trash" ? (
             <FileList

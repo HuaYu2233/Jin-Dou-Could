@@ -1,120 +1,165 @@
-/* /Users/zero/project/JinDou-Cloud/frontend/app/dashboard/page.module.css */
 .layout {
   display: flex;
   height: 100%;
   overflow: hidden;
+  background: var(--qk-bg);
 }
 
 .mainArea {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #ffffff;
+  background: var(--qk-bg);
 }
 
 .contentArea {
   flex: 1;
   overflow: auto;
-  padding: 16px 24px;
+  margin: 0 20px;
+  padding: 4px 8px;
+  background: var(--qk-surface);
+  border: 1px solid var(--qk-border);
+  border-radius: var(--qk-radius-lg);
+  box-shadow: var(--qk-shadow-sm);
+  transition: background 0.16s ease;
 }
 
 .paginationArea {
-  border-top: 1px solid #f0f0f0;
-  padding: 12px 24px;
-  background: #fafbfc;
+  padding: 12px 20px 14px;
 }
 
 .modalOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  background: rgba(29, 33, 41, 0.45);
+  backdrop-filter: blur(2px);
+  animation: overlayIn 0.16s ease-out;
+}
+
+@keyframes overlayIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .modalContent {
-  background: #ffffff;
-  border-radius: 8px;
-  padding: 24px;
   width: 400px;
   max-width: 90vw;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  padding: 24px;
+  background: var(--qk-surface);
+  border-radius: var(--qk-radius-lg);
+  box-shadow: var(--qk-shadow-lg);
+  animation: modalIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .modalTitle {
-  margin: 0 0 16px 0;
+  margin: 0 0 16px;
   font-size: 16px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--qk-text);
 }
 
 .modalInput {
   width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
+  padding: 9px 12px;
+  border: 1px solid var(--qk-border-strong);
+  border-radius: 8px;
   font-size: 14px;
+  color: var(--qk-text);
+  background: var(--qk-surface);
   outline: none;
   box-sizing: border-box;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.modalInput::placeholder {
+  color: var(--qk-text-4);
 }
 
 .modalInput:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+  border-color: var(--qk-primary);
+  box-shadow: 0 0 0 3px rgba(30, 111, 255, 0.12);
 }
 
 .modalActions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 16px;
+  margin-top: 20px;
 }
 
 .modalCancelBtn {
-  padding: 6px 16px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  background: #ffffff;
-  color: #4b5563;
+  padding: 8px 18px;
+  border: 1px solid var(--qk-border-strong);
+  border-radius: 8px;
+  background: var(--qk-surface);
+  color: var(--qk-text-2);
   font-size: 14px;
   cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
 }
 
-.modalCancelBtn:hover {
-  background: #f9fafb;
+.modalCancelBtn:hover:not(:disabled) {
+  background: var(--qk-surface-2);
+  border-color: var(--qk-border-strong);
+  color: var(--qk-text);
 }
 
 .modalConfirmBtn {
-  padding: 6px 16px;
+  padding: 8px 18px;
   border: none;
-  border-radius: 6px;
-  background: #2563eb;
-  color: #ffffff;
+  border-radius: 8px;
+  background: var(--qk-primary-gradient);
+  color: #fff;
   font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
+  box-shadow: 0 2px 8px rgba(30, 111, 255, 0.24);
+  transition: filter 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
 }
 
 .modalConfirmBtn:disabled {
-  background: #93c5fd;
+  opacity: 0.5;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .modalConfirmBtn:not(:disabled):hover {
-  background: #1d4ed8;
+  filter: brightness(1.05);
+  box-shadow: 0 4px 14px rgba(30, 111, 255, 0.32);
 }
 
 @media (max-width: 768px) {
   .contentArea {
-    padding: 12px 12px;
+    margin: 0 12px;
+    padding: 2px 4px;
+    border-radius: 12px;
   }
   .paginationArea {
-    padding: 10px 12px;
+    padding: 10px 12px 12px;
   }
   .modalContent {
     width: 320px;
-    padding: 16px;
+    padding: 18px;
   }
 }

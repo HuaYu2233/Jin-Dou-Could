@@ -54,80 +54,81 @@ export default function SharePage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-gray-50">
-        <p className="text-gray-500">加载中...</p>
+      <main className="flex min-h-screen items-center justify-center bg-page">
+        <p className="text-sm text-ink-3">加载中...</p>
       </main>
     );
   }
 
   if (queryError && !info) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gray-50">
-        <div className="text-5xl">😕</div>
-        <p className="text-lg font-medium text-gray-700">{error}</p>
-        <p className="text-sm text-gray-400">分享可能已过期或被取消</p>
+      <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-page px-6">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-surface-2 text-4xl">
+          😕
+        </div>
+        <p className="text-lg font-medium text-ink-2">{error}</p>
+        <p className="text-sm text-ink-4">分享可能已过期或被取消</p>
       </main>
     );
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-      <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
-        <div className="mb-6 text-center">
-          <h1 className="text-xl font-bold text-gray-900">JinDou Cloud 文件分享</h1>
-          <p className="mt-1 text-sm text-gray-500">请输入提取码查看文件</p>
+    <main className="flex min-h-screen items-center justify-center bg-page p-4">
+      <div className="w-full max-w-md rounded-[20px] border border-line bg-surface p-8 shadow-[0_18px_48px_rgba(29,33,41,0.1)]">
+        <div className="mb-7 flex flex-col items-center text-center">
+          <span className="flex h-11 w-11 items-center justify-center rounded-[12px] bg-brand text-lg font-bold tracking-tight text-white shadow-[0_6px_18px_rgba(30,111,255,0.34)]">
+            J
+          </span>
+          <h1 className="mt-4 text-lg font-semibold text-ink">JinDou Cloud 文件分享</h1>
+          <p className="mt-1 text-sm text-ink-3">请输入提取码查看文件</p>
         </div>
 
-        <div className="mb-6 rounded-lg bg-gray-50 p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-xl">
-              📄
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="truncate text-sm font-medium text-gray-900">
-                {info?.filename}
-              </p>
-              <p className="text-xs text-gray-500">
-                {info ? formatSize(info.file_size) : ""}
-              </p>
-            </div>
+        <div className="mb-6 flex items-center gap-3 rounded-[12px] border border-line bg-surface-2 p-4">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-surface text-xl shadow-[0_1px_2px_rgba(29,33,41,0.04)]">
+            📄
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-ink">{info?.filename}</p>
+            <p className="mt-0.5 text-xs text-ink-3">
+              {info ? formatSize(info.file_size) : ""}
+            </p>
           </div>
         </div>
 
         {error && (
-          <div className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+          <div className="mb-4 rounded-[8px] border border-[#ffd4cd] bg-danger-soft px-3 py-2 text-sm text-danger">
             {error}
           </div>
         )}
 
         {!verified ? (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <input
               type="text"
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
               placeholder="请输入提取码"
               maxLength={8}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-center text-lg tracking-widest font-mono focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-[10px] border border-transparent bg-surface-2 px-4 py-3 text-center text-lg font-mono tracking-[0.2em] text-ink outline-none transition placeholder:tracking-normal placeholder:text-ink-4 focus:border-brand focus:bg-surface focus:ring-[3px] focus:ring-brand/12"
               onKeyDown={(e) => e.key === "Enter" && handleVerify()}
             />
             <button
               onClick={handleVerify}
               disabled={code.length !== 8 && code.length !== 6}
-              className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:bg-gray-300"
+              className="w-full rounded-[10px] bg-brand py-3 text-sm font-medium text-white shadow-[0_4px_14px_rgba(30,111,255,0.28)] transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-ink-4 disabled:shadow-none"
             >
               验证提取码
             </button>
           </div>
         ) : (
-          <div className="space-y-4">
-            <div className="rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
+          <div className="space-y-3">
+            <div className="rounded-[10px] border border-[#b7f0c1] bg-[#e8ffea] px-4 py-3 text-sm text-[#009a25]">
               ✓ 验证成功，可以下载文件了
             </div>
             <button
               onClick={handleDownload}
               disabled={downloading}
-              className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:bg-gray-300"
+              className="w-full rounded-[10px] bg-brand py-3 text-sm font-medium text-white shadow-[0_4px_14px_rgba(30,111,255,0.28)] transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-55 disabled:shadow-none"
             >
               {downloading ? "下载中..." : "下载文件"}
             </button>

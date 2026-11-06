@@ -1,24 +1,48 @@
 .header {
   display: flex;
-  height: 56px;
+  height: var(--qk-header-h);
   align-items: center;
-  border-bottom: 1px solid #e5e7eb;
-  background: #fff;
+  background: var(--qk-surface);
+  border-bottom: 1px solid var(--qk-border);
+  padding-right: 16px;
+  position: relative;
+  z-index: 20;
 }
 
 .brand {
   display: flex;
   height: 100%;
   align-items: center;
-  padding: 0 12px;
-  width: 160px;
+  gap: 10px;
+  padding: 0 20px;
+  width: var(--qk-sidebar-w);
   flex-shrink: 0;
 }
 
-.brandText {
-  font-size: 16px;
+.brandMark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: var(--qk-primary-gradient);
+  color: #fff;
+  font-size: 14px;
   font-weight: 700;
-  color: #374151;
+  letter-spacing: -0.5px;
+  box-shadow: 0 2px 6px rgba(30, 111, 255, 0.32);
+}
+
+.brandText {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--qk-text);
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .headerRight {
@@ -27,49 +51,61 @@
   flex: 1;
   align-items: center;
   justify-content: flex-end;
-  gap: 12px;
-  padding: 0 24px;
+  gap: 10px;
 }
 
 .userLink {
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 999px;
   cursor: pointer;
-  text-decoration: none;
-  transition: opacity 0.15s ease;
+  transition: background 0.18s ease;
 }
 
 .userLink:hover {
-  opacity: 0.8;
+  background: var(--qk-surface-2);
 }
 
 .username {
-  font-size: 14px;
-  color: #4b5563;
+  font-size: 13px;
+  color: var(--qk-text-2);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .logoutBtn {
-  font-size: 14px;
-  font-weight: 500;
-  color: #dc2626;
+  font-size: 13px;
+  color: var(--qk-text-3);
   background: none;
   border: none;
+  padding: 6px 10px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: color 0.15s ease;
+  transition: color 0.18s ease, background 0.18s ease;
 }
 
 .logoutBtn:hover {
-  color: #b91c1c;
+  color: var(--qk-danger);
+  background: var(--qk-danger-soft);
 }
 
 @media (max-width: 768px) {
   .brand {
-    width: 56px;
-    padding: 0 4px;
+    width: 60px;
+    padding: 0 16px;
+  }
+  .brandText {
+    display: none;
   }
   .headerRight {
-    padding: 0 12px;
-    gap: 8px;
+    padding-right: 4px;
+    gap: 6px;
+  }
+  .username {
+    display: none;
   }
 }

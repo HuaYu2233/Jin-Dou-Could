@@ -47,14 +47,14 @@ export default function SharesView({ page, pageSize, onError, onTotalChange, rel
   }
 
   if (loading) {
-    return <div className="py-20 text-center text-gray-400">加载中...</div>;
+    return <div className="py-20 text-center text-ink-4">加载中...</div>;
   }
 
   if (shares.length === 0) {
     return (
-      <div className="flex flex-col items-center py-20 text-gray-400">
-        <div className="text-5xl mb-4">🔗</div>
-        <p className="text-base font-medium">暂无分享</p>
+      <div className="flex flex-col items-center py-20 text-ink-4">
+        <div className="text-5xl mb-4 opacity-50">🔗</div>
+        <p className="text-base font-medium text-ink-2">暂无分享</p>
         <p className="text-sm mt-1">在全部文件中选中文件后点击「分享」即可创建分享</p>
       </div>
     );
@@ -63,7 +63,7 @@ export default function SharesView({ page, pageSize, onError, onTotalChange, rel
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
-        <thead className="border-b border-gray-200 text-gray-500">
+        <thead className="border-b border-line bg-surface-2 text-ink-3">
           <tr>
             <th className="py-3 px-4 text-left font-medium">文件名</th>
             <th className="py-3 px-4 text-left font-medium">提取码</th>
@@ -73,29 +73,29 @@ export default function SharesView({ page, pageSize, onError, onTotalChange, rel
             <th className="py-3 px-4 text-left font-medium">操作</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-100">
+        <tbody className="divide-y divide-line">
           {shares.map((share) => (
-            <tr key={share.id} className="hover:bg-gray-50">
-              <td className="py-3 px-4 text-gray-900">{share.filename}</td>
-              <td className="py-3 px-4 font-mono text-blue-600">{share.extract_code}</td>
-              <td className="py-3 px-4 text-gray-600">{share.views}</td>
-              <td className="py-3 px-4 text-gray-600">
+            <tr key={share.id} className="transition-colors hover:bg-surface-2">
+              <td className="py-3 px-4 text-ink">{share.filename}</td>
+              <td className="py-3 px-4 font-mono text-brand">{share.extract_code}</td>
+              <td className="py-3 px-4 text-ink-2 tabular-nums">{share.views}</td>
+              <td className="py-3 px-4 text-ink-2 tabular-nums">
                 {share.expires_at ? new Date(share.expires_at).toLocaleString() : "永久有效"}
               </td>
-              <td className="py-3 px-4 text-gray-600">
+              <td className="py-3 px-4 text-ink-2 tabular-nums">
                 {new Date(share.created_at).toLocaleString()}
               </td>
               <td className="py-3 px-4">
                 <div className="flex gap-2">
                   <button
                     onClick={() => copyShareLink(share.share_token)}
-                    className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                    className="text-brand hover:text-brand-hover text-sm font-medium transition-colors"
                   >
                     复制链接
                   </button>
                   <button
                     onClick={() => handleCancelShare(share.id)}
-                    className="text-red-600 hover:text-red-700 text-sm font-medium"
+                    className="text-danger hover:opacity-80 text-sm font-medium transition-opacity"
                   >
                     取消分享
                   </button>

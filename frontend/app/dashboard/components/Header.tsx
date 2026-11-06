@@ -43,6 +43,9 @@ export default function Header({ extra }: HeaderProps) {
   return (
     <header className={styles.header}>
       <div className={styles.brand}>
+        <span className={styles.brandMark} aria-hidden="true">
+          J
+        </span>
         <span className={styles.brandText}>{t("app.brand")}</span>
       </div>
       <div className={styles.headerRight}>
