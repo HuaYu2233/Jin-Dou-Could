@@ -4,6 +4,7 @@
 *.env
 !.env.example
 测试账号.txt
+**/cookies.txt
 
 # ===== 系统/编辑器 =====
 .DS_Store

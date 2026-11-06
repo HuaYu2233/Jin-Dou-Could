@@ -66,7 +66,7 @@ class Settings(BaseSettings):
     RESET_PASSWORD_SMTP_USER: str = ""
     RESET_PASSWORD_SMTP_PASSWORD: str = ""
     RESET_PASSWORD_FROM_EMAIL: str = ""
-    RESET_PASSWORD_FROM_NAME: str = "金斗云盘"
+    RESET_PASSWORD_FROM_NAME: str = "筋斗云盘"
     RESET_PASSWORD_CODE_EXPIRE_SECONDS: int = 600
     RESET_PASSWORD_CODE_LENGTH: int = 6
 

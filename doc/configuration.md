@@ -14,6 +14,19 @@
 | `MINIO_ROOT_PASSWORD` | MinIO 密码     | -          | 是   |
 | `MINIO_SECURE`        | MinIO TLS 连接 | false      | 否   |
 
+### MinIO 与上传
+
+| 配置项                    | 说明                             | 默认值       | 必填 |
+| ------------------------- | -------------------------------- | ------------ | ---- |
+| `MINIO_ENDPOINT`          | 后端访问 MinIO 的内部地址        | minio:9000   | 否   |
+| `MINIO_PUBLIC_ENDPOINT`   | 浏览器访问 MinIO 的对外地址      | localhost:9000 | 否 |
+| `MINIO_BUCKET`            | 存储桶名称                       | cloud-drive  | 否   |
+| `MINIO_DOWNLOAD_EXPIRES`  | 预签名下载链接有效期（秒）       | 3600         | 否   |
+| `MAX_UPLOAD_SIZE`         | 单文件大小上限（字节）           | 104857600    | 否   |
+| `UPLOAD_CHUNK_SIZE`       | 分片读取步长（字节）             | 8388608      | 否   |
+| `MULTIPART_THRESHOLD`     | 触发分片上传的阈值（字节）       | 16777216     | 否   |
+| `UPLOAD_PART_SIZE`        | 分片大小（字节）                 | 5242880      | 否   |
+
 ## 2. JWT 与认证
 
 | 配置项                        | 说明                     | 默认值 | 必填 |
@@ -93,7 +106,7 @@ Webhook 类型：`generic` / `dingtalk` / `feishu` / `wechat`
 | `RESET_PASSWORD_SMTP_USER`           | SMTP 用户          | -        |
 | `RESET_PASSWORD_SMTP_PASSWORD`       | SMTP 密码          | -        |
 | `RESET_PASSWORD_FROM_EMAIL`          | 发件人邮箱         | -        |
-| `RESET_PASSWORD_FROM_NAME`           | 发件人名称         | 金斗云盘 |
+| `RESET_PASSWORD_FROM_NAME`           | 发件人名称         | 筋斗云盘 |
 | `RESET_PASSWORD_CODE_EXPIRE_SECONDS` | 验证码有效期（秒） | 600      |
 | `RESET_PASSWORD_CODE_LENGTH`         | 验证码位数         | 6        |
 
@@ -134,6 +147,11 @@ Webhook 类型：`generic` / `dingtalk` / `feishu` / `wechat`
 | `RATE_LIMIT_ENABLED`       | 启用全局限流                  | true   |
 | `RATE_LIMIT_PER_MINUTE`    | 每分钟每 IP 最大请求数        | 60     |
 | `TRUSTED_PROXIES`          | 信任的反向代理 IP（逗号分隔） | -      |
+| `LOGIN_RATE_LIMIT_MAX_ATTEMPTS`   | 登录失败最大次数      | 5      |
+| `LOGIN_RATE_LIMIT_WINDOW_SECONDS` | 登录失败统计窗口（秒） | 300    |
+| `LOGIN_RATE_LIMIT_LOCK_SECONDS`   | 触发后锁定时间（秒）   | 900    |
+| `MAX_CONCURRENT_UPLOADS`          | 单用户最大并发上传数   | 3      |
+| `MAX_CONCURRENT_DOWNLOADS`        | 单用户最大并发下载数   | 5      |
 | `CSRF_ENABLED`             | CSRF 双提交 Cookie 防护       | true   |
 
 ## 13. WebSocket 与可观测性
