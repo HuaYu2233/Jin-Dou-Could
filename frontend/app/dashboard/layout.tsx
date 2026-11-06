@@ -1,13 +1,24 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Header from "./components/Header";
 import NotificationToast from "./components/NotificationToast";
 import { useWebSocket } from "@/lib/hooks/useWebSocket";
+import { useAuthStore } from "@/stores/auth";
 import { useNotificationStore } from "@/stores/notifications";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   useWebSocket();
+  const router = useRouter();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isLoading = useAuthStore((s) => s.isLoading);
   const unreadCount = useNotificationStore((s) => s.unreadCount);
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!isAuthenticated) router.replace("/login");
+  }, [isAuthenticated, isLoading, router]);
 
   return (
     <div className="flex h-screen flex-col">

@@ -4,9 +4,10 @@ import type { NextRequest } from "next/server";
 const PROTECTED_PATHS = ["/dashboard", "/admin", "/profile"];
 const AUTH_PATHS = ["/login", "/register", "/forgot-password"];
 const TOKEN_COOKIE = "access_token";
+const AUTH_EXPIRED_PARAM = "auth_expired";
 
 export function middleware(request: NextRequest) {
-  const { pathname, origin } = request.nextUrl;
+  const { pathname, origin, searchParams } = request.nextUrl;
   const token = request.cookies.get(TOKEN_COOKIE)?.value;
 
   const isProtected = PROTECTED_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
@@ -17,7 +18,7 @@ export function middleware(request: NextRequest) {
   }
 
   const isAuthPath = AUTH_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-  if (isAuthPath && token) {
+  if (isAuthPath && token && !searchParams.get(AUTH_EXPIRED_PARAM)) {
     return NextResponse.redirect(new URL("/dashboard", origin));
   }
 

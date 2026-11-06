@@ -1,17 +1,25 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { login } from "@/lib/api/auth";
 import { useAuthStore } from "@/stores/auth";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [infoMsg, setInfoMsg] = useState("");
+
+  useEffect(() => {
+    if (searchParams.get("auth_expired")) {
+      setInfoMsg("登录已过期，请重新登录");
+    }
+  }, [searchParams]);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -20,10 +28,11 @@ export default function LoginPage() {
     try {
       await login({ email, password });
       await useAuthStore.getState().fetchMe();
-      router.push("/dashboard");
+      const redirect = searchParams.get("redirect");
+      router.push(redirect || "/dashboard");
     } catch (err) {
-        const message = err instanceof Error ? err.message : "登录失败";
-        setError(message);
+      const message = err instanceof Error ? err.message : "登录失败";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -32,6 +41,7 @@ export default function LoginPage() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <h2 className="text-xl font-semibold">登录</h2>
+      {infoMsg && <p className="text-sm text-blue-600 bg-blue-50 rounded px-3 py-2">{infoMsg}</p>}
       {error && <p className="text-sm text-red-500">{error}</p>}
       <input type="email" placeholder="邮箱" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full rounded border px-3 py-2" required />
       <input type="password" placeholder="密码" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full rounded border px-3 py-2" required />
