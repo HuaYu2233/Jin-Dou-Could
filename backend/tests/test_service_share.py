@@ -31,7 +31,7 @@ class TestShareTokenGeneration:
 
     def test_code_length(self):
         code = _generate_code()
-        assert len(code) == 6
+        assert len(code) == 8
 
     def test_code_uppercase_digits(self):
         code = _generate_code()
@@ -62,7 +62,7 @@ class TestShareRateLimitLogic:
             from app.services.share_service import check_share_rate_limit
 
             with pytest.raises(RateLimited, match="过多"):
-                await check_share_rate_limit("some-token")
+                await check_share_rate_limit("some-token", "127.0.0.1")
 
     @pytest.mark.asyncio
     async def test_check_rate_limit_passes_when_not_locked(self):
@@ -70,7 +70,7 @@ class TestShareRateLimitLogic:
             mock_redis.exists = AsyncMock(return_value=False)
             from app.services.share_service import check_share_rate_limit
 
-            await check_share_rate_limit("some-token")
+            await check_share_rate_limit("some-token", "127.0.0.1")
 
     @pytest.mark.asyncio
     async def test_record_failure_increments(self):
@@ -81,7 +81,7 @@ class TestShareRateLimitLogic:
             mock_redis.delete = AsyncMock()
             from app.services.share_service import record_share_verify_failure
 
-            await record_share_verify_failure("some-token")
+            await record_share_verify_failure("some-token", "127.0.0.1")
             mock_redis.incr.assert_called_once()
 
     @pytest.mark.asyncio
@@ -93,7 +93,7 @@ class TestShareRateLimitLogic:
             mock_redis.delete = AsyncMock()
             from app.services.share_service import record_share_verify_failure
 
-            await record_share_verify_failure("some-token")
+            await record_share_verify_failure("some-token", "127.0.0.1")
             mock_redis.setex.assert_called_once()
             mock_redis.delete.assert_called_once()
 
@@ -103,5 +103,5 @@ class TestShareRateLimitLogic:
             mock_redis.delete = AsyncMock()
             from app.services.share_service import clear_share_verify_attempts
 
-            await clear_share_verify_attempts("some-token")
+            await clear_share_verify_attempts("some-token", "127.0.0.1")
             mock_redis.delete.assert_called_once()

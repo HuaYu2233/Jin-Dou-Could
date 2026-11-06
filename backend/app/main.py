@@ -121,7 +121,14 @@ async def _cleanup_orphan_multipart_uploads() -> None:
             logger.warning(f"孤儿分片清理任务异常: {e}")
 
 
-app = FastAPI(title="Cloud Drive API", lifespan=lifespan)
+_docs_enabled = settings.ENVIRONMENT != "production"
+app = FastAPI(
+    title="Cloud Drive API",
+    lifespan=lifespan,
+    docs_url="/docs" if _docs_enabled else None,
+    redoc_url="/redoc" if _docs_enabled else None,
+    openapi_url="/openapi.json" if _docs_enabled else None,
+)
 
 register_exception_handlers(app)
 
@@ -140,7 +147,22 @@ if settings.PROMETHEUS_ENABLED:
     from prometheus_fastapi_instrumentator import Instrumentator
 
     Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
-    logger.info("Prometheus 指标已启用，访问 /metrics")
+
+    import secrets as _secrets
+
+    from starlette.responses import PlainTextResponse
+
+    _METRICS_TOKEN = _secrets.token_urlsafe(32)
+
+    async def _metrics_auth_middleware(request, call_next):
+        if request.url.path == "/metrics":
+            auth = request.headers.get("Authorization", "")
+            if auth != f"Bearer {_METRICS_TOKEN}":
+                return PlainTextResponse("Unauthorized", status_code=401)
+        return await call_next(request)
+
+    app.middleware("http")(_metrics_auth_middleware)
+    logger.info(f"Prometheus 指标已启用，访问 /metrics，Bearer Token={_METRICS_TOKEN}")
 
 # HTTPS 重定向（仅生产启用，最外层）
 if settings.HTTPS_REDIRECT and settings.ENVIRONMENT == "production":

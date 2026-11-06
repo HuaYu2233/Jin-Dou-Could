@@ -13,6 +13,8 @@ from app.core.storage import get_presigned_download_url
 from app.models.file import File
 from app.models.share import Share
 
+SHARE_CODE_CHARS = string.ascii_uppercase + string.digits
+SHARE_CODE_LENGTH = 8
 SHARE_VERIFY_MAX_ATTEMPTS = 5
 SHARE_VERIFY_LOCK_SECONDS = 900
 
@@ -22,8 +24,7 @@ def _generate_token() -> str:
 
 
 def _generate_code() -> str:
-    chars = string.ascii_uppercase + string.digits
-    return "".join(secrets.choice(chars) for _ in range(6))
+    return "".join(secrets.choice(SHARE_CODE_CHARS) for _ in range(SHARE_CODE_LENGTH))
 
 
 async def create_share(
@@ -157,7 +158,7 @@ async def verify_share(db: AsyncSession, token: str, extract_code: str) -> dict 
     if share.expires_at is not None and share.expires_at < datetime.now(UTC):
         return None
 
-    if share.extract_code != extract_code:
+    if not secrets.compare_digest(share.extract_code, extract_code):
         return None
 
     share.views = share.views + 1
@@ -173,16 +174,16 @@ async def verify_share(db: AsyncSession, token: str, extract_code: str) -> dict 
     }
 
 
-async def check_share_rate_limit(token: str) -> None:
-    lock_key = f"share_lock:{token}"
+async def check_share_rate_limit(token: str, client_ip: str) -> None:
+    lock_key = f"share_lock:{token}:{client_ip}"
     if await redis_client.exists(lock_key):
         ttl = await redis_client.ttl(lock_key)
         raise RateLimited(f"提取码错误次数过多，请 {max(ttl, 1)} 秒后再试")
 
 
-async def record_share_verify_failure(token: str) -> None:
-    attempts_key = f"share_verify:{token}"
-    lock_key = f"share_lock:{token}"
+async def record_share_verify_failure(token: str, client_ip: str) -> None:
+    attempts_key = f"share_verify:{token}:{client_ip}"
+    lock_key = f"share_lock:{token}:{client_ip}"
     attempts = await redis_client.incr(attempts_key)
     if attempts == 1:
         await redis_client.expire(attempts_key, SHARE_VERIFY_LOCK_SECONDS)
@@ -191,27 +192,27 @@ async def record_share_verify_failure(token: str) -> None:
         await redis_client.delete(attempts_key)
 
 
-async def clear_share_verify_attempts(token: str) -> None:
-    await redis_client.delete(f"share_verify:{token}")
+async def clear_share_verify_attempts(token: str, client_ip: str) -> None:
+    await redis_client.delete(f"share_verify:{token}:{client_ip}")
 
 
-async def verify_share_with_rate_limit(db: AsyncSession, token: str, extract_code: str) -> dict:
-    await check_share_rate_limit(token)
+async def verify_share_with_rate_limit(db: AsyncSession, token: str, extract_code: str, client_ip: str) -> dict:
+    await check_share_rate_limit(token, client_ip)
     info = await verify_share(db, token, extract_code)
     if not info:
-        await record_share_verify_failure(token)
+        await record_share_verify_failure(token, client_ip)
         raise Forbidden("提取码错误或分享已过期")
-    await clear_share_verify_attempts(token)
+    await clear_share_verify_attempts(token, client_ip)
     return info
 
 
-async def download_shared_file(db: AsyncSession, token: str, extract_code: str) -> str:
-    await check_share_rate_limit(token)
+async def download_shared_file(db: AsyncSession, token: str, extract_code: str, client_ip: str) -> str:
+    await check_share_rate_limit(token, client_ip)
     info = await verify_share(db, token, extract_code)
     if not info:
-        await record_share_verify_failure(token)
+        await record_share_verify_failure(token, client_ip)
         raise Forbidden("提取码错误或分享已过期")
-    await clear_share_verify_attempts(token)
+    await clear_share_verify_attempts(token, client_ip)
 
     file_result = await db.execute(select(File).where(File.storage_key == info["storage_key"]))
     file = file_result.scalar_one_or_none()

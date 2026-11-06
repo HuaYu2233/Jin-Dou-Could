@@ -1,3 +1,5 @@
+import shlex
+import subprocess
 import time
 from pathlib import Path
 
@@ -18,19 +20,18 @@ from app.core.config import settings
 )
 def trigger_backup(self) -> str:
     if settings.BACKUP_TRIGGER_CMD:
-        import subprocess
-
         try:
+            cmd = shlex.split(settings.BACKUP_TRIGGER_CMD)
             result = subprocess.run(
-                settings.BACKUP_TRIGGER_CMD,
-                shell=True,
+                cmd,
+                shell=False,
                 capture_output=True,
                 text=True,
                 timeout=600,
             )
             if result.returncode != 0:
                 raise RuntimeError(f"备份命令执行失败 (exit={result.returncode}): {result.stderr}")
-            logger.bind(log_type="backup").info("备份命令执行成功")
+            logger.bind(log_type="backup").info(f"备份命令执行成功: {' '.join(cmd)}")
             return "backup triggered via command"
         except Exception as exc:
             logger.bind(log_type="backup").error(f"备份命令执行失败: {exc}")
