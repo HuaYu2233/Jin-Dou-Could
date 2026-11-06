@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { login } from "@/lib/api/auth";
@@ -13,13 +13,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [infoMsg, setInfoMsg] = useState("");
-
-  useEffect(() => {
-    if (searchParams.get("auth_expired")) {
-      setInfoMsg("登录已过期，请重新登录");
-    }
-  }, [searchParams]);
+  const [infoMsg] = useState(() =>
+    typeof window !== "undefined" && searchParams.get("auth_expired") ? "登录已过期，请重新登录" : ""
+  );
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();

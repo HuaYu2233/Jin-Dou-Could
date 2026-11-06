@@ -6,7 +6,7 @@ const AUTH_PATHS = ["/login", "/register", "/forgot-password"];
 const TOKEN_COOKIE = "access_token";
 const AUTH_EXPIRED_PARAM = "auth_expired";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname, origin, searchParams } = request.nextUrl;
   const token = request.cookies.get(TOKEN_COOKIE)?.value;
 
