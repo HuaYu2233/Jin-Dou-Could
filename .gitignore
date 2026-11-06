@@ -3,6 +3,7 @@
 .env.*
 *.env
 !.env.example
+secrets/
 测试账号.txt
 **/cookies.txt
 

@@ -58,11 +58,13 @@ services:
 
   # ==================== PgBouncer 连接池代理 ====================
   pgbouncer:
-    image: edoburu/pgbouncer:1.21-alpine
+    image: edoburu/pgbouncer:1.21.0-p2
     container_name: cloud-drive-pgbouncer
     restart: unless-stopped
     environment:
       - DATABASE_URL=postgres://${POSTGRES_USER:-clouduser}:${POSTGRES_PASSWORD:-cloudpass123}@db:5432/${POSTGRES_DB:-clouddrive}
+      - LISTEN_PORT=5432
+      - AUTH_TYPE=scram-sha-256
       - PGBOUNCER_POOL_MODE=transaction
       - PGBOUNCER_MAX_CLIENT_CONN=200
       - PGBOUNCER_DEFAULT_POOL_SIZE=20
@@ -154,6 +156,7 @@ services:
       - CELERY_TASK_ALWAYS_EAGER=${CELERY_TASK_ALWAYS_EAGER:-false}
       - WS_PUBSUB_ENABLED=${WS_PUBSUB_ENABLED:-true}
       - PROMETHEUS_ENABLED=${PROMETHEUS_ENABLED:-false}
+      - METRICS_TOKEN=${METRICS_TOKEN:-}
       - ALGORITHM=${ALGORITHM:-HS256}
       - JWT_PRIVATE_KEY_PATH=${JWT_PRIVATE_KEY_PATH:-}
       - JWT_PUBLIC_KEY_PATH=${JWT_PUBLIC_KEY_PATH:-}
@@ -234,16 +237,9 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      target: dev
+      target: runner
     container_name: cloud-drive-frontend
     restart: unless-stopped
-    working_dir: /app
-    entrypoint: []
-    command: sh -c "[ -d node_modules ] || npm install --legacy-peer-deps; npm run dev"
-    volumes:
-      - ./frontend:/app
-      - frontend_node_modules:/app/node_modules
-      - frontend_next_cache:/app/.next
     environment:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
       - API_URL=${API_URL:-http://backend:8000}

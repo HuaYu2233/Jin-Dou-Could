@@ -258,7 +258,7 @@ make logs
 
 ### 迁移到生产环境
 
-1. **不加载 override 文件**：`docker compose -f docker-compose.yml up` 跳过开发覆盖
+1. **只用基础编排文件**：`docker compose -f docker-compose.yml up` 不加载 `docker-compose.dev.yml`
 2. **后端**：Gunicorn 多 worker 模式，构建产物内置代码
 3. **前端**：`runner` 阶段多阶段构建镜像（~216MB，非 root 运行），standalone 模式
 4. **HTTPS**：挂载 SSL 证书到 nginx，取消 `nginx.conf` 中 443 server 块注释，设 `HTTPS_REDIRECT=true`
@@ -524,16 +524,17 @@ curl http://localhost:8000/health/ready
 ```bash
 # ---- 服务管理（Makefile 快捷命令）----
 make dev                                     # 开发模式启动（~2秒）
+make dev-build                               # 构建前端 dev 镜像（首次/依赖变更）
 make dev-restart                             # 重启 backend + frontend
 make prod-build                              # 生产构建镜像
-make prod                                    # 生产模式启动
+make prod                                    # 生产模式启动（自动校验编排）
 make hot-reload                              # 热更新后端代码
 make logs                                    # 查看日志
 make down                                    # 停止所有服务
 
 # ---- 原始 Docker Compose 命令 ----
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d  # 开发模式
-docker compose -f docker-compose.yml up -d --build                    # 生产模式
+docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile dev up -d  # 开发模式（必须带 --profile dev）
+docker compose -f docker-compose.yml up -d --build                                 # 生产模式（只用基础文件）
 docker compose down                           # 停止
 docker compose down -v                        # 停止并删除数据卷（⚠️ 清空所有数据）
 docker compose restart frontend               # 重启单个服务
@@ -570,16 +571,19 @@ curl http://localhost:8000/health
 
 ## 开发说明
 
-项目使用 Docker Compose 的 **override 机制**区分开发与生产：
+项目使用**两个独立编排文件 + profile 隔离**区分开发与生产：
 
-| 场景 | 命令                                      | 配置文件                                             | 特点                                                      |
-| ---- | ----------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------- |
-| 开发 | `docker compose up`                       | `docker-compose.yml` + `docker-compose.override.yml` | volume 挂载、热重载、dev 构建目标、Celery Eager 模式      |
-| 生产 | `docker compose -f docker-compose.yml up` | 仅 `docker-compose.yml`                              | 构建产物运行、Gunicorn 多 worker、独立 Celery Worker 容器 |
+| 场景 | 命令                                                                                    | 配置文件                                            | 特点                                                      |
+| ---- | --------------------------------------------------------------------------------------- | --------------------------------------------------- | --------------------------------------------------------- |
+| 开发 | `make dev`（等价 `docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile dev up -d`） | `docker-compose.yml` + `docker-compose.dev.yml` | volume 挂载、热重载、dev 构建目标、Celery Eager 模式      |
+| 生产 | `make prod`（等价 `docker compose -f docker-compose.yml up -d`）                         | 仅 `docker-compose.yml`                             | 构建产物运行、Gunicorn 多 worker、独立 Celery Worker 容器 |
+
+> `docker-compose.dev.yml` 中的 backend / frontend / pgbouncer 均带 `profiles: ["dev"]`，**不带 `--profile dev` 时不会被启动**，避免 dev 编排被误合并进生产栈。
+> `make prod` 会先执行 `preflight-prod` 校验：`ENVIRONMENT` 必须为 `production`，且不得出现 `npm run dev`、`--reload`、源码 bind mount，否则直接拒绝启动。
 
 ### 前端开发
 
-前端采用多阶段 Dockerfile，override 文件自动切换到 `dev` 阶段（热重载 + volume 挂载）：
+前端采用多阶段 Dockerfile，dev 编排通过 `build.target: dev` 切换到 `dev` 阶段（热重载 + volume 挂载）：
 
 - **开发模式**（`dev` 阶段）：代码通过 volume 挂载，修改后自动热重载
 - **生产模式**（`runner` 阶段）：多阶段构建，仅包含 standalone 产物，镜像 ~150MB，非 root 用户运行

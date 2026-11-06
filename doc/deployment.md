@@ -146,8 +146,9 @@ DB_MAX_CONNECTIONS=80
 
 ```bash
 make setup                  # 初始化 git 性能优化（fsmonitor + untrackedCache）
-make prod-build             # 生产构建镜像（BuildKit 缓存）
-make prod                   # 生产模式启动
+make prod-build             # 生产构建镜像（BuildKit 缓存，frontend 为 runner 阶段）
+make prod                   # 生产模式启动（先跑 preflight-prod 编排校验）
+make dev-build              # 构建前端 dev 镜像（首次或依赖变更后）
 make dev                    # 开发模式启动（不含 celery-worker / backup / nginx）
 make dev-restart            # 重建 backend + frontend 容器
 make hot-reload             # 用 docker cp 同步后端代码，触发 uvicorn --reload
@@ -156,6 +157,8 @@ make down                   # 停止所有服务
 ```
 
 > `make dev` 启动的是 `db / redis / minio / pgbouncer / backend / frontend`，不包含 `celery-worker`、`backup`、`nginx` 与监控组件。需要验证异步任务时改用 `make prod`，或单独 `docker compose up -d celery-worker`。
+>
+> 编排隔离规则：`docker-compose.dev.yml` 中的 backend / frontend / pgbouncer 带 `profiles: ["dev"]`，必须显式 `--profile dev` 才会启动；不带 profile 合并 dev 文件会因 `nginx` 依赖缺失而直接报错，从而阻断"dev 编排混入生产"。`make prod` 另会校验 `ENVIRONMENT=production` 且无 `npm run dev` / `--reload` / 源码 bind mount。
 
 ### 4.2 日志查看
 
@@ -224,24 +227,29 @@ curl http://localhost:8000/health/ready
 PROMETHEUS_ENABLED=true
 ```
 
-启用后 `/metrics` 端点生效，但**不是匿名可访问**：后端每次启动会生成一次性 Bearer Token 并打印在日志中。
+启用后 `/metrics` 端点生效，默认**仅内网可访问**（回环与私有网段，如 Docker 网络内的 `prometheus` 容器），公网来源返回 403。
 
-```bash
-docker compose logs backend | grep "Bearer Token"
-curl -H "Authorization: Bearer <token>" http://localhost:8000/metrics
+如需显式鉴权，设置固定令牌：
+
+```env
+METRICS_TOKEN=<足够长的随机串>
 ```
 
-因此 `monitoring/prometheus/prometheus.yml` 中的 `cloud-drive-backend` job 若要真正抓到数据，需要在该 job 下补充 `authorization`：
+设置后请求必须携带 `Authorization: Bearer <token>`，否则返回 401；同时在 `monitoring/prometheus/prometheus.yml` 的 `cloud-drive-backend` job 下补充：
 
 ```yaml
   - job_name: cloud-drive-backend
     metrics_path: /metrics
     authorization:
       type: Bearer
-      credentials: <启动日志中的 token>
+      credentials: <METRICS_TOKEN 的值>
 ```
 
-> 该 token 每次重启都会变化，属于当前实现的已知限制：生产环境需要固定 token 时应改为从环境变量读取（尚未实现）。
+```bash
+curl -H "Authorization: Bearer $METRICS_TOKEN" http://localhost:8000/metrics
+```
+
+> 令牌由环境变量固定，不再每次重启变化，也不会写入日志。
 
 监控栈组成（`docker compose up -d` 会一并启动，无 profile 隔离）：
 

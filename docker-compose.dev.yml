@@ -1,10 +1,13 @@
 services:
   pgbouncer:
-    image: edoburu/pgbouncer:1.21-alpine
+    profiles: ["dev"]
+    image: edoburu/pgbouncer:1.21.0-p2
     container_name: cloud-drive-pgbouncer
     restart: unless-stopped
     environment:
       - DATABASE_URL=postgres://${POSTGRES_USER:-clouduser}:${POSTGRES_PASSWORD:-cloudpass123}@db:5432/${POSTGRES_DB:-clouddrive}
+      - LISTEN_PORT=6432
+      - AUTH_TYPE=scram-sha-256
       - PGBOUNCER_POOL_MODE=transaction
       - PGBOUNCER_MAX_CLIENT_CONN=100
       - PGBOUNCER_DEFAULT_POOL_SIZE=10
@@ -23,6 +26,7 @@ services:
       retries: 5
 
   backend:
+    profiles: ["dev"]
     image: jindou-cloud-backend:latest
     container_name: cloud-drive-backend
     restart: unless-stopped
@@ -51,6 +55,7 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
       - WS_PUBSUB_ENABLED=${WS_PUBSUB_ENABLED:-true}
       - PROMETHEUS_ENABLED=${PROMETHEUS_ENABLED:-false}
+      - METRICS_TOKEN=${METRICS_TOKEN:-}
       - DEFAULT_STORAGE_QUOTA=${DEFAULT_STORAGE_QUOTA:-1073741824}
       - RATE_LIMIT_ENABLED=${RATE_LIMIT_ENABLED:-true}
       - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-60}
@@ -80,7 +85,12 @@ services:
       retries: 3
 
   frontend:
-    image: jindou-cloud-frontend:latest
+    profiles: ["dev"]
+    image: jindou-cloud-frontend:dev
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: dev
     container_name: cloud-drive-frontend
     restart: unless-stopped
     working_dir: /app
