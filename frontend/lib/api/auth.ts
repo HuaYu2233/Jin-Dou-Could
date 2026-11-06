@@ -1,15 +1,22 @@
 import { client } from "./client";
+import { openSession } from "./session";
 
 export interface LoginData { email: string; password: string; }
 export interface RegisterData { email: string; username: string; password: string; }
 export interface User { id: string; email: string; username: string; is_active: boolean; is_admin: boolean; avatar_key: string | null; security_question: string | null; created_at: string; storage_quota: number; used_storage: number; }
 
 export async function login(data: LoginData): Promise<{ detail: string }> {
-  return client<{ detail: string }>("/api/v1/auth/login", { method: "POST", body: JSON.stringify(data) });
+  const res = await client<{ detail: string }>("/api/v1/auth/login", { method: "POST", body: JSON.stringify(data) });
+  openSession();
+  return res;
 }
 
 export async function register(data: RegisterData): Promise<User> {
   return client<User>("/api/v1/auth/register", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function logout(): Promise<{ detail: string }> {
+  return client<{ detail: string }>("/api/v1/auth/logout", { method: "POST" });
 }
 
 export async function forgotPassword(email: string): Promise<{ detail: string }> {

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/stores/auth";
-import { API_BASE_URL } from "@/lib/config";
+import { useIsHydrated } from "@/lib/hooks/useIsHydrated";
+import { logout as logoutApi } from "@/lib/api/auth";
 import { useTranslation } from "@/lib/i18n";
 import Avatar from "./Avatar";
 import LanguageSwitcher from "./LanguageSwitcher";
@@ -21,18 +22,22 @@ export default function Header({ extra }: HeaderProps) {
   const isLoading = useAuthStore((s) => s.isLoading);
   const error = useAuthStore((s) => s.error);
   const fetchMe = useAuthStore((s) => s.fetchMe);
+  const hydrated = useIsHydrated();
+
+  const didFetchRef = useRef(false);
 
   useEffect(() => {
+    if (didFetchRef.current) return;
+    didFetchRef.current = true;
     if (!user) fetchMe();
   }, [user, fetchMe]);
 
   async function handleLogout() {
-    try {
-      await fetch(`${API_BASE_URL}/api/v1/auth/logout`, { method: "POST", credentials: "include" });
-    } catch {}
     useAuthStore.getState().logout();
+    try {
+      await logoutApi();
+    } catch {}
     router.push("/login");
-    router.refresh();
   }
 
   return (
@@ -43,7 +48,7 @@ export default function Header({ extra }: HeaderProps) {
       <div className={styles.headerRight}>
         {extra}
         <LanguageSwitcher />
-        {user && (
+        {hydrated && user && (
           <Link href="/profile" className={styles.userLink}>
             <Avatar
               userId={user.id}

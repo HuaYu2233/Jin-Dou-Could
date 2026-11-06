@@ -3,9 +3,11 @@
 
 import Link from "next/link";
 import { useAuthStore } from "@/stores/auth";
+import { useIsHydrated } from "@/lib/hooks/useIsHydrated";
 
 export default function HomePage() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const hydrated = useIsHydrated();
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-8 p-8">
@@ -14,7 +16,7 @@ export default function HomePage() {
         <p className="mt-3 text-gray-500">你的私有云盘，安全可靠</p>
       </div>
       <div className="flex gap-4">
-        {isAuthenticated ? (
+        {hydrated && isAuthenticated ? (
           <Link
             href="/dashboard"
             className="rounded-lg bg-blue-600 px-6 py-3 text-white font-medium hover:bg-blue-700 transition"

@@ -13,9 +13,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [infoMsg] = useState(() =>
-    typeof window !== "undefined" && searchParams.get("auth_expired") ? "登录已过期，请重新登录" : ""
-  );
+  const infoMsg = searchParams.get("auth_expired") ? "登录已过期，请重新登录" : "";
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();

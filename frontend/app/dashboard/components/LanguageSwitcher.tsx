@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useI18nStore } from "@/stores/i18n";
+import { useI18nStore, DEFAULT_LOCALE } from "@/stores/i18n";
 import { LOCALES, useTranslation } from "@/lib/i18n";
+import { useIsHydrated } from "@/lib/hooks/useIsHydrated";
 import styles from "./LanguageSwitcher.module.css";
 
 export default function LanguageSwitcher() {
@@ -10,6 +11,8 @@ export default function LanguageSwitcher() {
   const currentLocale = useI18nStore((s) => s.locale);
   const setLocale = useI18nStore((s) => s.setLocale);
   const { t } = useTranslation();
+  const hydrated = useIsHydrated();
+  const displayLocale = hydrated ? currentLocale : DEFAULT_LOCALE;
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -24,7 +27,7 @@ export default function LanguageSwitcher() {
     document.documentElement.lang = currentLocale;
   }, [currentLocale]);
 
-  const current = LOCALES.find((l) => l.value === currentLocale) ?? LOCALES[0];
+  const current = LOCALES.find((l) => l.value === displayLocale) ?? LOCALES[0];
 
   return (
     <div className={styles.wrapper} ref={ref}>

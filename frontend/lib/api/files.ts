@@ -1,5 +1,6 @@
 // /Users/zero/project/JinDou-Cloud/frontend/lib/api/files.ts
-import { client, getCsrfToken } from "./client";
+import { client } from "./client";
+import { fetchWithCsrf, getCsrfToken } from "./csrf";
 
 export interface FileItem {
   id: string;
@@ -331,7 +332,7 @@ export async function verifyShare(
   token: string,
   extractCode: string
 ): Promise<{ share_token: string; filename: string; file_size: number; file_type: string }> {
-  const res = await fetch(
+  const res = await fetchWithCsrf(
     `${API_BASE_URL}/api/v1/shares/public/${token}/verify`,
     {
       method: "POST",

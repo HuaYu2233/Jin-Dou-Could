@@ -1,4 +1,5 @@
-import { useI18nStore, type Locale } from "@/stores/i18n";
+import { useI18nStore, type Locale, DEFAULT_LOCALE } from "@/stores/i18n";
+import { useIsHydrated } from "@/lib/hooks/useIsHydrated";
 import zhCN from "./locales/zh-CN";
 import zhTW from "./locales/zh-TW";
 import en from "./locales/en";
@@ -43,7 +44,9 @@ export function getTranslation(
 
 export function useTranslation() {
   const locale = useI18nStore((s) => s.locale);
+  const hydrated = useIsHydrated();
+  const activeLocale = hydrated ? locale : DEFAULT_LOCALE;
   const t = (key: TranslationKey, params?: TranslationParams): string =>
-    getTranslation(locale, key, params);
-  return { t, locale };
+    getTranslation(activeLocale, key, params);
+  return { t, locale: activeLocale };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNotificationStore, type WsNotification } from "@/stores/notifications";
 import styles from "./NotificationToast.module.css";
 
@@ -56,18 +56,11 @@ function ToastItem({ notification, onDismiss }: { notification: WsNotification; 
 export default function NotificationToast() {
   const notifications = useNotificationStore((s) => s.notifications);
   const removeNotification = useNotificationStore((s) => s.removeNotification);
-  const [toasts, setToasts] = useState<WsNotification[]>([]);
 
-  useEffect(() => {
-    const unread = notifications.filter((n) => !n.read);
-    if (unread.length > 0) {
-      setToasts((prev) => {
-        const existingIds = new Set(prev.map((t) => t.id));
-        const fresh = unread.filter((n) => !existingIds.has(n.id));
-        return [...prev, ...fresh].slice(-5);
-      });
-    }
-  }, [notifications]);
+  const toasts = useMemo(
+    () => notifications.filter((n) => !n.read).slice(0, 5).reverse(),
+    [notifications]
+  );
 
   return (
     <div className={styles.container}>
@@ -75,10 +68,7 @@ export default function NotificationToast() {
         <ToastItem
           key={n.id}
           notification={n}
-          onDismiss={() => {
-            removeNotification(n.id);
-            setToasts((prev) => prev.filter((t) => t.id !== n.id));
-          }}
+          onDismiss={() => removeNotification(n.id)}
         />
       ))}
     </div>

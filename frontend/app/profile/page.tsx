@@ -7,12 +7,14 @@ import AvatarEditor from "../dashboard/components/AvatarEditor";
 import PageHeader from "../admin/components/PageHeader";
 import { updateProfile, changePassword, uploadAvatar, setSecurityQuestion } from "@/lib/api/auth";
 import { useTranslation } from "@/lib/i18n";
+import { useIsHydrated } from "@/lib/hooks/useIsHydrated";
 import styles from "./page.module.css";
 
 export default function ProfilePage() {
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
   const { t } = useTranslation();
+  const hydrated = useIsHydrated();
 
   const [username, setUsername] = useState(user?.username ?? "");
   const [secQuestion, setSecQuestion] = useState(user?.security_question ?? "");
@@ -36,7 +38,7 @@ export default function ProfilePage() {
   const [secMsg, setSecMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  if (!user) return null;
+  if (!hydrated || !user) return null;
 
   async function handleSaveName() {
     setSavingName(true);

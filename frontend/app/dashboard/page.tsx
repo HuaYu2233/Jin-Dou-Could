@@ -18,6 +18,7 @@ import TransfersView from "./components/TransfersView";
 import ShareResultDialog from "./components/ShareResultDialog";
 import FolderDialog from "./components/FolderDialog";
 import { useFileOperations } from "./hooks/useFileOperations";
+import { useIsHydrated } from "@/lib/hooks/useIsHydrated";
 import pageStyles from "./page.module.css";
 
 export default function DashboardPage() {
@@ -36,9 +37,10 @@ export default function DashboardPage() {
 
   const user = useAuthStore((s) => s.user);
   const fetchMe = useAuthStore((s) => s.fetchMe);
+  const hydrated = useIsHydrated();
   const storage: StorageInfo = {
-    used: user?.used_storage ?? 0,
-    total: user?.storage_quota ?? 1024 * 1024 * 1024,
+    used: hydrated ? user?.used_storage ?? 0 : 0,
+    total: hydrated ? user?.storage_quota ?? 1024 * 1024 * 1024 : 1024 * 1024 * 1024,
   };
 
   const {
@@ -130,7 +132,7 @@ export default function DashboardPage() {
         activeCategory={category}
         onCategoryChange={handleCategoryChange}
         storage={storage}
-        isAdmin={!!user?.is_admin}
+        isAdmin={hydrated && !!user?.is_admin}
       />
       <div className={pageStyles.mainArea}>
         <Toolbar
