@@ -31,7 +31,8 @@ export default function Header({ extra }: HeaderProps) {
       await fetch(`${API_BASE_URL}/api/v1/auth/logout`, { method: "POST", credentials: "include" });
     } catch {}
     useAuthStore.getState().logout();
-    router.push("/");
+    router.push("/login");
+    router.refresh();
   }
 
   return (

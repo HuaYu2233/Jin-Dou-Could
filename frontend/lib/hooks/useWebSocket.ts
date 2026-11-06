@@ -5,7 +5,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNotificationStore } from "@/stores/notifications";
 import { queryKeys } from "@/lib/query/keys";
 import { API_BASE_URL } from "@/lib/config";
-import { refreshAccessToken } from "@/lib/api/refresh";
 
 interface WsMessage {
   event: string;
@@ -21,10 +20,10 @@ function getWsUrl(): string {
   return `${base}/api/v1/ws/connect`;
 }
 
-function getToken(): string | null {
-  if (typeof document === "undefined") return null;
-  const match = document.cookie.match(/(?:^|;\s*)access_token=([^;]*)/);
-  return match ? match[1] : null;
+function hasAuthCookie(): boolean {
+  if (typeof document === "undefined") return false;
+  if (typeof navigator === "undefined") return false;
+  return true;
 }
 
 export function useWebSocket() {
@@ -58,16 +57,13 @@ export function useWebSocket() {
   );
 
   const connect = useCallback(() => {
-    const token = getToken();
-    if (!token) return;
+    if (!hasAuthCookie()) return;
 
     const url = getWsUrl();
     const ws = new WebSocket(url);
     wsRef.current = ws;
 
-    ws.onopen = () => {
-      ws.send(JSON.stringify({ type: "auth", token }));
-    };
+    ws.onopen = () => {};
 
     ws.onmessage = (e) => {
       try {
@@ -88,10 +84,6 @@ export function useWebSocket() {
         const delay = RECONNECT_DELAYS[reconnectRef.current] ?? 16000;
         const doReconnect = async () => {
           reconnectRef.current += 1;
-          if (!getToken()) {
-            const refreshed = await refreshAccessToken();
-            if (!refreshed) return;
-          }
           connectRef.current();
         };
         timerRef.current = setTimeout(doReconnect, delay);
