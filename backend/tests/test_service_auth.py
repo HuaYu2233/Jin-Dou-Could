@@ -12,8 +12,8 @@ from uuid import uuid4
 
 import pytest
 
-from app.core.exceptions import RateLimited
-from app.core.security import hash_password
+from app.core.exceptions import RateLimited, Unauthorized
+from app.core.security import create_refresh_token, hash_password
 from app.models.user import User
 from app.services.auth_service import (
     authenticate_user,
@@ -21,6 +21,7 @@ from app.services.auth_service import (
     clear_login_rate_limit,
     get_client_ip,
     record_login_failure,
+    refresh_access_token,
     set_auth_cookies,
 )
 
@@ -158,6 +159,103 @@ class TestAuthenticateUser:
         db.execute = AsyncMock(return_value=mock_result)
         result = await authenticate_user(db, "test@example.com", "Test1234")
         assert result is None
+
+
+class TestRefreshReuseDetection:
+    def _request(self, family: str) -> MagicMock:
+        request = MagicMock()
+        request.cookies = {"refresh_token": create_refresh_token({"sub": str(uuid4()), "family": family})}
+        return request
+
+    @pytest.mark.asyncio
+    async def test_blacklisted_token_revokes_family(self):
+        request = self._request("fam-reuse")
+
+        async def _exists(key: str) -> bool:
+            return key.startswith("token_blacklist:")
+
+        with (
+            patch("app.services.auth_service.redis_client") as mock_redis,
+            patch("app.services.auth_service.revoke_token", new=AsyncMock()),
+        ):
+            mock_redis.exists = AsyncMock(side_effect=_exists)
+            mock_redis.setex = AsyncMock()
+            mock_redis.get = AsyncMock(return_value=None)
+            mock_redis.delete = AsyncMock()
+
+            with pytest.raises(Unauthorized, match="重用"):
+                await refresh_access_token(request, MagicMock(), AsyncMock())
+
+            keys = [call.args[0] for call in mock_redis.setex.call_args_list]
+            assert "refresh_reuse:fam-reuse" in keys
+
+    @pytest.mark.asyncio
+    async def test_blacklisted_token_within_grace_is_not_reuse(self):
+        request = self._request("fam-race")
+
+        with (
+            patch("app.services.auth_service.redis_client") as mock_redis,
+            patch("app.services.auth_service.revoke_token", new=AsyncMock()),
+        ):
+            mock_redis.exists = AsyncMock(return_value=True)
+            mock_redis.setex = AsyncMock()
+            mock_redis.get = AsyncMock(return_value=None)
+            mock_redis.delete = AsyncMock()
+
+            with pytest.raises(Unauthorized, match="已失效"):
+                await refresh_access_token(request, MagicMock(), AsyncMock())
+
+            keys = [call.args[0] for call in mock_redis.setex.call_args_list]
+            assert "refresh_reuse:fam-race" not in keys
+
+    @pytest.mark.asyncio
+    async def test_marked_family_rejects_live_token(self):
+        request = self._request("fam-marked")
+
+        async def _exists(key: str) -> bool:
+            return key.startswith("refresh_reuse:")
+
+        db = AsyncMock()
+
+        with (
+            patch("app.services.auth_service.redis_client") as mock_redis,
+            patch("app.services.auth_service.revoke_token", new=AsyncMock()),
+        ):
+            mock_redis.exists = AsyncMock(side_effect=_exists)
+            mock_redis.setex = AsyncMock()
+            mock_redis.get = AsyncMock(return_value=None)
+            mock_redis.delete = AsyncMock()
+
+            with pytest.raises(Unauthorized, match="重用"):
+                await refresh_access_token(request, MagicMock(), db)
+
+            db.get.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_rotation_marks_grace_window(self):
+        request = self._request("fam-rotate")
+        user = _make_user()
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=user)
+        response = MagicMock()
+
+        async def _exists(_key: str) -> bool:
+            return False
+
+        with (
+            patch("app.services.auth_service.redis_client") as mock_redis,
+            patch("app.services.auth_service.revoke_token", new=AsyncMock()),
+        ):
+            mock_redis.exists = AsyncMock(side_effect=_exists)
+            mock_redis.setex = AsyncMock()
+            mock_redis.get = AsyncMock(return_value=None)
+            mock_redis.delete = AsyncMock()
+
+            await refresh_access_token(request, response, db)
+
+            keys = [call.args[0] for call in mock_redis.setex.call_args_list]
+            assert any(k.startswith("refresh_grace:") for k in keys)
+            assert response.set_cookie.call_count == 2
 
 
 class TestSetAuthCookies:

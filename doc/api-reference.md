@@ -633,4 +633,4 @@ GET /health/ready
 GET /metrics
 ```
 
-需启用 `PROMETHEUS_ENABLED=true`。启用后必须携带 `Authorization: Bearer <token>`，token 为后端启动时随机生成并打印在日志中（每次重启都会变化）；未携带或错误返回 401。
+需启用 `PROMETHEUS_ENABLED=true`。默认仅内网来源（回环/私有网段）可访问，其他来源返回 403；若配置了 `METRICS_TOKEN`，则必须携带 `Authorization: Bearer <token>`，未携带或错误返回 401。

@@ -175,6 +175,7 @@ Webhook 类型：`generic` / `dingtalk` / `feishu` / `wechat`
 | -------------------- | ------------------------------------------ | ------ |
 | `WS_PUBSUB_ENABLED`  | WebSocket Redis Pub/Sub 多 Worker 消息广播 | true   |
 | `PROMETHEUS_ENABLED` | 启用 Prometheus 指标（`/metrics` 端点）    | false  |
+| `METRICS_TOKEN`      | `/metrics` Bearer Token，留空则仅内网可访问 | 空     |
 | `GRAFANA_ADMIN_USER` | Grafana 管理员用户名                       | admin  |
 | `GRAFANA_ADMIN_PASSWORD` | Grafana 管理员密码                     | admin  |
 

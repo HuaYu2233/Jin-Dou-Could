@@ -103,6 +103,7 @@ class Settings(BaseSettings):
 
     # Prometheus
     PROMETHEUS_ENABLED: bool = False
+    METRICS_TOKEN: str = ""
 
     @field_validator("SECRET_KEY")
     @classmethod

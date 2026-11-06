@@ -175,25 +175,37 @@ async def _unhandled_exception_handler(request, exc):
 
 
 if settings.PROMETHEUS_ENABLED:
+    import ipaddress
+    import secrets
+
     from prometheus_fastapi_instrumentator import Instrumentator
+    from starlette.responses import PlainTextResponse
 
     Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
-    import secrets as _secrets
+    _METRICS_TOKEN = settings.METRICS_TOKEN.strip()
 
-    from starlette.responses import PlainTextResponse
-
-    _METRICS_TOKEN = _secrets.token_urlsafe(32)
+    def _is_internal_client(host: str | None) -> bool:
+        if not host:
+            return False
+        try:
+            addr = ipaddress.ip_address(host)
+        except ValueError:
+            return False
+        return addr.is_loopback or addr.is_private
 
     async def _metrics_auth_middleware(request, call_next):
         if request.url.path == "/metrics":
-            auth = request.headers.get("Authorization", "")
-            if auth != f"Bearer {_METRICS_TOKEN}":
-                return PlainTextResponse("Unauthorized", status_code=401)
+            if _METRICS_TOKEN:
+                auth = request.headers.get("Authorization", "")
+                if not secrets.compare_digest(auth, f"Bearer {_METRICS_TOKEN}"):
+                    return PlainTextResponse("Unauthorized", status_code=401)
+            elif not _is_internal_client(request.client.host if request.client else None):
+                return PlainTextResponse("Forbidden", status_code=403)
         return await call_next(request)
 
     app.middleware("http")(_metrics_auth_middleware)
-    logger.info(f"Prometheus 指标已启用，访问 /metrics，Bearer Token={_METRICS_TOKEN}")
+    logger.info(f"Prometheus 指标已启用，/metrics 鉴权方式：{'Bearer Token' if _METRICS_TOKEN else '仅内网可访问'}")
 
 # HTTPS 重定向（仅生产启用，最外层）
 if settings.HTTPS_REDIRECT and settings.ENVIRONMENT == "production":

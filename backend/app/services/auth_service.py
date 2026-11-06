@@ -17,6 +17,9 @@ from app.core.security import (
 )
 from app.models.user import User
 
+REFRESH_REUSE_GRACE_SECONDS = 10
+_REUSE_MSG = "检测到 Refresh Token 重用，该 Token 族已全部撤销，请重新登录"
+
 
 def get_client_ip(request: Request) -> str:
     return resolve_client_ip(request)
@@ -103,13 +106,15 @@ async def refresh_access_token(request: Request, response: Response, db: AsyncSe
     if payload.get("type") != "refresh":
         raise Unauthorized("Token 类型错误，请使用 refresh token")
     jti = payload.get("jti")
+    family = payload.get("family")
     if jti and await redis_client.exists(f"token_blacklist:{jti}"):
+        if family and not await redis_client.exists(f"refresh_grace:{jti}"):
+            await _revoke_family(family)
+            raise Unauthorized(_REUSE_MSG)
         raise Unauthorized("Refresh token 已失效")
 
-    family = payload.get("family")
     if family and await redis_client.exists(f"refresh_reuse:{family}"):
-        await _revoke_family(family)
-        raise Unauthorized("检测到 Refresh Token 重用，该 Token 族已全部撤销，请重新登录")
+        raise Unauthorized(_REUSE_MSG)
 
     user_id = payload["sub"]
     try:
@@ -124,6 +129,8 @@ async def refresh_access_token(request: Request, response: Response, db: AsyncSe
         family = str(uuid.uuid4())
 
     await revoke_token(refresh)
+    if jti:
+        await redis_client.setex(f"refresh_grace:{jti}", REFRESH_REUSE_GRACE_SECONDS, "1")
 
     access_token = create_access_token({"sub": user_id})
     new_refresh_token = create_refresh_token({"sub": user_id, "family": family})
