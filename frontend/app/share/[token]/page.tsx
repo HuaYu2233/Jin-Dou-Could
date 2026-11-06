@@ -106,14 +106,14 @@ export default function SharePage() {
               type="text"
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="请输入6位提取码"
-              maxLength={6}
+              placeholder="请输入提取码"
+              maxLength={8}
               className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-center text-lg tracking-widest font-mono focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               onKeyDown={(e) => e.key === "Enter" && handleVerify()}
             />
             <button
               onClick={handleVerify}
-              disabled={code.length !== 6}
+              disabled={code.length !== 8 && code.length !== 6}
               className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:bg-gray-300"
             >
               验证提取码

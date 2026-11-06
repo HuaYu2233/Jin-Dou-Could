@@ -75,6 +75,37 @@ A: 默认 100MB（`MAX_UPLOAD_SIZE=104857600`），可在 `.env` 中修改。
 
 A: 参考 [deployment.md](./deployment.md) 第 3.3 节。
 
+### Q: 上传的压缩包不在「压缩包」分类里？
+
+A: 分类由上传时探测出的真实 MIME 决定，白名单覆盖 `zip` / `rar` / `7z` / `gzip` / `x-gzip` / `tar` / `bzip2` / `xz`。
+
+- 若文件被归为「其他」，说明其 MIME 不在上述集合内（例如 `application/x-rar` 之外的变体）
+- 历史文件的 `file_type` 在上传时已落库，调整分类规则不会自动回填，需要重新上传或写迁移脚本
+- 若上传直接被拒，则是 MIME 白名单未包含该类型，需要修改 `backend/app/services/file_validation.py` 后重启
+
+### Q: 切换账号后还能看到上一个账号的文件？
+
+A: 这是客户端缓存未清理的表现。正常登出会执行 `queryClient.clear()` 与通知 store 的 `clearAll()`；若仍复现，检查是否直接关闭标签页而未走登出流程（此时 localStorage 中的 `auth-storage` 与内存缓存会保留）。
+
+排查：
+
+```javascript
+// 浏览器控制台
+localStorage.removeItem("auth-storage");
+location.reload();
+```
+
+### Q: 在 `.env` 里改了配置但没生效？
+
+A: 变量必须被 `docker-compose.yml` 的 `environment` 段引用才会进入容器。核对方式：
+
+```bash
+docker compose config | grep -i 变量名
+docker compose exec backend printenv | grep -i 变量名
+```
+
+若两处都没有，说明 compose 未透传，需要补 `environment` 后 `docker compose up -d` 重建。详见 [pitfalls.md](./pitfalls.md) 第 15 条。
+
 ## 3. 开发相关
 
 ### Q: 后端代码修改后不生效？

@@ -61,8 +61,8 @@ JinDou Cloud（筋斗云盘）是一个基于 Docker Compose 的全栈云存储�
 | Celery       | 5.4+        | 异步任务队列          |
 | Loguru       | 0.7+        | 结构化日志            |
 | python-magic | 0.4+        | MIME 类型检测         |
-| Prometheus   | 6.1+        | 指标采集与可观测性    |
-| Python       | 3.9+        | 运行时                |
+| Prometheus   | 6.1+        | 指标采集（prometheus-fastapi-instrumentator） |
+| Python       | 3.12+       | 运行时                |
 
 ### 3.3 基础设施
 
@@ -84,7 +84,7 @@ JinDou-Cloud/
 │   │   ├── api/v1/             # API 路由
 │   │   │   ├── endpoints/      # 各模块端点
 │   │   │   └── api.py          # 路由聚合
-│   │   ├── core/               # 核心模块（config, security, storage 等）
+│   │   ├── core/               # 核心模块（config, security, storage, client_ip, smtp 等）
 │   │   ├── db/                 # 数据库引擎与会话
 │   │   ├── middleware/         # 中间件（限流、日志、安全头、CSRF）
 │   │   ├── models/             # SQLAlchemy 模型
@@ -102,7 +102,11 @@ JinDou-Cloud/
 │   │   ├── dashboard/          # 主界面
 │   │   ├── profile/            # 用户中心
 │   │   └── share/[token]/      # 分享访问页
-│   ├── lib/                    # 工具库（API 封装、i18n、hooks）
+│   ├── lib/                    # 工具库
+│   │   ├── api/                # 接口封装：auth.ts / files.ts（文件+文件夹+分享）/ admin.ts，以及 client.ts / csrf.ts / refresh.ts / session.ts
+│   │   ├── query/              # TanStack Query 的 keys.ts 与 QueryProvider
+│   │   ├── i18n/               # 多语言资源（zh-CN / zh-TW / en）与切换
+│   │   └── hooks/              # 通用 hooks（useIsHydrated、useWebSocket）
 │   ├── stores/                 # Zustand 状态管理
 │   └── tests/                  # 测试套件
 ├── scripts/                    # 备份/恢复脚本
@@ -131,7 +135,7 @@ JinDou-Cloud/
 | 服务层    | `services/`        | 业务逻辑、数据编排、权限校验                |
 | 模型层    | `models/`          | 数据库表定义（SQLAlchemy ORM）              |
 | Schema 层 | `schemas/`         | 请求/响应数据验证与序列化（Pydantic）       |
-| 核心层    | `core/`            | 配置、安全、存储、日志、Redis、Celery 等    |
+| 核心层    | `core/`            | 配置、安全、存储、日志、Redis、Celery、客户端 IP 解析、SMTP 发信等 |
 | 中间件层  | `middleware/`      | 限流、请求日志、安全头、CSRF                |
 | 任务层    | `tasks/`           | Celery 异步任务（邮件、备份、缩略图、告警） |
 
@@ -158,6 +162,8 @@ JinDou-Cloud/
 | `i18n`          | 国际化语言切换           |
 | `notifications` | WebSocket 通知管理       |
 
+> `notifications` 为纯内存 store，不持久化。登出时必须调用 `clearAll()` 清零 `unreadCount`，否则下一个会话会继承上一用户的未读角标。
+
 ### 6.3 数据流
 
 ```
@@ -166,6 +172,18 @@ JinDou-Cloud/
     └── TanStack Query 缓存 ←──────── 响应
     └── WebSocket 实时推送 ←──────── 事件通知
 ```
+
+### 6.4 会话边界与缓存隔离
+
+TanStack Query 的缓存 key 只描述查询参数（`category` / `page` / `folderId` / `keyword`），**不含用户身份**。因此缓存的生命周期必须与登录会话绑定：
+
+```
+登出（本地或服务端触发）→ queryClient.clear() + notifications.clearAll() → 跳转 /login
+```
+
+- 使用 `clear()` 而非 `invalidateQueries()`：登出场景需要丢弃缓存，invalidate 会在跳转前用旧 Cookie 再打一轮请求
+- 清理逻辑集中放在 `app/dashboard/layout.tsx` 的未认证分支，任何进入该分支的路径（主动登出、Cookie 失效、Token 刷新失败）都会执行
+- 新增任何按用户维度存放的客户端状态时，必须同步加入该清理分支
 
 ## 7. 容器编排
 
@@ -181,6 +199,17 @@ JinDou-Cloud/
 | `frontend`      | 构建               | 3000           | backend           |
 | `backup`        | 构建               | -              | db, minio         |
 | `nginx`         | nginx:alpine       | 80             | frontend, backend |
+
+监控栈（随主栈一并启动，端口均绑定 127.0.0.1）：
+
+| 容器                | 镜像                                          | 端口           | 说明               |
+| ------------------- | --------------------------------------------- | -------------- | ------------------ |
+| `prometheus`        | prom/prometheus:v2.54.1                       | 127.0.0.1:9090 | 指标采集与告警规则 |
+| `grafana`           | grafana/grafana:11.4.0                        | 127.0.0.1:3001 | 仪表盘             |
+| `redis-exporter`    | oliver006/redis_exporter:v1.62.0              | 127.0.0.1:9121 | Redis 指标导出     |
+| `postgres-exporter` | quay.io/prometheuscommunity/postgres-exporter:v0.16.0 | 127.0.0.1:9187 | PostgreSQL 指标导出 |
+
+> `pgbouncer` 同样在主栈内，但 backend 的 `DATABASE_URL` 默认直连 `db`，未经代理；需要走连接池代理时手动改为指向 `pgbouncer:5432`。
 
 ### 7.2 开发 vs 生产
 
@@ -203,3 +232,5 @@ JinDou-Cloud/
 6. **CSRF 纯 ASGI**：自定义 ASGI 中间件，避免 BaseHTTPMiddleware 性能开销
 7. **多阶段构建**：Docker 镜像最小化，backend 315MB / frontend 216MB
 8. **非 root 运行**：生产容器以非 root 用户运行，降低安全风险
+9. **会话边界隔离**：客户端缓存与通知状态随登出整体清空，避免同一浏览器内跨用户串数据
+10. **公共能力下沉**：客户端 IP 解析、SMTP 发信、游标分页统一收敛到单一实现，避免多处副本各自漂移

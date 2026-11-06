@@ -32,10 +32,15 @@
 | 配置项                        | 说明                     | 默认值 | 必填 |
 | ----------------------------- | ------------------------ | ------ | ---- |
 | `SECRET_KEY`                  | JWT 签名密钥（≥32 字符） | -      | 是   |
+| `ALGORITHM`                   | JWT 算法                 | HS256  | 否   |
+| `JWT_PRIVATE_KEY_PATH`        | RS256 私钥路径           | -      | 否   |
+| `JWT_PUBLIC_KEY_PATH`         | RS256 公钥路径           | -      | 否   |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Access Token 过期时间    | 30     | 否   |
 | `REFRESH_TOKEN_EXPIRE_DAYS`   | Refresh Token 过期时间   | 7      | 否   |
 
-> ⚠️ `SECRET_KEY` 必须为 32 字符以上的强随机值，弱密钥将导致启动失败。
+> ⚠️ `SECRET_KEY` 必须为 32 字符以上的强随机值，且不能包含 `change` / `todo` / `example` 等占位符关键词，否则启动失败。
+
+> 使用 `ALGORITHM=RS256` 时需同时提供私钥与公钥路径。密钥对通过 `./scripts/generate-jwt-keys.sh [位数] [输出目录]` 生成，Docker Secrets 场景下路径为 `/run/secrets/jwt_private_key` 与 `/run/secrets/jwt_public_key`。
 
 ## 3. 前端与网络
 
@@ -67,10 +72,16 @@
 
 | 配置项                  | 说明                       | 默认值      | 必填 |
 | ----------------------- | -------------------------- | ----------- | ---- |
+| `BACKUP_DIR`            | 备份输出目录（容器内）     | /backups    | 否   |
 | `BACKUP_RETENTION_DAYS` | 备份保留天数               | 7           | 否   |
 | `BACKUP_CRON`           | 备份 Cron 表达式           | `0 3 * * *` | 否   |
 | `BACKUP_RUN_ON_START`   | 启动时立即备份             | false       | 否   |
 | `BACKUP_ENCRYPT_KEY`    | 备份加密密钥（留空不加密） | -           | 否   |
+| `BACKUP_TRIGGER_CMD`    | 备份完成后的外部触发命令   | -           | 否   |
+
+> `BACKUP_DIR` 与 `BACKUP_TRIGGER_CMD` 属于 `Settings` 字段；`BACKUP_RETENTION_DAYS` / `BACKUP_CRON` / `BACKUP_RUN_ON_START` / `BACKUP_ENCRYPT_KEY` 由 backup 容器脚本直接读取，不经过 `Settings`。
+>
+> 注意 compose 里的变量名映射：`.env` 中写 `BACKUP_RUN_ON_START`，传给容器时改名为 `RUN_ON_START`（脚本读的是后者）。自定义时不要直接改脚本侧的变量名。
 
 ## 7. 告警
 
@@ -111,6 +122,8 @@ Webhook 类型：`generic` / `dingtalk` / `feishu` / `wechat`
 | `RESET_PASSWORD_CODE_LENGTH`         | 验证码位数         | 6        |
 
 > 留空则复用告警邮件 SMTP 配置
+>
+> `RESET_PASSWORD_CODE_EXPIRE_SECONDS` 与 `RESET_PASSWORD_CODE_LENGTH` 会同时透传给 backend 与 celery-worker：前者用于生成验证码与设置 Redis TTL，后者用于邮件正文中的「有效期 N 分钟」文案，两边不一致会出现邮件文案与真实有效期不符。
 
 ## 9. 环境与部署
 
@@ -128,9 +141,11 @@ Webhook 类型：`generic` / `dingtalk` / `feishu` / `wechat`
 | `CELERY_TASK_ALWAYS_EAGER`  | Eager 模式（同步执行，仅开发/测试用）         | false  |
 | `CELERY_CONCURRENCY`        | Worker 并发数                                 | 4      |
 
+> `CELERY_CONCURRENCY` 只被 `docker-compose.yml` 的 worker 启动命令使用，不属于 `Settings` 字段；`CELERY_BROKER_URL` / `CELERY_RESULT_BACKEND_URL` 留空时自动从 `REDIS_URL` 派生 DB1 与 DB2。
+
 ## 11. 数据库连接池
 
-| 配置项               | 说明         | 默认值 | 说明                                             |
+| 配置项               | 说明         | 默认值 | 备注                                             |
 | -------------------- | ------------ | ------ | ------------------------------------------------ |
 | `DB_POOL_SIZE`       | 连接池大小   | 5      | 开发 5，生产建议 10                              |
 | `DB_MAX_OVERFLOW`    | 溢出上限     | 5      | 允许超出 pool_size 的连接数                      |
@@ -160,6 +175,10 @@ Webhook 类型：`generic` / `dingtalk` / `feishu` / `wechat`
 | -------------------- | ------------------------------------------ | ------ |
 | `WS_PUBSUB_ENABLED`  | WebSocket Redis Pub/Sub 多 Worker 消息广播 | true   |
 | `PROMETHEUS_ENABLED` | 启用 Prometheus 指标（`/metrics` 端点）    | false  |
+| `GRAFANA_ADMIN_USER` | Grafana 管理员用户名                       | admin  |
+| `GRAFANA_ADMIN_PASSWORD` | Grafana 管理员密码                     | admin  |
+
+> `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` 仅被 grafana 容器读取，不属于 `Settings` 字段。生产环境必须修改默认密码。
 
 ## 14. 生产环境配置检查清单
 
@@ -170,6 +189,9 @@ Webhook 类型：`generic` / `dingtalk` / `feishu` / `wechat`
 - [ ] `ENVIRONMENT=production`
 - [ ] `NEXT_PUBLIC_API_URL` 改为实际域名
 - [ ] `CORS_ORIGINS` 改为实际域名
+- [ ] `MINIO_PUBLIC_ENDPOINT` 改为公网可达域名（预签名下载链接指向它）
+- [ ] `TRUSTED_PROXIES` 配置反向代理 IP，否则限流按同一 IP 计数
+- [ ] `GRAFANA_ADMIN_PASSWORD` 改为强密码（启用监控时）
 - [ ] `HTTPS_REDIRECT=true`（如启用 SSL）
 - [ ] `CSRF_ENABLED=true`
 - [ ] `SECURITY_HEADERS_ENABLED=true`
@@ -177,3 +199,7 @@ Webhook 类型：`generic` / `dingtalk` / `feishu` / `wechat`
 - [ ] `CELERY_TASK_ALWAYS_EAGER=false`
 - [ ] `BACKUP_ENCRYPT_KEY` 设为加密密钥
 - [ ] 连接池配置合理：WORKERS × (POOL_SIZE + MAX_OVERFLOW) < DB_MAX_CONNECTIONS
+
+## 15. 配置透传校验
+
+`.env` 的值只有在 `docker-compose.yml` 的 `environment` 中以 `${VAR}` 引用才会进入容器。新增或修改配置后建议做一次双向校验，命令与已知例外见 [pitfalls.md 第 19 条](./pitfalls.md)。

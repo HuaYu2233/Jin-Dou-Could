@@ -68,6 +68,13 @@ SECRET_KEY=<openssl rand -hex 32>
 NEXT_PUBLIC_API_URL=https://api.example.com
 CORS_ORIGINS=https://cloud.example.com
 
+# 浏览器可访问的 MinIO 地址（预签名下载链接指向此地址，必须是公网可达域名）
+MINIO_PUBLIC_ENDPOINT=minio.example.com:9000
+
+# 可信反向代理 IP（逗号分隔，精确匹配，不支持 CIDR）
+# 部署在 Nginx / Cloudflare 之后必须填写，否则限流会把所有请求记成同一个 IP
+TRUSTED_PROXIES=127.0.0.1
+
 # HTTPS
 HTTPS_REDIRECT=true
 
@@ -80,6 +87,8 @@ ADMIN_EMAIL=admin@example.com
 # 最大用户数（0=不限）
 MAX_USERS=0
 ```
+
+> `.env` 中的变量只有被 `docker-compose.yml` 的 `environment` 段引用后才会进入容器。新增配置项时必须同时修改 `.env.example`、`config.py` 与 compose 的 `environment`，否则会静默回落到代码默认值，表现为「改了 `.env` 但不生效」。
 
 ### 3.2 启动生产服务
 
@@ -136,13 +145,17 @@ DB_MAX_CONNECTIONS=80
 ### 4.1 服务管理
 
 ```bash
-make dev                    # 开发模式启动
-make dev-restart            # 重启 backend + frontend
+make setup                  # 初始化 git 性能优化（fsmonitor + untrackedCache）
+make prod-build             # 生产构建镜像（BuildKit 缓存）
 make prod                   # 生产模式启动
+make dev                    # 开发模式启动（不含 celery-worker / backup / nginx）
+make dev-restart            # 重建 backend + frontend 容器
+make hot-reload             # 用 docker cp 同步后端代码，触发 uvicorn --reload
+make logs                   # 跟随 backend + frontend 日志
 make down                   # 停止所有服务
-make logs                   # 查看日志
-make hot-reload             # 热更新后端代码
 ```
+
+> `make dev` 启动的是 `db / redis / minio / pgbouncer / backend / frontend`，不包含 `celery-worker`、`backup`、`nginx` 与监控组件。需要验证异步任务时改用 `make prod`，或单独 `docker compose up -d celery-worker`。
 
 ### 4.2 日志查看
 
@@ -211,7 +224,35 @@ curl http://localhost:8000/health/ready
 PROMETHEUS_ENABLED=true
 ```
 
-访问 `http://localhost:8000/metrics` 获取指标
+启用后 `/metrics` 端点生效，但**不是匿名可访问**：后端每次启动会生成一次性 Bearer Token 并打印在日志中。
+
+```bash
+docker compose logs backend | grep "Bearer Token"
+curl -H "Authorization: Bearer <token>" http://localhost:8000/metrics
+```
+
+因此 `monitoring/prometheus/prometheus.yml` 中的 `cloud-drive-backend` job 若要真正抓到数据，需要在该 job 下补充 `authorization`：
+
+```yaml
+  - job_name: cloud-drive-backend
+    metrics_path: /metrics
+    authorization:
+      type: Bearer
+      credentials: <启动日志中的 token>
+```
+
+> 该 token 每次重启都会变化，属于当前实现的已知限制：生产环境需要固定 token 时应改为从环境变量读取（尚未实现）。
+
+监控栈组成（`docker compose up -d` 会一并启动，无 profile 隔离）：
+
+| 服务              | 端口（仅绑定 127.0.0.1） | 作用                            |
+| ----------------- | ----------------------- | ------------------------------- |
+| `prometheus`      | 9090                    | 抓取 backend / redis / pg / minio |
+| `grafana`         | 3001                    | 仪表盘，管理员账号见配置文档    |
+| `redis-exporter`  | 9121                    | Redis 指标                      |
+| `postgres-exporter` | 9187                  | PostgreSQL 指标                 |
+
+MinIO 指标走 `/minio/v2/metrics/cluster`（`MINIO_PROMETHEUS_AUTH_TYPE=public`），无需额外鉴权。
 
 ### 6.3 告警配置
 
@@ -239,25 +280,33 @@ docker compose exec backend alembic upgrade head
 docker compose logs -f backend
 ```
 
-## 8. CI/CD 自动部署
+## 8. CI 门禁
 
 项目使用 GitHub Actions，配置文件位于 `.github/workflows/ci.yml`。
 
 ### 8.1 流水线阶段
 
 ```
-Lint + TypeCheck + Test → Docker Build → Deploy (master/main)
+Backend Lint  ┐
+Backend Test  ├─→ 三个 job 并行，全部通过才算绿灯
+Frontend Check┘
 ```
 
-### 8.2 配置 Secrets
+| Job              | 内容                                                          |
+| ---------------- | ------------------------------------------------------------- |
+| `backend-lint`   | `ruff check .` + `ruff format --check .`                      |
+| `backend-test`   | `pytest tests/ -v` + 覆盖率（Service Container: PG16 + Redis7）|
+| `frontend-check` | `npm run lint` + `npx tsc --noEmit` + `npm run test`          |
 
-在 GitHub 仓库 Settings → Secrets and variables → Actions 中添加：
+触发条件：push 到 `main` / `dev`，或向 `main` 发起 PR。
 
-| Secret               | 说明                    |
-| -------------------- | ----------------------- |
-| `DOCKERHUB_USERNAME` | Docker Hub 用户名       |
-| `DOCKERHUB_TOKEN`    | Docker Hub Access Token |
-| `DEPLOY_HOST`        | 部署服务器 IP/域名      |
-| `DEPLOY_USER`        | SSH 登录用户名          |
-| `DEPLOY_SSH_KEY`     | SSH 私钥                |
-| `DEPLOY_PATH`        | 服务器上项目路径        |
+> 当前流水线**只做门禁校验，不含 Docker 构建与自动部署**。生产发布仍按第 7 节手动执行 `git pull` + `docker compose up -d --build`。
+
+### 8.2 本地等价命令
+
+提交前在本地跑同样的检查，避免把红叉推上去：
+
+```bash
+cd backend && uv run ruff check . && uv run ruff format --check . && uv run pytest -q
+cd ../frontend && npm run lint && npx tsc --noEmit && npm run test
+```

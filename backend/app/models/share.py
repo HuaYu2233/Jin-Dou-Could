@@ -19,7 +19,7 @@ class Share(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     share_token: Mapped[str] = mapped_column(String(32), unique=True, index=True)
-    extract_code: Mapped[str] = mapped_column(String(6))
+    extract_code: Mapped[str] = mapped_column(String(8))
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     views: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

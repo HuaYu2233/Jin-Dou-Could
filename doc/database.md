@@ -101,6 +101,8 @@
 - `ix_files_owner_deleted_filename` (owner_id, deleted_at, filename)
 - `ix_files_filename_trgm` (filename) - GIN 三元组索引，支持模糊搜索
 
+**`file_type` 取值**：`image` / `document` / `video` / `audio` / `archive` / `other`，由上传时 `python-magic` 探测出的真实 MIME 推导后落库，不随分类规则调整而回填。
+
 ### 3.4 shares - 分享表
 
 | 字段         | 类型          | 约束          | 说明       |
@@ -109,7 +111,7 @@
 | file_id      | UUID          | FK→files.id   | 分享的文件 |
 | owner_id     | UUID          | FK→users.id   | 分享创建者 |
 | share_token  | VARCHAR(32)   | UNIQUE, INDEX | 分享令牌   |
-| extract_code | VARCHAR(6)    | NOT NULL      | 提取码     |
+| extract_code | VARCHAR(8)    | NOT NULL      | 提取码     |
 | expires_at   | TIMESTAMP(tz) | NULLABLE      | 过期时间   |
 | views        | INTEGER       | DEFAULT 0     | 访问次数   |
 | created_at   | TIMESTAMP(tz) | DEFAULT now() | 创建时间   |
@@ -149,29 +151,37 @@
 | j4k5l6m7n8o9_add_search_and_folder_composite_indexes     | 添加搜索和文件夹复合索引     |
 | k5l6m7n8o9p0_add_pgtrgm_extension_and_gin_index          | 添加 pg_trgm 扩展和 GIN 索引 |
 | l7m8n9o0p1q2_add_thumbnail_key_to_files                  | 文件表添加缩略图字段         |
+| m8n9o0p1q2r3_widen_share_extract_code                    | 分享提取码列扩宽到 8 位       |
 
 ## 6. Redis 数据结构
 
 Redis 在项目中承担多种职责，使用不同的 DB 编号：
 
-| DB  | 用途            | Key 模式                        | 说明       |
-| --- | --------------- | ------------------------------- | ---------- |
-| 0   | 缓存/限流/Token | `user:{id}`, `rate:{ip}:{path}` | 默认数据库 |
-| 1   | Celery Broker   | Celery 内部管理                 | 任务队列   |
-| 2   | Celery Result   | Celery 内部管理                 | 任务结果   |
+| DB  | 用途                                | Key 模式                                                        | 说明       |
+| --- | ----------------------------------- | --------------------------------------------------------------- | ---------- |
+| 0   | 缓存/限流/Token/WebSocket Pub/Sub   | `user:{id}`, `rl:{ip}:global`, `ws:user:{id}`                   | 默认数据库 |
+| 1   | Celery Broker                       | Celery 内部管理                                                 | 任务队列   |
+| 2   | Celery Result                       | Celery 内部管理                                                 | 任务结果   |
+
+> `REDIS_URL` 默认带 `/0`，后端所有业务 key 与 Pub/Sub 频道都在 DB 0；Celery 的 broker/backend 由 `_build_celery_url` 从 `REDIS_URL` 派生到 DB 1 / DB 2。
 
 ### 6.1 主要 Key 设计
 
-| Key 模式                     | 类型   | TTL         | 说明               |
-| ---------------------------- | ------ | ----------- | ------------------ |
-| `user:{user_id}`             | Hash   | 30m         | 用户信息缓存       |
-| `file_count:{user_id}`       | String | 30m         | 用户文件计数缓存   |
-| `rate:{ip}:{path}`           | ZSet   | 60s         | 滑动窗口限流       |
-| `login_fail:{ip}:{email}`    | String | 15m         | 登录失败计数       |
-| `token_blacklist:{jti}`      | String | Token有效期 | Token 黑名单       |
-| `share_rate:{token}`         | String | 5m          | 分享提取码验证限流 |
-| `reset_code:{email}`         | String | 10m         | 密码重置验证码     |
-| `alert_cooldown:{error_key}` | String | 5m          | 告警冷却           |
+| Key 模式                            | 类型   | TTL                          | 说明                               |
+| ----------------------------------- | ------ | ---------------------------- | ---------------------------------- |
+| `user:{user_id}`                    | String | 60s                          | 用户信息缓存（JSON 序列化）        |
+| `rl:{ip}:global`                    | ZSet   | 60s                          | 全局限流滑动窗口                   |
+| `rl:{ip}:login`                     | ZSet   | 60s                          | 登录/注册路径限流滑动窗口          |
+| `login_rl:{ip}:{email}`             | String | 300s                         | 登录失败计数                       |
+| `login_lock:{ip}:{email}`           | String | 900s                         | 登录失败锁定标记                   |
+| `token_blacklist:{jti}`             | String | 剩余 Token 有效期            | Token 黑名单                       |
+| `share_verify:{token}:{ip}`         | String | 900s                         | 分享提取码验证失败计数             |
+| `share_lock:{token}:{ip}`           | String | 900s                         | 分享提取码锁定标记                 |
+| `reset_password_send_limit:{email}` | String | 60s                          | 重置验证码发送频率限制             |
+| `reset_password_code:{email}`       | String | `RESET_PASSWORD_CODE_EXPIRE_SECONDS`（默认 600s） | 密码重置验证码 |
+| `ws:user:{user_id}`                 | Pub/Sub 频道 | 无                       | WebSocket 多 Worker 消息广播       |
+
+> 告警冷却（`ALERT_COOLDOWN_SECONDS`）是进程内内存字典，不写 Redis；多 Worker 部署时各 Worker 独立计时。
 
 ## 7. MinIO 对象存储
 

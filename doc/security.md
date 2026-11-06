@@ -12,11 +12,14 @@
 
 | 属性           | Access Token     | Refresh Token     |
 | -------------- | ---------------- | ----------------- |
+| Cookie 名      | `access_token`   | `refresh_token`   |
 | 用途           | API 请求认证     | 刷新 Access Token |
 | 存储方式       | HttpOnly Cookie  | HttpOnly Cookie   |
 | 过期时间       | 30 分钟          | 7 天              |
 | Token 类型字段 | `type: "access"` | `type: "refresh"` |
 | 黑名单         | Redis            | Redis             |
+
+Cookie 属性：`HttpOnly=True`、`SameSite=Lax`，`ENVIRONMENT=production` 时追加 `Secure`。前端 JS 无法读取 Token，所有鉴权由浏览器自动携带 Cookie 完成。
 
 **防混用机制**：JWT payload 包含 `type` 字段，access token 不能用于 refresh 接口，反之亦然。
 
@@ -52,17 +55,38 @@
 
 - **实现方式**：纯 ASGI 中间件，避免 BaseHTTPMiddleware 性能开销
 - **策略**：双提交 Cookie（Double Submit Cookie）
-- **豁免**：GET/HEAD/OPTIONS 请求、WebSocket、`/health` 端点
+- **Cookie**：`csrf_token`（`Path=/`，`SameSite=Lax`，生产 HTTPS 下为 `SameSite=None; Secure`）
+- **Header**：`X-CSRF-Token`，值必须与 Cookie 一致（`secrets.compare_digest` 比较）
+- **豁免**：GET/HEAD/OPTIONS 请求、非 `/api/` 路径、WebSocket、`/health` 端点
+- **首次访问**：无 Cookie 时中间件自动下发 Token，写请求需带 Cookie 与 Header 双份
 - **scope 级解析**：直接解析 cookie 和 header，不构造 Request 对象
 
 ### 3.3 限流（RateLimitMiddleware）
 
-- **算法**：Redis 滑动窗口限流
-- **维度**：IP + 路径
-- **默认规则**：每分钟每 IP 60 次请求
-- **登录/注册**：更严格限流（5 次/5 分钟）
+- **算法**：Redis ZSet 滑动窗口限流（60 秒窗口）
+- **维度**：客户端 IP（全局限流，不区分路径），登录/注册路径额外加一层同维度限流
+- **默认规则**：每分钟每 IP 60 次请求（`RATE_LIMIT_PER_MINUTE`）
+- **登录/注册**：额外限流，每分钟 5 次（`LOGIN_RATE_LIMIT_MAX_ATTEMPTS`）
+- **豁免**：`OPTIONS` 预检请求、`/health`、`/docs`、`/openapi.json`、`/redoc`
 - **Redis 不可达时**：放行并记录告警日志（降级策略）
 - **仅信任代理 IP** 读取 X-Forwarded-For（`TRUSTED_PROXIES`）
+  - 精确匹配，不支持 CIDR 网段
+  - 只有 TCP 对端地址命中该列表时才采信 `X-Forwarded-For` / `X-Real-IP`
+  - 留空表示不信任任何代理，直接使用 TCP 对端地址；部署在 Nginx / Cloudflare 之后必须显式配置，否则所有请求会被记成同一个 IP
+
+### 3.3.1 登录失败与分享提取码限流
+
+这两处是业务级计数限流，不经过中间件，由 service 层直接读写 Redis：
+
+| 场景         | 计数 Key                    | 锁 Key                   | 阈值                | 锁定时长 |
+| ------------ | --------------------------- | ------------------------ | ------------------- | -------- |
+| 登录失败     | `login_rl:{ip}:{email}`     | `login_lock:{ip}:{email}` | 5 次                | 15 分钟  |
+| 分享提取码   | `share_verify:{token}:{ip}` | `share_lock:{token}:{ip}` | 5 次                | 15 分钟  |
+
+- 计数 Key 首次写入时设置与锁定时长相同的 TTL，达到阈值后写入锁 Key 并删除计数 Key
+- 锁定期内直接返回 429，`detail` 中携带剩余秒数
+- 登录成功会清除 `login_rl:{ip}:{email}`，但不会主动清除锁 Key
+- 分享提取码比较使用 `secrets.compare_digest`，避免时序侧信道；提取码为 8 位大写字母 + 数字（`SHARE_CODE_CHARS`），单次猜测空间约 36^8
 
 ### 3.4 请求日志（RequestLoggingMiddleware）
 
@@ -81,6 +105,7 @@
 - 分片合并要求上传会话存在且 `storage_key` 与会话一致，会话过期后不能凭已上传分片直接合并
 - 常见别名（`audio/mp3`、`application/mp4`）归一化后参与白名单判断
 - libmagic 细分的文本子类型（`text/x-python`、`text/x-shellscript` 等）归一化为 `text/plain` 后参与白名单判断
+- 归档类 MIME 覆盖 `zip` / `rar` / `7z` / `gzip` / `x-gzip` / `tar` / `bzip2` / `xz`，统一归类为 `archive`，避免 `tar.gz` 等常见格式被误判为 `other` 而无法按分类检索
 - 头像上传同样以探测结果为准，仅接受 JPG/PNG/WEBP/GIF，客户端声明的 `Content-Type` 不参与放行判断
 - 预览 `text/html`、`application/xhtml+xml`、`image/svg+xml` 时强制 `attachment` 下载，避免预签名 URL 在浏览器内直接渲染脚本
 - 防止 MIME 嗅探：`X-Content-Type-Options: nosniff`
@@ -145,6 +170,17 @@
 | 端口绑定 | API 9000 + Console 9001 |
 | TLS 支持 | `MINIO_SECURE=true`     |
 
+### 6.5 凭据与敏感文件
+
+| 对象              | 处置方式                                                                 |
+| ----------------- | ------------------------------------------------------------------------ |
+| `.env`            | 仅保留 `.env.example` 模板，真实配置不入库                               |
+| `cookies.txt`     | curl 调试导出的 Cookie jar，含可用 JWT，已被 `.gitignore` 的 `**/cookies.txt` 排除 |
+| `测试账号.txt`    | 本地测试凭据，已列入 `.gitignore`                                        |
+| JWT 密钥对        | 通过 `scripts/generate-jwt-keys.sh` 生成，存放于 `secrets/` 或 Docker Secrets |
+
+> 若历史提交中已包含凭据文件，停止跟踪使用 `git rm --cached` 并补入 `.gitignore`；凭据已过期时可不改写历史，仍需尽快轮换。
+
 ## 7. 缓存安全
 
 ### 7.1 用户缓存脱敏
@@ -185,4 +221,5 @@ SECURITY_HEADERS_ENABLED=true
 RATE_LIMIT_ENABLED=true
 HTTPS_REDIRECT=true
 ENVIRONMENT=production
+TRUSTED_PROXIES=<反向代理 IP，部署在 Nginx/Cloudflare 之后必填>
 ```
