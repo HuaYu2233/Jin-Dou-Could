@@ -101,6 +101,10 @@ class TestCategorizeFileType:
 
     def test_archive(self):
         assert categorize_file_type("application/zip") == "archive"
+        assert categorize_file_type("application/x-rar-compressed") == "archive"
+        assert categorize_file_type("application/x-7z-compressed") == "archive"
+        assert categorize_file_type("application/gzip") == "archive"
+        assert categorize_file_type("application/x-tar") == "archive"
 
     def test_other(self):
         assert categorize_file_type("application/octet-stream") == "other"

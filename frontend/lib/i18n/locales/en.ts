@@ -14,6 +14,7 @@ export default {
   "sidebar.document": "Documents",
   "sidebar.video": "Videos",
   "sidebar.audio": "Music",
+  "sidebar.archive": "Archives",
   "sidebar.other": "Other",
   "sidebar.trash": "Trash",
   "sidebar.shares": "My Shares",

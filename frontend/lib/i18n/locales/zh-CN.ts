@@ -14,6 +14,7 @@ export default {
   "sidebar.document": "文档",
   "sidebar.video": "视频",
   "sidebar.audio": "音乐",
+  "sidebar.archive": "压缩包",
   "sidebar.other": "其他",
   "sidebar.trash": "回收站",
   "sidebar.shares": "我的分享",

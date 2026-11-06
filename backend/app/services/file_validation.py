@@ -36,6 +36,11 @@ ALLOWED_MIME_TYPES = {
     "application/zip",
     "application/x-rar-compressed",
     "application/x-7z-compressed",
+    "application/gzip",
+    "application/x-gzip",
+    "application/x-tar",
+    "application/x-bzip2",
+    "application/x-xz",
     "application/octet-stream",
 }
 
@@ -46,7 +51,16 @@ _DOCUMENT_MIME_PREFIXES = {
     "application/vnd.ms-excel",
     "application/vnd.ms-powerpoint",
 }
-_ARCHIVE_MIME_TYPES = {"application/zip", "application/x-rar-compressed", "application/x-7z-compressed"}
+_ARCHIVE_MIME_TYPES = {
+    "application/zip",
+    "application/x-rar-compressed",
+    "application/x-7z-compressed",
+    "application/gzip",
+    "application/x-gzip",
+    "application/x-tar",
+    "application/x-bzip2",
+    "application/x-xz",
+}
 
 _MIME_ALIASES = {
     ("audio/mpeg", "audio/mp3"),

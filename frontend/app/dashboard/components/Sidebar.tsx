@@ -21,6 +21,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "document", labelKey: "sidebar.document", icon: "📄", groupKey: "sidebar.group.myFiles" },
   { id: "video", labelKey: "sidebar.video", icon: "🎬", groupKey: "sidebar.group.myFiles" },
   { id: "audio", labelKey: "sidebar.audio", icon: "🎵", groupKey: "sidebar.group.myFiles" },
+  { id: "archive", labelKey: "sidebar.archive", icon: "🗜️", groupKey: "sidebar.group.myFiles" },
   { id: "other", labelKey: "sidebar.other", icon: "📦", groupKey: "sidebar.group.myFiles" },
   { id: "trash", labelKey: "sidebar.trash", icon: "🗑️", groupKey: "sidebar.group.other" },
   { id: "shares", labelKey: "sidebar.shares", icon: "🔗", groupKey: "sidebar.group.other" },
