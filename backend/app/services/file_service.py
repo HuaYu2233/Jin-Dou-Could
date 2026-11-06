@@ -1,4 +1,3 @@
-import asyncio
 import uuid
 from contextlib import suppress
 from datetime import UTC, datetime
@@ -17,7 +16,6 @@ from app.core.storage import (
     upload_fileobj,
     upload_stream_multipart,
 )
-from app.db.base import engine
 from app.models.file import File
 from app.models.user import User
 from app.services import storage_accounting
@@ -28,16 +26,13 @@ from app.services.file_validation import (
     validate_mime_type,
 )
 
-_COUNT_CACHE_TTL = 120
-_SEARCH_CACHE_TTL = 60
+_CACHE_TTL = 60
 _CACHE_HASH_KEY = "file_caches"
 
 
-async def _count_files(filters: list) -> int:
+async def _count_files(db: AsyncSession, filters: list) -> int:
     stmt = select(func.count()).select_from(File).where(*filters)
-    async with engine.connect() as conn:
-        result = await conn.execute(stmt)
-        return result.scalar_one()
+    return await db.scalar(stmt) or 0
 
 
 async def invalidate_file_caches(owner_id: uuid.UUID) -> None:
@@ -164,14 +159,11 @@ async def list_files(
         result = await db.execute(query)
         files = list(result.scalars().all())
     else:
-        count_result, select_result = await asyncio.gather(
-            _count_files(filters),
-            db.execute(query),
-        )
-        total = count_result
-        files = list(select_result.scalars().all())
+        total = await _count_files(db, filters)
+        result = await db.execute(query)
+        files = list(result.scalars().all())
         await redis_client.hset(_CACHE_HASH_KEY, cache_field, str(total))
-        await redis_client.expire(_CACHE_HASH_KEY, _COUNT_CACHE_TTL)
+        await redis_client.expire(_CACHE_HASH_KEY, _CACHE_TTL)
 
     next_cursor = None
     if files:
@@ -228,14 +220,11 @@ async def search_files(
         result = await db.execute(query)
         files = list(result.scalars().all())
     else:
-        count_result, select_result = await asyncio.gather(
-            _count_files(filters),
-            db.execute(query),
-        )
-        total = count_result
-        files = list(select_result.scalars().all())
+        total = await _count_files(db, filters)
+        result = await db.execute(query)
+        files = list(result.scalars().all())
         await redis_client.hset(_CACHE_HASH_KEY, cache_field, str(total))
-        await redis_client.expire(_CACHE_HASH_KEY, _SEARCH_CACHE_TTL)
+        await redis_client.expire(_CACHE_HASH_KEY, _CACHE_TTL)
 
     next_cursor = None
     if files:
@@ -305,14 +294,11 @@ async def list_trash_files(
         result = await db.execute(query)
         files = list(result.scalars().all())
     else:
-        count_result, select_result = await asyncio.gather(
-            _count_files(filters),
-            db.execute(query),
-        )
-        total = count_result
-        files = list(select_result.scalars().all())
+        total = await _count_files(db, filters)
+        result = await db.execute(query)
+        files = list(result.scalars().all())
         await redis_client.hset(_CACHE_HASH_KEY, cache_field, str(total))
-        await redis_client.expire(_CACHE_HASH_KEY, _COUNT_CACHE_TTL)
+        await redis_client.expire(_CACHE_HASH_KEY, _CACHE_TTL)
 
     next_cursor = None
     if files:

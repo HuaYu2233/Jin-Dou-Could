@@ -140,40 +140,23 @@ class TestDetectRealMimeType:
         assert result in ("text/plain", "application/octet-stream")
 
 
-class _FakeResult:
-    def __init__(self, value: int) -> None:
+class _FakeSession:
+    def __init__(self, value: int | None) -> None:
         self._value = value
 
-    def scalar_one(self) -> int:
+    async def scalar(self, _stmt: object) -> int | None:
         return self._value
-
-
-class _FakeConn:
-    def __init__(self, value: int) -> None:
-        self._value = value
-
-    async def __aenter__(self) -> "_FakeConn":
-        return self
-
-    async def __aexit__(self, *args: object) -> None:
-        return None
-
-    async def execute(self, _stmt: object) -> _FakeResult:
-        return _FakeResult(self._value)
-
-
-class _FakeEngine:
-    def __init__(self, value: int) -> None:
-        self._value = value
-
-    def connect(self) -> _FakeConn:
-        return _FakeConn(self._value)
 
 
 class TestCountFiles:
     @pytest.mark.asyncio
-    async def test_uses_engine_connect(self, monkeypatch: pytest.MonkeyPatch):
+    async def test_uses_request_session(self):
         from app.services import file_service
 
-        monkeypatch.setattr(file_service, "engine", _FakeEngine(7))
-        assert await file_service._count_files([]) == 7
+        assert await file_service._count_files(_FakeSession(7), []) == 7
+
+    @pytest.mark.asyncio
+    async def test_none_result_becomes_zero(self):
+        from app.services import file_service
+
+        assert await file_service._count_files(_FakeSession(None), []) == 0

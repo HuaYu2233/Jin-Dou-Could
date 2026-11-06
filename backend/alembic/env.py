@@ -5,10 +5,9 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+import app.models  # noqa: F401
 from alembic import context
 from app.core.config import settings
-
-# ⚠️ 【关键】导入你的模型和配置
 from app.db.base_class import Base
 
 # Alembic Config

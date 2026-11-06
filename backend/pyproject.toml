@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "huayu", email = "1343367056@qq.com" }
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.16.5",
     "asyncpg>=0.31.0",
@@ -20,6 +20,7 @@ dependencies = [
     "gunicorn>=22.0.0",
     "python-magic>=0.4.27",
     "minio>=7.2.7",
+    "pillow>=10.0.0",
     "aiobotocore>=2.15.0",
     "redis>=5.0.7",
     "python-jose[cryptography]>=3.3.0",

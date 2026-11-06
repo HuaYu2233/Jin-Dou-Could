@@ -119,7 +119,7 @@ class TestListenLoopNoDuplicate:
         mgr._pubsub = MagicMock()
         mgr._pubsub.listen = _fake_listen
 
-        await mgr._listen_loop()
+        await mgr._consume_messages()
 
         assert ws.sent == []
 
@@ -139,7 +139,33 @@ class TestListenLoopNoDuplicate:
         mgr._pubsub = MagicMock()
         mgr._pubsub.listen = _fake_listen
 
-        await mgr._listen_loop()
+        await mgr._consume_messages()
 
         assert len(ws.sent) == 1
         assert json.loads(ws.sent[0])["event"] == "x"
+
+
+class TestListenLoopReconnect:
+    @pytest.mark.asyncio
+    async def test_retries_and_resubscribes_after_error(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(ws_module, "_PUBSUB_RETRY_DELAY", 0)
+        mgr = _make_manager(pubsub_enabled=True)
+        mgr._subscribed_users.add("u1")
+
+        calls = {"n": 0}
+
+        async def _flaky_listen():
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise RuntimeError("连接中断")
+            mgr._pubsub_enabled = False
+            yield {"type": "subscribe", "channel": "ws:user:u1", "data": 1}
+
+        mgr._pubsub = MagicMock()
+        mgr._pubsub.listen = _flaky_listen
+        mgr._pubsub.subscribe = AsyncMock()
+
+        await mgr._listen_loop()
+
+        assert calls["n"] == 2
+        mgr._pubsub.subscribe.assert_awaited_once_with("ws:user:u1")

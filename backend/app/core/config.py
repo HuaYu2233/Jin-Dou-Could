@@ -6,7 +6,6 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://clouduser:cloudpass123@db:5432/clouddrive"
-    DATABASE_URL_DIRECT: str = ""
     REDIS_URL: str = "redis://redis:6379/0"
     REDIS_PASSWORD: str = ""
 

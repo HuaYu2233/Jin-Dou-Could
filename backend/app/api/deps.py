@@ -58,24 +58,13 @@ def _deserialize_user(data: str) -> User:
 
 async def invalidate_user_cache(user_id: UUID | str) -> None:
     uid = str(user_id)
-    pipe = redis_client.pipeline()
-    pipe.delete(f"user:{uid}")
-    pipe.delete(f"trash_count:{uid}")
-    await pipe.execute()
+    await redis_client.delete(f"user:{uid}")
     try:
         from app.services.file_service import invalidate_file_caches
 
         await invalidate_file_caches(user_id)
     except Exception as exc:
         logger.bind(log_type="cache").warning(f"文件缓存失效失败: user={uid}, {exc}")
-    try:
-        keys = []
-        async for key in redis_client.scan_iter(match=f"file_count:{uid}:*", count=100):
-            keys.append(key)
-        for i in range(0, len(keys), 500):
-            await redis_client.delete(*keys[i : i + 500])
-    except Exception as exc:
-        logger.bind(log_type="cache").warning(f"文件计数缓存清理失败: user={uid}, {exc}")
 
 
 async def get_current_user(

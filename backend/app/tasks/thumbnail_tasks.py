@@ -1,6 +1,10 @@
+import asyncio
 import io
+import uuid
+from concurrent.futures import ThreadPoolExecutor
 
 from loguru import logger
+from PIL import Image
 
 from app.core.celery_app import celery_app
 from app.core.config import settings
@@ -31,8 +35,6 @@ def generate_thumbnail(self, storage_key: str, file_id: str) -> str | None:
         response.close()
         response.release_conn()
 
-        from PIL import Image
-
         img = Image.open(io.BytesIO(data))
         img.thumbnail((256, 256), Image.Resampling.LANCZOS)
 
@@ -57,9 +59,6 @@ def generate_thumbnail(self, storage_key: str, file_id: str) -> str | None:
 
         return thumb_key
 
-    except ImportError:
-        logger.bind(log_type="thumbnail").warning("Pillow 未安装，跳过缩略图生成")
-        return None
     except Exception as exc:
         logger.bind(log_type="thumbnail").error(f"缩略图生成失败 [{storage_key}]: {exc}")
         try:
@@ -68,17 +67,30 @@ def generate_thumbnail(self, storage_key: str, file_id: str) -> str | None:
             return None
 
 
+def _run_coroutine(coro):
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(asyncio.run, coro).result()
+
+
+async def _apply_thumbnail_key(file_id: str, thumb_key: str) -> None:
+    from sqlalchemy import update
+
+    from app.db.base import AsyncSessionLocal
+    from app.models.file import File
+
+    async with AsyncSessionLocal() as session:
+        stmt = update(File).where(File.id == uuid.UUID(file_id)).values(thumbnail_key=thumb_key)
+        await session.execute(stmt)
+        await session.commit()
+
+
 def _update_thumbnail_key(file_id: str, thumb_key: str) -> None:
     try:
-        from sqlalchemy import update
-
-        from app.db.base import sync_session_factory
-        from app.models.file import File
-
-        with sync_session_factory() as session:
-            stmt = update(File).where(File.id == file_id).values(thumbnail_key=thumb_key)
-            session.execute(stmt)
-            session.commit()
+        _run_coroutine(_apply_thumbnail_key(file_id, thumb_key))
         logger.bind(log_type="thumbnail").info(f"已更新 thumbnail_key: file_id={file_id}")
     except Exception as exc:
         logger.bind(log_type="thumbnail").warning(f"更新 thumbnail_key 失败: {exc}")

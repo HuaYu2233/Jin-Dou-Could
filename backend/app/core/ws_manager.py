@@ -1,3 +1,4 @@
+import asyncio
 import json
 from contextlib import suppress
 from datetime import UTC, datetime
@@ -9,6 +10,7 @@ from loguru import logger
 from app.core.config import settings
 
 _WS_CHANNEL_PREFIX = "ws:user:"
+_PUBSUB_RETRY_DELAY = 5
 _INSTANCE_ID = uuid4().hex
 
 
@@ -27,10 +29,8 @@ class ConnectionManager:
         self._subscribed_users.add(user_id)
         logger.bind(log_type="ws").info(f"WebSocket 连接: user={user_id}, 当前连接数={len(self._connections[user_id])}")
         if self._pubsub_enabled and self._pubsub is not None:
-            import asyncio
-
             with suppress(Exception):
-                asyncio.get_event_loop().create_task(self._subscribe_user(user_id))
+                asyncio.get_running_loop().create_task(self._subscribe_user(user_id))
 
     def disconnect(self, user_id: str, ws: WebSocket):
         if user_id in self._connections:
@@ -39,10 +39,8 @@ class ConnectionManager:
                 del self._connections[user_id]
                 self._subscribed_users.discard(user_id)
                 if self._pubsub_enabled and self._pubsub is not None:
-                    import asyncio
-
                     with suppress(Exception):
-                        asyncio.get_event_loop().create_task(self._unsubscribe_user(user_id))
+                        asyncio.get_running_loop().create_task(self._unsubscribe_user(user_id))
             logger.bind(log_type="ws").info(f"WebSocket 断开: user={user_id}")
 
     async def send_to_user(self, user_id: str, event: str, data: dict):
@@ -85,7 +83,7 @@ class ConnectionManager:
         if self._pubsub is None:
             return
         try:
-            channel = f"ws:user:{user_id}"
+            channel = f"{_WS_CHANNEL_PREFIX}{user_id}"
             await self._pubsub.subscribe(channel)
             logger.bind(log_type="ws").debug(f"已订阅频道: {channel}")
         except Exception as exc:
@@ -95,11 +93,21 @@ class ConnectionManager:
         if self._pubsub is None:
             return
         try:
-            channel = f"ws:user:{user_id}"
+            channel = f"{_WS_CHANNEL_PREFIX}{user_id}"
             await self._pubsub.unsubscribe(channel)
             logger.bind(log_type="ws").debug(f"已取消订阅频道: {channel}")
         except Exception as exc:
             logger.bind(log_type="ws").warning(f"取消订阅频道失败: {exc}")
+
+    async def _resubscribe(self) -> None:
+        if self._pubsub is None or not self._subscribed_users:
+            return
+        try:
+            channels = [f"{_WS_CHANNEL_PREFIX}{uid}" for uid in self._subscribed_users]
+            await self._pubsub.subscribe(*channels)
+            logger.bind(log_type="ws").info(f"Pub/Sub 重连后已恢复 {len(channels)} 个订阅")
+        except Exception as exc:
+            logger.bind(log_type="ws").warning(f"重新订阅频道失败: {exc}")
 
     async def start_pubsub(self):
         if not self._pubsub_enabled:
@@ -108,8 +116,6 @@ class ConnectionManager:
             from app.core.redis import redis_pubsub
 
             self._pubsub = redis_pubsub.pubsub()
-            import asyncio
-
             self._listen_task = asyncio.create_task(self._listen_loop())
             logger.bind(log_type="ws").info("WebSocket Redis Pub/Sub 已启动（按需订阅模式）")
         except Exception as exc:
@@ -135,24 +141,32 @@ class ConnectionManager:
         logger.bind(log_type="ws").info("WebSocket Redis Pub/Sub 已停止")
 
     async def _listen_loop(self):
-        try:
-            async for message in self._pubsub.listen():
-                if message["type"] not in ("message",):
-                    continue
-                channel = message["channel"]
-                if isinstance(channel, bytes):
-                    channel = channel.decode("utf-8")
-                user_id = channel.removeprefix(_WS_CHANNEL_PREFIX)
-                raw = message["data"]
-                if isinstance(raw, bytes):
-                    raw = raw.decode("utf-8")
-                payload = self._unwrap_payload(raw)
-                if payload is None:
-                    continue
-                if user_id in self._connections:
-                    await self._send_local(user_id, payload)
-        except Exception as exc:
-            logger.bind(log_type="ws").warning(f"Redis Pub/Sub 监听异常: {exc}")
+        while self._pubsub_enabled and self._pubsub is not None:
+            try:
+                await self._consume_messages()
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.bind(log_type="ws").warning(f"Redis Pub/Sub 监听异常，{_PUBSUB_RETRY_DELAY}s 后重连: {exc}")
+                await self._resubscribe()
+            await asyncio.sleep(_PUBSUB_RETRY_DELAY)
+
+    async def _consume_messages(self):
+        async for message in self._pubsub.listen():
+            if message["type"] not in ("message",):
+                continue
+            channel = message["channel"]
+            if isinstance(channel, bytes):
+                channel = channel.decode("utf-8")
+            user_id = channel.removeprefix(_WS_CHANNEL_PREFIX)
+            raw = message["data"]
+            if isinstance(raw, bytes):
+                raw = raw.decode("utf-8")
+            payload = self._unwrap_payload(raw)
+            if payload is None:
+                continue
+            if user_id in self._connections:
+                await self._send_local(user_id, payload)
 
     @staticmethod
     def _unwrap_payload(raw: str) -> str | None:

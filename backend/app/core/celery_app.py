@@ -24,10 +24,18 @@ if not settings.CELERY_BROKER_URL and not settings.CELERY_TASK_ALWAYS_EAGER:
     )
     _fallback_to_eager = True
 
+_TASK_MODULES = [
+    "app.tasks.alert_tasks",
+    "app.tasks.backup_tasks",
+    "app.tasks.email_tasks",
+    "app.tasks.thumbnail_tasks",
+]
+
 celery_app = Celery(
     "jindou_cloud",
     broker=_broker_url,
     backend=_backend_url,
+    include=_TASK_MODULES,
 )
 
 celery_app.conf.update(
@@ -43,5 +51,3 @@ celery_app.conf.update(
     task_eager_propagates=True,
     broker_connection_retry_on_startup=True,
 )
-
-celery_app.autodiscover_tasks(["app.tasks"])
