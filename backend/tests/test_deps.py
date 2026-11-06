@@ -172,9 +172,13 @@ class TestInactiveUserRejected:
         token = create_access_token({"sub": str(inactive.id)})
         db = AsyncMock()
 
+        pipe = MagicMock()
+        pipe.exists = MagicMock()
+        pipe.get = MagicMock()
+        pipe.execute = AsyncMock(return_value=[0, _serialize_user(inactive)])
+
         with patch("app.api.deps.redis_client") as mock_redis:
-            mock_redis.exists = AsyncMock(return_value=0)
-            mock_redis.get = AsyncMock(return_value=_serialize_user(inactive))
+            mock_redis.pipeline = MagicMock(return_value=pipe)
             with pytest.raises(HTTPException) as exc_info:
                 await get_current_user(request, token, db)
 

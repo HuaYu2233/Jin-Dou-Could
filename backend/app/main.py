@@ -15,7 +15,7 @@ from app.core.logging import setup_logging
 from app.core.redis import close_redis, close_redis_pubsub, redis_client
 from app.core.storage import close_s3_clients, ensure_bucket, init_s3_clients
 from app.core.ws_manager import ws_manager
-from app.db.base import dispose_engine
+from app.db.base import dispose_engine, engine
 from app.middleware.csrf import CSRFMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.request_logging import RequestLoggingMiddleware
@@ -56,6 +56,15 @@ async def lifespan(app: FastAPI):
 
     if settings.ENVIRONMENT == "production":
         _check_production_security()
+
+    from sqlalchemy import text
+
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("SELECT 1"))
+        logger.info(f"DB pool 预热完成 | pool_size={engine.pool.size()}")
+    except Exception as e:
+        logger.error(f"DB pool 预热失败: {e}")
 
     await init_s3_clients()
     await ensure_bucket()

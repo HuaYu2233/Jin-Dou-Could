@@ -94,20 +94,26 @@ async def get_current_user(
     if payload.get("type") != "access":
         raise HTTPException(status_code=401, detail="Token 类型错误，请使用 access token")
 
-    jti = payload.get("jti")
-    if jti and await redis_client.exists(f"token_blacklist:{jti}"):
-        raise HTTPException(status_code=401, detail="Token 已被撤销，请重新登录")
-
     user_id = payload["sub"]
     cache_key = f"user:{user_id}"
 
     if request.method == "GET":
-        cached = await redis_client.get(cache_key)
+        pipe = redis_client.pipeline(transaction=False)
+        pipe.exists(f"token_blacklist:{payload.get('jti') or ''}")
+        pipe.get(cache_key)
+        bl_exist, cached = await pipe.execute()
+
+        if bl_exist:
+            raise HTTPException(status_code=401, detail="Token 已被撤销，请重新登录")
         if cached:
             cached_user = _deserialize_user(cached)
             if not cached_user.is_active:
                 raise HTTPException(status_code=403, detail="账号已被禁用")
             return cached_user
+    else:
+        jti = payload.get("jti")
+        if jti and await redis_client.exists(f"token_blacklist:{jti}"):
+            raise HTTPException(status_code=401, detail="Token 已被撤销，请重新登录")
 
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()

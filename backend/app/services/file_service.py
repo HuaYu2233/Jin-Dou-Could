@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from contextlib import suppress
 from datetime import UTC, datetime
@@ -16,6 +17,7 @@ from app.core.storage import (
     upload_fileobj,
     upload_stream_multipart,
 )
+from app.db.base import engine
 from app.models.file import File
 from app.models.user import User
 from app.services import storage_accounting
@@ -125,18 +127,6 @@ async def list_files(
     else:
         filters.append(File.folder_id.is_(None))
 
-    next_cursor = None
-
-    cache_field = f"{owner_id}:count:{file_type or ''}:{folder_id or 'root'}"
-    cached_total = await redis_client.hget(_CACHE_HASH_KEY, cache_field)
-    if cached_total is not None:
-        total = int(cached_total)
-    else:
-        count_result = await db.execute(select(func.count()).select_from(File).where(*filters))
-        total = count_result.scalar_one()
-        await redis_client.hset(_CACHE_HASH_KEY, cache_field, str(total))
-        await redis_client.expire(_CACHE_HASH_KEY, _COUNT_CACHE_TTL)
-
     if cursor:
         cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=UTC)
         query = select(File).where(*filters, File.created_at < cursor_dt).order_by(File.created_at.desc()).limit(limit)
@@ -159,9 +149,25 @@ async def list_files(
     else:
         query = select(File).where(*filters).order_by(File.created_at.desc()).limit(limit)
 
-    result = await db.execute(query)
-    files = list(result.scalars().all())
+    cache_field = f"{owner_id}:count:{file_type or ''}:{folder_id or 'root'}"
+    cached_total = await redis_client.hget(_CACHE_HASH_KEY, cache_field)
 
+    if cached_total is not None:
+        total = int(cached_total)
+        result = await db.execute(query)
+        files = list(result.scalars().all())
+    else:
+        count_stmt = select(func.count()).select_from(File).where(*filters)
+        count_result, select_result = await asyncio.gather(
+            engine.execute(count_stmt),
+            db.execute(query),
+        )
+        total = count_result.scalar_one()
+        files = list(select_result.scalars().all())
+        await redis_client.hset(_CACHE_HASH_KEY, cache_field, str(total))
+        await redis_client.expire(_CACHE_HASH_KEY, _COUNT_CACHE_TTL)
+
+    next_cursor = None
     if files:
         last_created = files[-1].created_at
         if total > skip + len(files):
@@ -191,18 +197,6 @@ async def search_files(
 
     filters = [*base_filters, search_filter]
 
-    next_cursor = None
-
-    cache_field = f"{owner_id}:search:{keyword}"
-    cached_total = await redis_client.hget(_CACHE_HASH_KEY, cache_field)
-    if cached_total is not None:
-        total = int(cached_total)
-    else:
-        count_result = await db.execute(select(func.count()).select_from(File).where(*filters))
-        total = count_result.scalar_one()
-        await redis_client.hset(_CACHE_HASH_KEY, cache_field, str(total))
-        await redis_client.expire(_CACHE_HASH_KEY, _SEARCH_CACHE_TTL)
-
     if cursor:
         cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=UTC)
         query = select(File).where(*filters, File.created_at < cursor_dt).order_by(*order_cols).limit(limit)
@@ -220,9 +214,25 @@ async def search_files(
     else:
         query = select(File).where(*filters).order_by(*order_cols).limit(limit)
 
-    result = await db.execute(query)
-    files = list(result.scalars().all())
+    cache_field = f"{owner_id}:search:{keyword}"
+    cached_total = await redis_client.hget(_CACHE_HASH_KEY, cache_field)
 
+    if cached_total is not None:
+        total = int(cached_total)
+        result = await db.execute(query)
+        files = list(result.scalars().all())
+    else:
+        count_stmt = select(func.count()).select_from(File).where(*filters)
+        count_result, select_result = await asyncio.gather(
+            engine.execute(count_stmt),
+            db.execute(query),
+        )
+        total = count_result.scalar_one()
+        files = list(select_result.scalars().all())
+        await redis_client.hset(_CACHE_HASH_KEY, cache_field, str(total))
+        await redis_client.expire(_CACHE_HASH_KEY, _SEARCH_CACHE_TTL)
+
+    next_cursor = None
     if files:
         last_created = files[-1].created_at
         if total > skip + len(files):
@@ -260,18 +270,6 @@ async def list_trash_files(
 ) -> tuple[list[File], int, str | None]:
     filters = [File.owner_id == owner_id, File.deleted_at.is_not(None)]
 
-    next_cursor = None
-
-    cache_field = f"{owner_id}:trash"
-    cached_total = await redis_client.hget(_CACHE_HASH_KEY, cache_field)
-    if cached_total is not None:
-        total = int(cached_total)
-    else:
-        count_result = await db.execute(select(func.count()).select_from(File).where(*filters))
-        total = count_result.scalar_one()
-        await redis_client.hset(_CACHE_HASH_KEY, cache_field, str(total))
-        await redis_client.expire(_CACHE_HASH_KEY, _COUNT_CACHE_TTL)
-
     if cursor:
         cursor_dt = datetime.fromisoformat(cursor).replace(tzinfo=UTC)
         query = select(File).where(*filters, File.deleted_at < cursor_dt).order_by(File.deleted_at.desc()).limit(limit)
@@ -294,9 +292,25 @@ async def list_trash_files(
     else:
         query = select(File).where(*filters).order_by(File.deleted_at.desc()).limit(limit)
 
-    result = await db.execute(query)
-    files = list(result.scalars().all())
+    cache_field = f"{owner_id}:trash"
+    cached_total = await redis_client.hget(_CACHE_HASH_KEY, cache_field)
 
+    if cached_total is not None:
+        total = int(cached_total)
+        result = await db.execute(query)
+        files = list(result.scalars().all())
+    else:
+        count_stmt = select(func.count()).select_from(File).where(*filters)
+        count_result, select_result = await asyncio.gather(
+            engine.execute(count_stmt),
+            db.execute(query),
+        )
+        total = count_result.scalar_one()
+        files = list(select_result.scalars().all())
+        await redis_client.hset(_CACHE_HASH_KEY, cache_field, str(total))
+        await redis_client.expire(_CACHE_HASH_KEY, _COUNT_CACHE_TTL)
+
+    next_cursor = None
     if files:
         last_deleted = files[-1].deleted_at
         if last_deleted and total > skip + len(files):
