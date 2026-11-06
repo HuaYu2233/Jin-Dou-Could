@@ -33,11 +33,11 @@ export default function Header({ extra }: HeaderProps) {
   }, [user, fetchMe]);
 
   async function handleLogout() {
-    useAuthStore.getState().logout();
     try {
       await logoutApi();
     } catch {}
-    router.push("/login");
+    useAuthStore.getState().logout();
+    router.replace("/login");
   }
 
   return (
