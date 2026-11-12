@@ -98,12 +98,13 @@ async def list_files(
     limit: int = Query(20, ge=1, le=100),
     file_type: str | None = Query(None),
     folder_id: UUID | None = Query(None),
+    all_folders: bool = Query(False, description="为 true 时不限制文件夹，返回所有文件夹内的同类文件"),
     cursor: str | None = Query(None, description="游标分页：上一页最后一条的 created_at ISO 格式"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     files, total, next_cursor = await file_service.list_files(
-        db, current_user.id, skip, limit, file_type, folder_id, cursor
+        db, current_user.id, skip, limit, file_type, folder_id, cursor, all_folders
     )
     return {"items": files, "total": total, "next_cursor": next_cursor}
 
@@ -128,6 +129,7 @@ async def move_files(
     current_user: User = Depends(get_current_user),
 ):
     moved = await file_service.move_files(db, current_user.id, body.file_ids, body.target_folder_id)
+    await invalidate_user_cache(current_user.id)
     return {"message": f"已移动 {moved} 个文件", "moved": moved}
 
 

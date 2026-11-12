@@ -22,6 +22,7 @@ interface FileListProps {
   loading: boolean;
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
+  onToggleSelectAll?: (select: boolean) => void;
   onDownload: (file: FileItem) => void;
   onPreview: (file: FileItem) => void;
   onOpenFolder?: (folder: FolderItem) => void;
@@ -116,6 +117,7 @@ function Thumbnail({ file, variant = "grid" }: { file: FileItem; variant?: "grid
 
   return (
     <div className={isList ? styles.listThumbWrap : styles.gridThumbWrap}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         ref={imgRef}
         className={`${isList ? styles.listThumbnail : styles.gridThumbnail} ${loaded ? styles.thumbLoaded : styles.thumbBlur}`}
@@ -123,6 +125,7 @@ function Thumbnail({ file, variant = "grid" }: { file: FileItem; variant?: "grid
         alt={file.filename}
         loading="lazy"
         onLoad={handleLoad}
+        onError={handleError}
       />
     </div>
   );
@@ -136,6 +139,7 @@ export default function FileList({
   loading,
   selectedIds,
   onToggleSelect,
+  onToggleSelectAll,
   onDownload,
   onPreview,
   onOpenFolder,
@@ -164,10 +168,30 @@ export default function FileList({
     e.dataTransfer.effectAllowed = "move";
   }
 
+  function handleFileDragEnd() {
+    setDragOverFolderId(null);
+  }
+
+  function handleRowClick(item: UnifiedItem) {
+    if (item.type === "file") {
+      onToggleSelect(item.data.id);
+      return;
+    }
+    if (item.type === "folder") {
+      onOpenFolder?.(item.data);
+    }
+  }
+
   function handleFolderDragOver(e: React.DragEvent, folderId: string | null) {
     e.preventDefault();
+    e.stopPropagation();
     e.dataTransfer.dropEffect = "move";
     setDragOverFolderId(folderId ?? "root");
+  }
+
+  function handleFolderDragLeave(e: React.DragEvent) {
+    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+    setDragOverFolderId(null);
   }
 
   function handleFolderDrop(e: React.DragEvent, folderId: string | null) {
@@ -177,6 +201,21 @@ export default function FileList({
     const fileId = e.dataTransfer.getData("text/plain");
     if (fileId) onMoveToFolder?.([fileId], folderId);
   }
+
+  const selectableIds = useMemo(() => files.map((file) => file.id), [files]);
+  const selectedFileCount = useMemo(
+    () => selectableIds.reduce((count, id) => (selectedIds.has(id) ? count + 1 : count), 0),
+    [selectableIds, selectedIds]
+  );
+  const allSelected = selectableIds.length > 0 && selectedFileCount === selectableIds.length;
+  const partiallySelected = selectedFileCount > 0 && !allSelected;
+
+  const selectAllRef = useCallback(
+    (el: HTMLInputElement | null) => {
+      if (el) el.indeterminate = partiallySelected;
+    },
+    [partiallySelected]
+  );
 
   if (loading) {
     return (
@@ -200,59 +239,105 @@ export default function FileList({
 
   if (viewMode === "grid") {
     return (
-      <VirtuosoGrid
-        data={unifiedItems}
-        listClassName={styles.gridContainer}
-        itemClassName={styles.gridItem}
-        itemContent={(index, item) => {
-          if (item.type === "folder") {
-            const folder = item.data;
-            return (
-              <>
-                <div className={styles.gridIcon}>📁</div>
-                <div className={styles.gridName} title={folder.name}>{folder.name}</div>
-                <div className={styles.gridSize}>文件夹</div>
-              </>
-            );
-          }
-          if (item.type === "trashedFolder") {
-            const folder = item.data;
-            return (
-              <>
-                <div className={styles.gridIcon}>📁</div>
-                <div className={styles.gridName} title={folder.name}>{folder.name}</div>
-                <div className={styles.gridSize}>文件夹</div>
-              </>
-            );
-          }
-          const file = item.data;
-          return (
-            <>
-              <Thumbnail file={file} />
-              <div className={styles.gridName} title={file.filename}>{file.filename}</div>
-              <div className={styles.gridSize}>{formatSize(file.size)}</div>
-            </>
-          );
-        }}
-        components={{
-          Item: ({ children, ...props }) => {
-            const item = unifiedItems[props["data-index"]];
-            let className = styles.gridItem;
-            if (item) {
-              if (item.type === "folder" && dragOverFolderId === item.data.id) {
-                className += ` ${styles.gridItemDropTarget}`;
-              } else if (item.type === "file" && selectedIds.has(item.data.id)) {
-                className += ` ${styles.gridItemSelected}`;
+      <div className={styles.gridLayout}>
+        {selectableIds.length > 0 && (
+          <div className={styles.gridSelectBar}>
+            <label className={styles.selectAllLabel}>
+              <input
+                type="checkbox"
+                className={styles.checkbox}
+                checked={allSelected}
+                ref={selectAllRef}
+                onChange={() => onToggleSelectAll?.(!allSelected)}
+                aria-label="全选"
+              />
+              <span>全选</span>
+            </label>
+            <span className={styles.selectCount}>
+              {selectedFileCount} / {selectableIds.length}
+            </span>
+          </div>
+        )}
+        <div className={styles.gridScroll}>
+          <VirtuosoGrid
+            data={unifiedItems}
+            listClassName={styles.gridContainer}
+            itemClassName={styles.gridItem}
+            itemContent={(_, item) => {
+              if (item.type === "folder") {
+                const folder = item.data;
+                return (
+                  <>
+                    <div className={styles.gridIcon}>📁</div>
+                    <div className={styles.gridName} title={folder.name}>{folder.name}</div>
+                    <div className={styles.gridSize}>文件夹</div>
+                  </>
+                );
               }
-            }
-            return (
-              <div {...props} className={className}>
-                {children}
-              </div>
-            );
-          },
-        }}
-      />
+              if (item.type === "trashedFolder") {
+                const folder = item.data;
+                return (
+                  <>
+                    <div className={styles.gridIcon}>📁</div>
+                    <div className={styles.gridName} title={folder.name}>{folder.name}</div>
+                    <div className={styles.gridSize}>文件夹</div>
+                  </>
+                );
+              }
+              const file = item.data;
+              return (
+                <>
+                  <Thumbnail file={file} />
+                  <div className={styles.gridName} title={file.filename}>{file.filename}</div>
+                  <div className={styles.gridSize}>{formatSize(file.size)}</div>
+                </>
+              );
+            }}
+            components={{
+              Item: ({ children, ...props }) => {
+                const item = unifiedItems[props["data-index"]];
+                const folderId = item?.type === "folder" ? item.data.id : null;
+                const fileId = item?.type === "file" ? item.data.id : null;
+                let className = styles.gridItem;
+                if (item) {
+                  if (item.type === "folder" && dragOverFolderId === item.data.id) {
+                    className += ` ${styles.gridItemDropTarget}`;
+                  } else if (item.type === "file" && selectedIds.has(item.data.id)) {
+                    className += ` ${styles.gridItemSelected}`;
+                  }
+                }
+                return (
+                  <div
+                    {...props}
+                    className={className}
+                    onClick={item ? () => handleRowClick(item) : undefined}
+                    onKeyDown={
+                      item
+                        ? (e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              handleRowClick(item);
+                            }
+                          }
+                        : undefined
+                    }
+                    tabIndex={item ? 0 : undefined}
+                    role={item ? "button" : undefined}
+                    draggable={fileId ? true : undefined}
+                    onDragStart={fileId ? (e) => handleFileDragStart(e, fileId) : undefined}
+                    onDragEnd={fileId ? handleFileDragEnd : undefined}
+                    onDragOver={folderId ? (e) => handleFolderDragOver(e, folderId) : undefined}
+                    onDragLeave={folderId ? handleFolderDragLeave : undefined}
+                    onDrop={folderId ? (e) => handleFolderDrop(e, folderId) : undefined}
+                  >
+                    {children}
+                  </div>
+                );
+              },
+            }}
+          />
+        </div>
+      </div>
     );
   }
 
@@ -270,7 +355,17 @@ export default function FileList({
         TableHead: ({ ...props }) => (
           <thead {...props}>
             <tr className={styles.tableHeader}>
-              <th className={styles.checkboxCol}></th>
+              <th className={styles.checkboxCol}>
+                <input
+                  type="checkbox"
+                  className={styles.checkbox}
+                  checked={allSelected}
+                  ref={selectAllRef}
+                  onChange={() => onToggleSelectAll?.(!allSelected)}
+                  disabled={selectableIds.length === 0}
+                  aria-label="全选"
+                />
+              </th>
               <th className={styles.nameCol}>文件名</th>
               <th className={styles.sizeCol}>大小</th>
               <th className={styles.typeCol}>类型</th>
@@ -281,6 +376,8 @@ export default function FileList({
         ),
         TableRow: ({ children, ...props }) => {
           const item = unifiedItems[props["data-index"]];
+          const folderId = item?.type === "folder" ? item.data.id : null;
+          const fileId = item?.type === "file" ? item.data.id : null;
           let className = styles.tableRow;
           if (item) {
             if (item.type === "folder" && dragOverFolderId === item.data.id) {
@@ -290,13 +387,24 @@ export default function FileList({
             }
           }
           return (
-            <tr {...props} className={className}>
+            <tr
+              {...props}
+              className={className}
+              onClick={item ? () => handleRowClick(item) : undefined}
+              aria-selected={fileId ? selectedIds.has(fileId) : undefined}
+              draggable={fileId ? true : undefined}
+              onDragStart={fileId ? (e) => handleFileDragStart(e, fileId) : undefined}
+              onDragEnd={fileId ? handleFileDragEnd : undefined}
+              onDragOver={folderId ? (e) => handleFolderDragOver(e, folderId) : undefined}
+              onDragLeave={folderId ? handleFolderDragLeave : undefined}
+              onDrop={folderId ? (e) => handleFolderDrop(e, folderId) : undefined}
+            >
               {children}
             </tr>
           );
         },
       }}
-      itemContent={(index, item) => {
+      itemContent={(_, item) => {
         if (item.type === "folder") {
           const folder = item.data;
           return (
@@ -354,8 +462,10 @@ export default function FileList({
               <input
                 type="checkbox"
                 checked={selectedIds.has(file.id)}
-                onChange={(e) => { e.stopPropagation(); onToggleSelect(file.id); }}
+                onClick={(e) => e.stopPropagation()}
+                onChange={() => onToggleSelect(file.id)}
                 className={styles.checkbox}
+                aria-label={file.filename}
               />
             </td>
             <td className={styles.nameCol}>

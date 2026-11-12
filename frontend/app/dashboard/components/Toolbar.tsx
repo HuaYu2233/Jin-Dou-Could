@@ -40,9 +40,9 @@ export default function Toolbar({
   onRestore,
   onPurge,
 }: ToolbarProps) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   return (
-    <div className={styles.toolbar}>
+    <div className={styles.toolbar} data-locale={locale}>
       <div className={styles.actionGroup}>
         {isTrash ? (
           <>
@@ -50,6 +50,8 @@ export default function Toolbar({
               className={styles.secondaryBtn}
               onClick={onRestore}
               disabled={selectedCount === 0}
+              title={t("toolbar.restore")}
+              aria-label={t("toolbar.restore")}
             >
               <svg className={styles.btnIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l4 4m-4-4l4-4" />
@@ -60,6 +62,8 @@ export default function Toolbar({
               className={styles.dangerBtn}
               onClick={onPurge}
               disabled={selectedCount === 0}
+              title={t("toolbar.purge")}
+              aria-label={t("toolbar.purge")}
             >
               <svg className={styles.btnIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -69,13 +73,24 @@ export default function Toolbar({
           </>
         ) : (
           <>
-            <button className={styles.primaryBtn} onClick={onUpload} disabled={uploading} aria-label={t("toolbar.upload")}>
+            <button
+              className={styles.primaryBtn}
+              onClick={onUpload}
+              disabled={uploading}
+              title={uploading ? t("toolbar.uploading") : t("toolbar.upload")}
+              aria-label={uploading ? t("toolbar.uploading") : t("toolbar.upload")}
+            >
               <svg className={styles.btnIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
               </svg>
               <span className={styles.btnLabel}>{uploading ? t("toolbar.uploading") : t("toolbar.upload")}</span>
             </button>
-            <button className={styles.secondaryBtn} onClick={onNewFolder} aria-label={t("toolbar.newFolder")}>
+            <button
+              className={styles.secondaryBtn}
+              onClick={onNewFolder}
+              title={t("toolbar.newFolder")}
+              aria-label={t("toolbar.newFolder")}
+            >
               <svg className={styles.btnIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
               </svg>
@@ -85,6 +100,8 @@ export default function Toolbar({
               className={styles.secondaryBtn}
               onClick={onMove}
               disabled={selectedCount === 0}
+              title={t("toolbar.moveTo")}
+              aria-label={t("toolbar.moveTo")}
             >
               <svg className={styles.btnIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
@@ -95,6 +112,8 @@ export default function Toolbar({
               className={styles.secondaryBtn}
               onClick={onDownload}
               disabled={selectedCount !== 1}
+              title={t("toolbar.download")}
+              aria-label={t("toolbar.download")}
             >
               <svg className={styles.btnIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -105,6 +124,8 @@ export default function Toolbar({
               className={styles.secondaryBtn}
               onClick={onShare}
               disabled={selectedCount === 0}
+              title={t("toolbar.share")}
+              aria-label={t("toolbar.share")}
             >
               <svg className={styles.btnIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
@@ -115,6 +136,8 @@ export default function Toolbar({
               className={styles.dangerBtn}
               onClick={onDelete}
               disabled={selectedCount === 0}
+              title={t("toolbar.delete")}
+              aria-label={t("toolbar.delete")}
             >
               <svg className={styles.btnIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

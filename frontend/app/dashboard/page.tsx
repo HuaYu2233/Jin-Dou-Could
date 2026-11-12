@@ -94,6 +94,10 @@ export default function DashboardPage() {
     });
   }
 
+  function toggleSelectAll(select: boolean) {
+    setSelectedIds(select ? new Set(files.map((file) => file.id)) : new Set());
+  }
+
   function handlePreview(file: FileItem) {
     setPreviewFile(file);
   }
@@ -173,7 +177,11 @@ export default function DashboardPage() {
         )}
         <div
           className={pageStyles.contentArea}
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragOver={(e) => {
+            if (!e.dataTransfer.types.includes("Files")) return;
+            e.preventDefault();
+            setDragOver(true);
+          }}
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
           style={dragOver ? { background: "var(--qk-primary-soft)" } : undefined}
@@ -186,6 +194,7 @@ export default function DashboardPage() {
               loading={loading}
               selectedIds={selectedIds}
               onToggleSelect={toggleSelect}
+              onToggleSelectAll={toggleSelectAll}
               onDownload={() => {}}
               onPreview={() => {}}
               onRestoreFolder={handleRestoreFolder}
@@ -213,6 +222,7 @@ export default function DashboardPage() {
               loading={loading}
               selectedIds={selectedIds}
               onToggleSelect={toggleSelect}
+              onToggleSelectAll={toggleSelectAll}
               onDownload={handleDownload}
               onPreview={handlePreview}
               onOpenFolder={handleOpenFolder}

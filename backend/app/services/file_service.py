@@ -169,14 +169,19 @@ async def list_files(
     file_type: str | None = None,
     folder_id: uuid.UUID | None = None,
     cursor: str | None = None,
+    all_folders: bool = False,
 ) -> tuple[list[File], int, str | None]:
     filters = [File.owner_id == owner_id, File.deleted_at.is_(None)]
     if file_type:
         filters.append(File.file_type == file_type)
     if folder_id is not None:
         filters.append(File.folder_id == folder_id)
+        scope = f"folder:{folder_id}"
+    elif all_folders:
+        scope = "all"
     else:
         filters.append(File.folder_id.is_(None))
+        scope = "root"
 
     return await _paginate(
         db,
@@ -187,7 +192,7 @@ async def list_files(
         cursor=cursor,
         skip=skip,
         limit=limit,
-        cache_field=f"{owner_id}:count:{file_type or ''}:{folder_id or 'root'}",
+        cache_field=f"{owner_id}:count:{file_type or ''}:{scope}",
     )
 
 

@@ -81,7 +81,7 @@ export function useFileList(category: CategoryId) {
           breadcrumbs: [],
         };
       }
-      const res = await listFiles((page - 1) * PAGE_SIZE, PAGE_SIZE, category, cursor);
+      const res = await listFiles((page - 1) * PAGE_SIZE, PAGE_SIZE, category, cursor, true);
       if (res.next_cursor) setCursorMap((prev) => ({ ...prev, [page]: res.next_cursor! }));
       return { files: res.items, folders: [], trashedFolders: [], total: res.total, breadcrumbs: [], nextCursor: res.next_cursor };
     },

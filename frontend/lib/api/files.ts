@@ -34,11 +34,13 @@ export async function listFiles(
   skip = 0,
   limit = 20,
   fileType?: string,
-  cursor?: string
+  cursor?: string,
+  allFolders = false
 ): Promise<FileListResponse> {
   const params = new URLSearchParams({ skip: String(skip), limit: String(limit) });
   if (fileType && fileType !== "all") params.set("file_type", fileType);
   if (cursor) params.set("cursor", cursor);
+  if (allFolders) params.set("all_folders", "true");
   return client<FileListResponse>(`/api/v1/files?${params}`);
 }
 
