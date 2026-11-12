@@ -52,6 +52,7 @@ cat > "${MANIFEST}" << EOF
 {
   "timestamp": "${TIMESTAMP}",
   "created_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "app_version": "${APP_VERSION:-unknown}",
   "postgres": {
     "file": "${PG_FILE}",
     "size": ${PG_DUMP_SIZE},

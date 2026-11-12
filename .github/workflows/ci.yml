@@ -2,9 +2,10 @@ name: CI
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main, master, dev]
+    tags: ["v*"]
   pull_request:
-    branches: [main]
+    branches: [main, master]
 
 jobs:
   # ==================== 后端 Lint ====================
@@ -187,3 +188,24 @@ jobs:
       - name: Audit Node dependencies
         working-directory: frontend
         run: npm audit --audit-level=high || true
+
+  # ==================== 版本标签一致性 ====================
+  release-verify:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Verify tag matches version files
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PY_VER=$(grep -E '^version = "' backend/pyproject.toml | head -n1 | cut -d'"' -f2)
+          NODE_VER=$(node -p "require('./frontend/package.json').version")
+          [ "$PY_VER" = "$TAG" ] || { echo "✗ pyproject=${PY_VER} 与标签 v${TAG} 不一致"; exit 1; }
+          [ "$NODE_VER" = "$TAG" ] || { echo "✗ package.json=${NODE_VER} 与标签 v${TAG} 不一致"; exit 1; }
+          echo "✓ 版本一致: v${TAG}"

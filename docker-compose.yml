@@ -105,6 +105,7 @@ services:
       - MINIO_DOWNLOAD_EXPIRES=${MINIO_DOWNLOAD_EXPIRES:-3600}
       - SECRET_KEY=${SECRET_KEY:?SECRET_KEY 必须在 .env 中设置}
       - ENVIRONMENT=${ENVIRONMENT:-production}
+      - APP_VERSION=${APP_VERSION:-1.0.0}
       - BACKEND_WORKERS=${BACKEND_WORKERS:-4}
       - DB_POOL_SIZE=${DB_POOL_SIZE:-5}
       - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-5}
@@ -270,6 +271,7 @@ services:
       - BACKUP_CRON=${BACKUP_CRON:-0 3 * * *}
       - RUN_ON_START=${BACKUP_RUN_ON_START:-false}
       - BACKUP_ENCRYPT_KEY=${BACKUP_ENCRYPT_KEY:-}
+      - APP_VERSION=${APP_VERSION:-1.0.0}
     volumes:
       - ./scripts:/scripts:ro
       - ./backups:/backups

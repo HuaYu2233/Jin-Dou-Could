@@ -16,6 +16,8 @@ DO_PULL=true
 DO_BUILD=true
 ASSUME_YES=false
 LATEST_BACKUP=""
+PREVIOUS_TAG=""
+PREVIOUS_COMMIT=""
 
 usage() {
   cat <<'USAGE'
@@ -45,6 +47,10 @@ on_error() {
       "$COMPOSE_FILE" "$(basename "$LATEST_BACKUP")" >&2
   fi
   printf '查看日志:\n  docker compose -f %s logs --tail 50 backend\n' "$COMPOSE_FILE" >&2
+  if [ -n "$PREVIOUS_COMMIT" ]; then
+    printf '回滚代码到升级前版本:\n  git checkout %s && docker compose -f %s up -d --build\n' \
+      "$PREVIOUS_COMMIT" "$COMPOSE_FILE" >&2
+  fi
 }
 trap on_error ERR
 
@@ -131,7 +137,14 @@ if [ "$DO_PULL" = true ] && [ -d .git ]; then
     warn "工作区存在未提交改动，git pull 可能失败"
   fi
   current=$(git --no-pager rev-parse --short HEAD 2>/dev/null || echo '?')
+  PREVIOUS_COMMIT=$(git --no-pager rev-parse HEAD 2>/dev/null || echo '')
+  PREVIOUS_TAG=$(git --no-pager describe --tags --exact-match 2>/dev/null || echo '')
   note "当前提交: ${current}"
+  if [ -n "$PREVIOUS_TAG" ]; then
+    note "升级前版本: ${PREVIOUS_TAG}"
+  else
+    note "当前提交未打标签，回滚将使用 commit ${current}"
+  fi
 fi
 
 confirm "确认开始升级" y || die "已取消"
@@ -192,6 +205,14 @@ else
   die "等待 ${HEALTH_TIMEOUT}s 仍未就绪，升级可能失败"
 fi
 
+running_version=$(curl -fsS --max-time 5 "$HEALTH_URL" 2>/dev/null \
+  | tr ',' '\n' | sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' | head -n1 || true)
+if [ -n "$running_version" ]; then
+  ok "当前运行版本: ${running_version}"
+else
+  warn "无法从 /health/ready 读取版本号，请检查 APP_VERSION 是否已透传"
+fi
+
 note "数据库迁移由 backend 启动命令自动执行（alembic upgrade head）"
 current_rev=$(docker compose -f "$COMPOSE_FILE" exec -T backend alembic current 2>/dev/null | tail -n1 || true)
 if [ -n "$current_rev" ]; then
@@ -211,6 +232,7 @@ cat <<EOF
 
 == 升级完成 ==
   备份目录: ${LATEST_BACKUP:-(本次未备份)}
+  运行版本: ${running_version:-未知}
   如需回滚数据:
     docker compose -f ${COMPOSE_FILE} exec backup /bin/sh /scripts/restore.sh <备份目录名>
   部署体检:

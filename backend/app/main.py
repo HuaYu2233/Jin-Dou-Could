@@ -155,6 +155,7 @@ async def _cleanup_orphan_multipart_uploads() -> None:
 _docs_enabled = settings.ENVIRONMENT != "production"
 app = FastAPI(
     title="Cloud Drive API",
+    version=settings.APP_VERSION,
     lifespan=lifespan,
     docs_url="/docs" if _docs_enabled else None,
     redoc_url="/redoc" if _docs_enabled else None,

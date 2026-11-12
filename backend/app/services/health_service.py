@@ -3,6 +3,7 @@ import time
 
 from sqlalchemy import text
 
+from app.core.config import settings
 from app.core.redis import ping_redis
 from app.core.storage import get_s3_client
 from app.db.base import engine
@@ -65,5 +66,6 @@ async def get_health() -> dict:
 
     return {
         "status": "ok" if overall else "degraded",
+        "version": settings.APP_VERSION,
         "checks": checks,
     }
