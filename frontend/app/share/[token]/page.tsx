@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -76,8 +77,8 @@ export default function SharePage() {
     <main className="flex min-h-screen items-center justify-center bg-page p-4">
       <div className="w-full max-w-md rounded-[20px] border border-line bg-surface p-8 shadow-[0_18px_48px_rgba(29,33,41,0.1)]">
         <div className="mb-7 flex flex-col items-center text-center">
-          <span className="flex h-11 w-11 items-center justify-center rounded-[12px] bg-brand text-lg font-bold tracking-tight text-white shadow-[0_6px_18px_rgba(30,111,255,0.34)]">
-            J
+          <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full">
+            <Image src="/logo-badge-light.png" alt="" width={44} height={44} className="h-full w-full object-contain" />
           </span>
           <h1 className="mt-4 text-lg font-semibold text-ink">JinDou Cloud 文件分享</h1>
           <p className="mt-1 text-sm text-ink-3">请输入提取码查看文件</p>

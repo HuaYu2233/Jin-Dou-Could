@@ -44,6 +44,12 @@ class NotFound(AppError):
     default_message = "资源不存在"
 
 
+class Gone(AppError):
+    code = "gone"
+    status_code = 410
+    default_message = "资源已失效"
+
+
 class Forbidden(AppError):
     code = "forbidden"
     status_code = 403
@@ -54,6 +60,18 @@ class Conflict(AppError):
     code = "conflict"
     status_code = 409
     default_message = "资源冲突"
+
+
+class InsufficientStorage(AppError):
+    code = "insufficient_storage"
+    status_code = 507
+    default_message = "存储空间不足"
+
+
+class UnsupportedMediaType(AppError):
+    code = "unsupported_media_type"
+    status_code = 415
+    default_message = "不支持的文件类型"
 
 
 class Unauthorized(AppError):

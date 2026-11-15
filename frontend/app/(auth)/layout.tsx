@@ -1,4 +1,5 @@
 import React from "react";
+import Image from "next/image";
 import styles from "./auth.module.css";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
@@ -7,7 +8,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <div className={styles.card}>
         <div className={styles.brandRow}>
           <span className={styles.brandMark} aria-hidden="true">
-            J
+            <Image src="/logo-badge-light.png" alt="" width={46} height={46} priority className={styles.brandLogo} />
           </span>
           <span className={styles.brandName}>JinDou Cloud</span>
           <span className={styles.tagline}>安全存储 · 随时随地访问</span>

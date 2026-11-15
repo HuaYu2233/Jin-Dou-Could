@@ -182,8 +182,8 @@ make logs
 
 | 配置项                | 说明                     | 默认值                |
 | --------------------- | ------------------------ | --------------------- |
-| `NEXT_PUBLIC_API_URL` | 浏览器访问后端地址       | http://localhost:8000 |
-| `API_URL`             | Docker 内部后端地址      | http://backend:8000   |
+| `NEXT_PUBLIC_API_URL` | 浏览器访问后端地址（留空=同源反代） | 空 |
+| `API_URL`             | Docker 内部后端地址（Next.js 反代目标） | http://backend:8000   |
 | `CORS_ORIGINS`        | 允许的前端源（逗号分隔） | http://localhost:3000 |
 
 ### 管理与配额
@@ -264,12 +264,11 @@ make logs
 4. **HTTPS**：挂载 SSL 证书到 nginx，取消 `nginx.conf` 中 443 server 块注释，设 `HTTPS_REDIRECT=true`
 5. **安全密钥**：修改所有密码和 `SECRET_KEY`（≥32 字符强随机值）
 6. **JWT RS256**（推荐）：生成 RSA 密钥对并配置 `ALGORITHM=RS256`
-7. **域名配置**：`NEXT_PUBLIC_API_URL` 和 `CORS_ORIGINS` 改为实际域名
+7. **域名配置**：`CORS_ORIGINS` 改为实际域名（`NEXT_PUBLIC_API_URL` 保持留空，前端同源反代访问后端）
 
 ```bash
 # 1. 修改 .env
 #    ENVIRONMENT=production
-#    NEXT_PUBLIC_API_URL=https://api.example.com
 #    CORS_ORIGINS=https://cloud.example.com
 #    HTTPS_REDIRECT=true
 #    BACKEND_WORKERS=4

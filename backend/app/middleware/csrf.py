@@ -9,6 +9,7 @@ _SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 _CSRF_COOKIE_NAME = "csrf_token"
 _CSRF_HEADER_NAME = "x-csrf-token"
 _API_PREFIX = "/api/"
+_LAN_PUBLIC_PREFIX = "/api/v1/lan-transfer/public/"
 
 
 def _get_cookie_from_scope(scope: Scope, name: str) -> str | None:
@@ -51,6 +52,13 @@ class CSRFMiddleware:
 
         method = scope.get("method", "")
         path = scope.get("path", "")
+
+        if path.startswith(_LAN_PUBLIC_PREFIX):
+            if needs_cookie:
+                await self._run_with_cookie(scope, receive, send, new_token)
+            else:
+                await self.app(scope, receive, send)
+            return
 
         if method in _SAFE_METHODS:
             if needs_cookie:

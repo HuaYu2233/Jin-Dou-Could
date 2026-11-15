@@ -15,6 +15,7 @@ import FilePreview from "./components/FilePreview";
 import MoveDialog from "./components/MoveDialog";
 import SharesView from "./components/SharesView";
 import TransfersView from "./components/TransfersView";
+import LanTransferView from "./components/LanTransferView";
 import ShareResultDialog from "./components/ShareResultDialog";
 import FolderDialog from "./components/FolderDialog";
 import { useFileOperations } from "./hooks/useFileOperations";
@@ -139,6 +140,12 @@ export default function DashboardPage() {
         isAdmin={hydrated && !!user?.is_admin}
       />
       <div className={pageStyles.mainArea}>
+        {category === "lan" ? (
+          <div className={pageStyles.contentArea}>
+            <LanTransferView />
+          </div>
+        ) : (
+          <>
         <Toolbar
           viewMode={viewMode}
           onViewModeChange={setViewMode}
@@ -240,6 +247,8 @@ export default function DashboardPage() {
             onPageChange={setPage}
           />
         </div>
+          </>
+        )}
       </div>
       {previewFile && (
         <FilePreview file={previewFile} onClose={() => setPreviewFile(null)} />

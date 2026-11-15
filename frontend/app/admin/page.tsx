@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { getAdminStats, type AdminStats } from "@/lib/api/admin";
 import { useTranslation } from "@/lib/i18n";
+import { formatSize } from "@/lib/utils/format";
 import { queryKeys } from "@/lib/query/keys";
 import StatCard from "./components/StatCard";
 import StorageBar from "./components/StorageBar";
@@ -39,6 +40,22 @@ export default function AdminDashboardPage() {
           <a href="/admin/users" className={styles.link}>{t("admin.overview.manageQuotaLink")}</a>
         </div>
         <StorageBar used={stats.total_used} total={stats.total_quota} />
+      </div>
+
+      <div className={styles.section}>
+        <div className={styles.sectionHead}>
+          <h2 className={styles.sectionTitle}>{t("admin.overview.lanTransfer")}</h2>
+        </div>
+        <div className={styles.cardGrid}>
+          <StatCard label={t("admin.overview.diskTotal")} value={formatSize(stats.disk_total)} color="blue" />
+          <StatCard label={t("admin.overview.diskFree")} value={formatSize(stats.disk_free)} color="green" />
+          <StatCard
+            label={t("admin.overview.lanTransfer")}
+            value={stats.lan_transfer_available ? t("admin.users.status.active") : t("admin.users.status.inactive")}
+            hint={t("admin.overview.lanTransferRooms", { count: stats.lan_transfer_active_rooms })}
+            color={stats.lan_transfer_available ? "green" : "purple"}
+          />
+        </div>
       </div>
 
       <div className={styles.section}>

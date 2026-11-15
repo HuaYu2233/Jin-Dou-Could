@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     JWT_PUBLIC_KEY_PATH: str = ""
 
     ENVIRONMENT: str = "development"
-    APP_VERSION: str = "1.0.0"
+    APP_VERSION: str = "1.1.0"
     MAX_UPLOAD_SIZE: int = 104857600
 
     BACKEND_WORKERS: int = 4
@@ -101,6 +101,22 @@ class Settings(BaseSettings):
 
     # WebSocket
     WS_PUBSUB_ENABLED: bool = True
+
+    # 局域网快传
+    LAN_TRANSFER_ENABLED: bool = True
+    LAN_TRANSFER_ROOM_TTL_HOURS: int = 24
+    LAN_TRANSFER_MAX_ACTIVE_ROOMS: int = 5
+    LAN_TRANSFER_MIN_FREE_BYTES: int = 2147483648
+    LAN_TRANSFER_MAX_FILES_PER_ROOM: int = 100
+    LAN_TRANSFER_JOIN_RATE_LIMIT: int = 5
+    LAN_TRANSFER_JOIN_RATE_WINDOW_SECONDS: int = 300
+    LAN_TRANSFER_PART_SIZE: int = 16777216
+    LAN_TRANSFER_CHUNK_THRESHOLD: int = 33554432
+    LAN_TRANSFER_PUBLIC_BASE_URL: str = ""
+    LAN_TRANSFER_DIRECT_MINIO: bool = False
+    LAN_TRANSFER_DISK_PATH: str = "/minio-data"
+    LAN_TRANSFER_REQUIRE_SAME_SUBNET: bool = False
+    LAN_TRANSFER_ALLOWED_CIDRS: str = ""
 
     # Prometheus
     PROMETHEUS_ENABLED: bool = False

@@ -102,7 +102,7 @@ describe("Header 用户信息拉取与退出登录", () => {
       await new Promise((r) => setTimeout(r, 80));
     });
 
-    expect(calls).toEqual(["POST http://localhost:8000/api/v1/auth/logout"]);
+    expect(calls).toEqual(["POST /api/v1/auth/logout"]);
     expect(replace).toHaveBeenCalledWith("/login");
     expect(push).not.toHaveBeenCalled();
     expect(refresh).not.toHaveBeenCalled();

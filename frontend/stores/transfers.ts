@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type TransferType = "upload" | "download";
+export type TransferType = "upload" | "download" | "lan-upload" | "lan-download";
 export type TransferStatus = "pending" | "transferring" | "paused" | "completed" | "error" | "canceled";
 
 export interface TransferTask {

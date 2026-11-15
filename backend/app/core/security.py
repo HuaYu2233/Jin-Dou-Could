@@ -73,6 +73,17 @@ def create_refresh_token(data: dict) -> str:
     return _create_token(data, timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS), token_type="refresh")
 
 
+ROOM_TOKEN_TYPE = "lan_room"
+
+
+def create_room_token(room_id: uuid.UUID, role: str, subject: str, expires_delta: timedelta) -> str:
+    return _create_token(
+        {"sub": subject, "room_id": str(room_id), "role": role},
+        expires_delta,
+        token_type=ROOM_TOKEN_TYPE,
+    )
+
+
 def decode_token(token: str) -> dict | None:
     try:
         return jwt.decode(token, _get_verifying_key(), algorithms=[settings.ALGORITHM])

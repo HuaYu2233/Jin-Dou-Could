@@ -1,4 +1,5 @@
 import json
+from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
@@ -9,8 +10,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.redis import redis_client
-from app.core.security import decode_token
+from app.core.security import ROOM_TOKEN_TYPE, decode_token
 from app.db.base import get_db
+from app.models.transfer_room import TransferRoom
 from app.models.user import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
@@ -138,3 +140,64 @@ async def get_current_admin(
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="需要管理员权限")
     return current_user
+
+
+@dataclass
+class RoomContext:
+    room: TransferRoom
+    jti: str | None
+    role: str
+    user_id: UUID | None = None
+    user_name: str | None = None
+
+
+async def get_room_context(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> RoomContext:
+    from app.services import lan_transfer_service
+
+    raw_room_id = request.path_params.get("room_id")
+    try:
+        room_id = UUID(str(raw_room_id))
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=404, detail="房间不存在") from exc
+
+    token = request.headers.get("x-room-token")
+    if not token:
+        auth = request.headers.get("authorization", "")
+        if auth.lower().startswith("bearer "):
+            token = auth[7:].strip()
+    if not token:
+        token = request.cookies.get("access_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="缺少房间令牌")
+
+    payload = decode_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="房间令牌无效或已过期")
+
+    token_type = payload.get("type")
+    if token_type == ROOM_TOKEN_TYPE:
+        if payload.get("room_id") != str(room_id):
+            raise HTTPException(status_code=403, detail="房间令牌与请求房间不匹配")
+        room = await lan_transfer_service.get_room(db, room_id)
+        return RoomContext(room=room, jti=payload.get("jti"), role=payload.get("role", "guest"))
+
+    if token_type == "access":
+        room = await lan_transfer_service.get_room(db, room_id)
+        sub = payload.get("sub")
+        if not sub or str(room.owner_id) != str(sub):
+            raise HTTPException(status_code=403, detail="仅房间创建者可访问该接口")
+        owner = await db.scalar(select(User).where(User.id == room.owner_id))
+        if not owner or not owner.is_active:
+            raise HTTPException(status_code=403, detail="账号不可用")
+        return RoomContext(
+            room=room,
+            jti=payload.get("jti"),
+            role="owner",
+            user_id=room.owner_id,
+            user_name=owner.username,
+        )
+
+    raise HTTPException(status_code=401, detail="房间令牌无效或已过期")

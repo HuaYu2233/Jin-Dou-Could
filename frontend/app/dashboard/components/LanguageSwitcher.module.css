@@ -7,7 +7,6 @@
 .trigger {
   display: flex;
   align-items: center;
-  gap: 4px;
   height: 32px;
   padding: 0 10px;
   font-size: 13px;
@@ -23,11 +22,6 @@
   background: var(--qk-surface-3);
   border-color: var(--qk-border-strong);
   color: var(--qk-text);
-}
-
-.icon {
-  font-size: 14px;
-  line-height: 1;
 }
 
 .short {

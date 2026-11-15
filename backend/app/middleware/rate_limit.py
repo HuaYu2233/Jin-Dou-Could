@@ -10,6 +10,7 @@ from app.core.redis import redis_client
 
 EXEMPT_PATHS = {"/health", "/docs", "/openapi.json", "/redoc"}
 LOGIN_PATHS = {"/api/v1/auth/login", "/api/v1/auth/register"}
+LAN_PUBLIC_PREFIX = "/api/v1/lan-transfer/public/"
 LOGIN_RATE_LIMIT = settings.LOGIN_RATE_LIMIT_MAX_ATTEMPTS
 
 
@@ -33,6 +34,10 @@ class RateLimitMiddleware:
 
         path = scope.get("path", "")
         if path in EXEMPT_PATHS:
+            await self.app(scope, receive, send)
+            return
+
+        if path.startswith(LAN_PUBLIC_PREFIX):
             await self.app(scope, receive, send)
             return
 

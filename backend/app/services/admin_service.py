@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime
 
 from loguru import logger
 from sqlalchemy import func, select
@@ -8,7 +9,9 @@ from app.core.exceptions import Conflict, NotFound, ValidationFailed
 from app.core.storage import batch_delete_files
 from app.core.storage import delete_file as s3_delete_file
 from app.models.file import File
+from app.models.transfer_room import TransferRoom
 from app.models.user import User
+from app.services import lan_transfer_service
 
 
 async def get_stats(db: AsyncSession) -> dict:
@@ -17,12 +20,23 @@ async def get_stats(db: AsyncSession) -> dict:
     admin_users = await db.scalar(select(func.count(User.id)).where(User.is_admin.is_(True)))
     total_quota = await db.scalar(select(func.coalesce(func.sum(User.storage_quota), 0)))
     total_used = await db.scalar(select(func.coalesce(func.sum(User.used_storage), 0)))
+    active_rooms = await db.scalar(
+        select(func.count(TransferRoom.id)).where(
+            TransferRoom.closed_at.is_(None),
+            TransferRoom.expires_at > datetime.now(UTC),
+        )
+    )
+    disk_total, _, disk_free = lan_transfer_service.get_disk_usage()
     return {
         "total_users": total_users,
         "active_users": active_users,
         "admin_users": admin_users,
         "total_quota": total_quota,
         "total_used": total_used,
+        "disk_total": disk_total,
+        "disk_free": disk_free,
+        "lan_transfer_available": lan_transfer_service.is_feature_available(),
+        "lan_transfer_active_rooms": active_rooms or 0,
     }
 
 

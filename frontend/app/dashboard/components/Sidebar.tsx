@@ -11,21 +11,21 @@ import styles from "./Sidebar.module.css";
 interface NavItem {
   id: CategoryId;
   labelKey: TranslationKey;
-  icon: string;
   groupKey: TranslationKey;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: "all", labelKey: "sidebar.all", icon: "📁", groupKey: "sidebar.group.myFiles" },
-  { id: "image", labelKey: "sidebar.image", icon: "🖼️", groupKey: "sidebar.group.myFiles" },
-  { id: "document", labelKey: "sidebar.document", icon: "📄", groupKey: "sidebar.group.myFiles" },
-  { id: "video", labelKey: "sidebar.video", icon: "🎬", groupKey: "sidebar.group.myFiles" },
-  { id: "audio", labelKey: "sidebar.audio", icon: "🎵", groupKey: "sidebar.group.myFiles" },
-  { id: "archive", labelKey: "sidebar.archive", icon: "🗜️", groupKey: "sidebar.group.myFiles" },
-  { id: "other", labelKey: "sidebar.other", icon: "📦", groupKey: "sidebar.group.myFiles" },
-  { id: "trash", labelKey: "sidebar.trash", icon: "🗑️", groupKey: "sidebar.group.other" },
-  { id: "shares", labelKey: "sidebar.shares", icon: "🔗", groupKey: "sidebar.group.other" },
-  { id: "transfers", labelKey: "sidebar.transfers", icon: "⚡", groupKey: "sidebar.group.other" },
+  { id: "all", labelKey: "sidebar.all", groupKey: "sidebar.group.myFiles" },
+  { id: "image", labelKey: "sidebar.image", groupKey: "sidebar.group.myFiles" },
+  { id: "document", labelKey: "sidebar.document", groupKey: "sidebar.group.myFiles" },
+  { id: "video", labelKey: "sidebar.video", groupKey: "sidebar.group.myFiles" },
+  { id: "audio", labelKey: "sidebar.audio", groupKey: "sidebar.group.myFiles" },
+  { id: "archive", labelKey: "sidebar.archive", groupKey: "sidebar.group.myFiles" },
+  { id: "other", labelKey: "sidebar.other", groupKey: "sidebar.group.myFiles" },
+  { id: "trash", labelKey: "sidebar.trash", groupKey: "sidebar.group.other" },
+  { id: "shares", labelKey: "sidebar.shares", groupKey: "sidebar.group.other" },
+  { id: "transfers", labelKey: "sidebar.transfers", groupKey: "sidebar.group.other" },
+  { id: "lan", labelKey: "sidebar.lan", groupKey: "sidebar.group.other" },
 ];
 
 interface SidebarProps {
@@ -53,7 +53,6 @@ export default function Sidebar({ activeCategory, onCategoryChange, storage, isA
                 className={`${styles.navItem} ${styles.badge} ${activeCategory === item.id ? styles.navItemActive : ""}`}
                 onClick={() => onCategoryChange(item.id)}
               >
-                <span className={styles.navIcon}>{item.icon}</span>
                 <span className={styles.navLabel}>{t(item.labelKey)}</span>
                 {item.id === "transfers" && hasActive && <span className={styles.redDot} />}
               </button>
@@ -63,7 +62,6 @@ export default function Sidebar({ activeCategory, onCategoryChange, storage, isA
       </div>
       {isAdmin && (
         <Link href="/admin" className={styles.navItem}>
-          <span className={styles.navIcon}>⚙️</span>
           <span className={styles.navLabel}>{t("sidebar.admin")}</span>
         </Link>
       )}

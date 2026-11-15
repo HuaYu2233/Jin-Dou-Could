@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import QuotaExceeded
 from app.models.file import File
+from app.models.transfer_room import TransferRoom, TransferRoomFile
 from app.models.user import User
 
 
@@ -51,7 +52,18 @@ async def recalculate(db: AsyncSession, owner_id: UUID) -> int:
             File.deleted_at.is_(None),
         )
     )
-    actual = result.scalar_one()
+    drive_total = int(result.scalar_one() or 0)
+
+    room_total = await db.scalar(
+        select(func.coalesce(func.sum(TransferRoomFile.size), 0))
+        .join(TransferRoom, TransferRoom.id == TransferRoomFile.room_id)
+        .where(
+            TransferRoom.owner_id == owner_id,
+            TransferRoom.closed_at.is_(None),
+            TransferRoomFile.source_file_id.is_(None),
+        )
+    )
+    actual = drive_total + int(room_total or 0)
 
     owner = await get_owner(db, owner_id)
     if owner and owner.used_storage != actual:

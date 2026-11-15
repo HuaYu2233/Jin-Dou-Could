@@ -64,8 +64,7 @@ MINIO_ROOT_PASSWORD=<强密码>
 # JWT 密钥（≥32 字符强随机值）
 SECRET_KEY=<openssl rand -hex 32>
 
-# 域名配置
-NEXT_PUBLIC_API_URL=https://api.example.com
+# 域名配置（前端经 Next.js / Nginx 同源反代访问后端，NEXT_PUBLIC_API_URL 保持留空）
 CORS_ORIGINS=https://cloud.example.com
 
 # 浏览器可访问的 MinIO 地址（预签名下载链接指向此地址，必须是公网可达域名）

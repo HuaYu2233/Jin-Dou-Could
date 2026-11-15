@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { useAuthStore } from "@/stores/auth";
 import { useIsHydrated } from "@/lib/hooks/useIsHydrated";
 import { logout as logoutApi } from "@/lib/api/auth";
@@ -44,7 +45,7 @@ export default function Header({ extra }: HeaderProps) {
     <header className={styles.header}>
       <div className={styles.brand}>
         <span className={styles.brandMark} aria-hidden="true">
-          J
+          <Image src="/logo-badge-light.png" alt="" width={28} height={28} className={styles.brandLogo} />
         </span>
         <span className={styles.brandText}>{t("app.brand")}</span>
       </div>

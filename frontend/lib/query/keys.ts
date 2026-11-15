@@ -19,4 +19,8 @@ export const queryKeys = {
     all: ["auth"] as const,
     me: () => [...queryKeys.auth.all, "me"] as const,
   },
+  lanTransfer: {
+    all: ["lanTransfer"] as const,
+    room: (roomId: string) => [...queryKeys.lanTransfer.all, "room", roomId] as const,
+  },
 };

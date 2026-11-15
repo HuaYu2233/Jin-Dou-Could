@@ -72,6 +72,7 @@ async def lifespan(app: FastAPI):
     await ws_manager.start_pubsub()
 
     cleanup_task = asyncio.create_task(_cleanup_orphan_multipart_uploads())
+    room_cleanup_task = asyncio.create_task(_cleanup_expired_rooms())
 
     logger.info(
         f"应用启动完成 | env={settings.ENVIRONMENT} | "
@@ -84,8 +85,11 @@ async def lifespan(app: FastAPI):
     yield
 
     cleanup_task.cancel()
+    room_cleanup_task.cancel()
     with suppress(asyncio.CancelledError):
         await cleanup_task
+    with suppress(asyncio.CancelledError):
+        await room_cleanup_task
 
     await ws_manager.stop_pubsub()
     await close_s3_clients()
@@ -108,7 +112,6 @@ async def _cleanup_orphan_multipart_uploads() -> None:
                     upload_id = upload.get("UploadId", "")
                     if key.count("/") < 1:
                         continue
-                    owner_id = key.split("/")[0]
                     upload_entries.append((key, upload_id))
 
             if not upload_entries:
@@ -116,8 +119,10 @@ async def _cleanup_orphan_multipart_uploads() -> None:
 
             pipeline = redis_client.pipeline(transaction=False)
             for key, upload_id in upload_entries:
-                owner_id = key.split("/")[0]
-                pipeline.exists(f"multipart:{owner_id}:{upload_id}")
+                if key.startswith("lan-transfer/"):
+                    pipeline.exists(f"lan_mpu:{upload_id}")
+                else:
+                    pipeline.exists(f"multipart:{key.split('/')[0]}:{upload_id}")
             results = await pipeline.execute()
 
             orphans = [
@@ -150,6 +155,22 @@ async def _cleanup_orphan_multipart_uploads() -> None:
             raise
         except Exception as e:
             logger.warning(f"孤儿分片清理任务异常: {e}")
+
+
+async def _cleanup_expired_rooms() -> None:
+    from app.services.lan_transfer_service import cleanup_expired_rooms
+
+    interval = 600
+    while True:
+        try:
+            await asyncio.sleep(interval)
+            cleaned = await cleanup_expired_rooms()
+            if cleaned:
+                logger.bind(log_type="storage").info(f"清理过期快传房间: {cleaned} 个")
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.warning(f"过期快传房间清理任务异常: {e}")
 
 
 _docs_enabled = settings.ENVIRONMENT != "production"
@@ -246,7 +267,16 @@ app.add_middleware(
     allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With", "Range", "Origin", "X-CSRF-Token"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "X-Requested-With",
+        "Range",
+        "Origin",
+        "X-CSRF-Token",
+        "X-Room-Token",
+    ],
     expose_headers=["Content-Disposition", "Content-Length", "Content-Range", "Accept-Ranges"],
 )
 

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useAuthStore } from "@/stores/auth";
 import { useIsHydrated } from "@/lib/hooks/useIsHydrated";
 
@@ -14,8 +15,8 @@ export default function HomePage() {
       <div className="pointer-events-none absolute -bottom-40 -right-24 h-[420px] w-[420px] rounded-full bg-brand/10 blur-[100px]" />
 
       <div className="relative z-10 flex w-full max-w-lg flex-col items-center text-center">
-        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-2xl font-bold tracking-tight text-white shadow-[0_8px_24px_rgba(30,111,255,0.34)]">
-          J
+        <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full">
+          <Image src="/logo-badge-light.png" alt="" width={56} height={56} priority className="h-full w-full object-contain" />
         </span>
         <h1 className="mt-7 text-4xl font-semibold tracking-tight text-ink sm:text-5xl">
           JinDou Cloud

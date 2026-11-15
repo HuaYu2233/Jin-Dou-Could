@@ -1,7 +1,7 @@
 # 局域网快传（房间码模式）设计与实施文档
 
-> 状态：方案已定稿，待实施
-> 目标版本：下一迭代
+> 状态：已实施（v1.1.0）
+> 目标版本：v1.1.0
 > 影响范围：后端配置 / 数据模型 / API / 中间件 / 前端 dashboard + 新增公开页
 
 ## 1. 背景与目标
@@ -125,18 +125,21 @@
   且 disk_free >= LAN_TRANSFER_MIN_FREE_BYTES
 
 单文件上限:
-  普通用户: min(LAN_TRANSFER_USER_LIMIT, LAN_TRANSFER_USER_LIMIT) = 1GB
-  管理员:   LAN_TRANSFER_ADMIN_LIMIT > 0 ? LAN_TRANSFER_ADMIN_LIMIT
-                                       : disk_free - LAN_TRANSFER_MIN_FREE_BYTES
+  所有用户: user.storage_quota（默认 1GB）
 
 房间总量上限:
-  普通用户: LAN_TRANSFER_USER_LIMIT = 1GB
-  管理员:   同上
+  所有用户: user.storage_quota（默认 1GB）
+
+活跃房间数上限:
+  单用户 closed_at 为空且未过期的房间数 <= LAN_TRANSFER_MAX_ACTIVE_ROOMS
 
 写入前校验:
   room_used(DB 求和) + room_reserved(Redis 在途) + 本次大小 <= room.max_total_size
+  owner_used_storage + owner_reserved(Redis 在途) + 本次大小 <= user.storage_quota
   且 disk_free - disk_reserved >= 本次大小
 ```
+
+> 快传与网盘共用同一额度池：`User.used_storage` 同时统计网盘文件与快传房间文件（网盘直发文件不重复计入），访客上传同样计入房主额度。
 
 ## 5. 数据库设计
 
@@ -180,7 +183,8 @@
 ### 5.3 与现有表的关系
 
 - 不修改 `files`、`folders`、`shares` 表结构。
-- 快传文件不写入 `files` 表，不参与 `used_storage` 计算。
+- 快传文件不写入 `files` 表；`transfer_room_files` 新增 `source_file_id` 关联 `files.id`，用于「从网盘直发」的引用式文件。
+- 快传文件参与 `used_storage` 计算，与网盘共用同一额度池；`source_file_id` 非空的记录不重复计入。
 - 迁移文件命名沿用现有风格，例如 `n9o0p1q2r3s4_add_transfer_rooms.py`。
 
 ## 6. 配置项
@@ -191,8 +195,7 @@
 | --- | --- | --- |
 | `LAN_TRANSFER_ENABLED` | 快传总开关 | `true` |
 | `LAN_TRANSFER_ROOM_TTL_HOURS` | 房间有效期（小时） | `24` |
-| `LAN_TRANSFER_USER_LIMIT` | 普通用户单文件与房间总量上限（字节） | `1073741824` |
-| `LAN_TRANSFER_ADMIN_LIMIT` | 管理员上限（字节），0 表示取磁盘余量 | `0` |
+| `LAN_TRANSFER_MAX_ACTIVE_ROOMS` | 单用户活跃房间数上限（0 表示不限制） | `5` |
 | `LAN_TRANSFER_MIN_FREE_BYTES` | 磁盘剩余低于该值暂停功能 | `2147483648` |
 | `LAN_TRANSFER_MAX_FILES_PER_ROOM` | 单房间最大文件数 | `100` |
 | `LAN_TRANSFER_JOIN_RATE_LIMIT` | 加入尝试次数上限 | `5` |
@@ -209,8 +212,9 @@
 
 | 配置项 | 调整内容 |
 | --- | --- |
-| `NEXT_PUBLIC_API_URL` | 改为局域网可达地址，例如 `http://192.168.1.10`，不能是 `localhost:8000` |
-| `CORS_ORIGINS` | 加入该局域网地址 |
+| `NEXT_PUBLIC_API_URL` | 保持留空。前端通过同源 `/api` 反代访问后端，局域网 IP / 域名 / localhost 三种入口都无需改配置 |
+| `CORS_ORIGINS` | 同源反代下不再是必需项，按需加入实际访问来源 |
+| `LAN_TRANSFER_PUBLIC_BASE_URL` | 若常用 `localhost` 打开面板，填本机局域网 IP（如 `http://192.168.1.10:3000`），否则生成的加入链接指向 localhost |
 | `TRUSTED_PROXIES` | 若经 Nginx，需配置 Nginx 容器 IP 或固定网段，否则限流按同一 IP 计数 |
 | `MINIO_PUBLIC_ENDPOINT` | 仅在使用预签名直链的场景需要改为局域网可达地址；快传流式代理不依赖此项 |
 
@@ -224,8 +228,7 @@ volumes:
 environment:
   - LAN_TRANSFER_ENABLED=${LAN_TRANSFER_ENABLED:-true}
   - LAN_TRANSFER_ROOM_TTL_HOURS=${LAN_TRANSFER_ROOM_TTL_HOURS:-24}
-  - LAN_TRANSFER_USER_LIMIT=${LAN_TRANSFER_USER_LIMIT:-1073741824}
-  - LAN_TRANSFER_ADMIN_LIMIT=${LAN_TRANSFER_ADMIN_LIMIT:-0}
+  - LAN_TRANSFER_MAX_ACTIVE_ROOMS=${LAN_TRANSFER_MAX_ACTIVE_ROOMS:-5}
   - LAN_TRANSFER_MIN_FREE_BYTES=${LAN_TRANSFER_MIN_FREE_BYTES:-2147483648}
   - LAN_TRANSFER_MAX_FILES_PER_ROOM=${LAN_TRANSFER_MAX_FILES_PER_ROOM:-100}
   - LAN_TRANSFER_JOIN_RATE_LIMIT=${LAN_TRANSFER_JOIN_RATE_LIMIT:-5}
@@ -544,13 +547,16 @@ if path.startswith(_LAN_PUBLIC_PREFIX):
 
 #### 限流调整
 
-`RateLimitMiddleware` 中对 `_LAN_PUBLIC_PREFIX` 跳过全局 IP 桶，改由服务层按 `room_id + token jti` 计数：
+`RateLimitMiddleware` 中对 `_LAN_PUBLIC_PREFIX` 跳过全局 IP 桶，改由服务层按 `room_id + 操作桶 + token jti` 计数：
 
 ```python
 _LAN_PUBLIC_PREFIX = "/api/v1/lan-transfer/public/"
 ```
 
-房间维度限流上限建议：列表 `30 次/分钟`，上传分片 `300 次/分钟`，下载 `60 次/分钟`。
+计数键为 `lan_rl:{room_id}:{bucket}:{jti}`，`bucket` 取 `list` / `upload` / `download` / `delete`。
+不同操作使用独立计数桶，避免分片上传（一次几十上百个请求）把列表接口的配额打满后返回 429。
+
+房间维度限流上限建议：列表 `60 次/分钟`（访客页 4 秒轮询约 15 次/分钟，留多标签页余量），上传分片 `300 次/分钟`，下载 `60 次/分钟`，删除 `30 次/分钟`。
 
 ### 7.9 清理任务
 
@@ -706,7 +712,8 @@ lan.anonymous
 | --- | --- |
 | 后端可达 | 当前 `127.0.0.1:8000` 仅本机可用，需经 Nginx 80 端口或改绑定地址 |
 | 前端可达 | 前端 `3000:3000` 已对局域网开放，或经 Nginx |
-| `NEXT_PUBLIC_API_URL` | 必须为局域网可达地址，不能是 `localhost:8000` |
+| `NEXT_PUBLIC_API_URL` | 保持留空，前端经同源 `/api` 反代访问后端 |
+| `LAN_TRANSFER_PUBLIC_BASE_URL` | 若常用 localhost 打开面板，需填本机局域网 IP，否则加入链接指向 localhost |
 | `CORS_ORIGINS` | 包含实际访问来源 |
 | `TRUSTED_PROXIES` | 经 Nginx 时配置，否则限流按同一 IP |
 | 防火墙 | 放行 80 / 3000 端口 |

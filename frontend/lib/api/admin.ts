@@ -7,6 +7,10 @@ export interface AdminStats {
   admin_users: number;
   total_quota: number;
   total_used: number;
+  disk_total: number;
+  disk_free: number;
+  lan_transfer_available: boolean;
+  lan_transfer_active_rooms: number;
 }
 
 export interface AdminUserItem {

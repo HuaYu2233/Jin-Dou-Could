@@ -354,6 +354,24 @@ async def head_object_size(storage_key: str) -> int:
         return int(resp["ContentLength"])
 
 
+async def head_object(storage_key: str) -> dict:
+    async with get_s3_client() as client:
+        return await client.head_object(
+            Bucket=settings.MINIO_BUCKET,
+            Key=storage_key,
+        )
+
+
+@asynccontextmanager
+async def open_object_stream(storage_key: str, range_header: str | None = None):
+    async with get_s3_client() as client:
+        params: dict = {"Bucket": settings.MINIO_BUCKET, "Key": storage_key}
+        if range_header:
+            params["Range"] = range_header
+        resp = await client.get_object(**params)
+        yield resp
+
+
 async def abort_multipart(storage_key: str, upload_id: str) -> None:
     async with get_s3_client() as client:
         with suppress(Exception):

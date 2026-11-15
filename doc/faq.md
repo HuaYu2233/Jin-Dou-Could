@@ -32,7 +32,7 @@ ports:
   - "127.0.0.1:8001:8000" # 将 8000 改为 8001
 ```
 
-同时修改 `.env` 中的 `NEXT_PUBLIC_API_URL` 和 `CORS_ORIGINS`。
+同时修改 `.env` 中的 `API_URL`（前端反代目标）和 `CORS_ORIGINS`。
 
 ### Q: 如何查看容器日志？
 

@@ -18,7 +18,7 @@ from app.core.storage import (
 )
 from app.models.file import File
 from app.models.user import User
-from app.services import storage_accounting
+from app.services import lan_transfer_service, storage_accounting
 from app.services.file_validation import (
     categorize_file_type,
     detect_real_mime_type,
@@ -277,6 +277,7 @@ async def soft_delete_file(db: AsyncSession, file_id: uuid.UUID, owner_id: uuid.
     if not file:
         return False
     file.deleted_at = datetime.now(UTC)
+    await lan_transfer_service.detach_drive_file(db, file.id)
     await storage_accounting.adjust(db, owner_id, -file.size)
 
     await db.commit()
@@ -316,6 +317,7 @@ async def purge_file(db: AsyncSession, file_id: uuid.UUID, owner_id: uuid.UUID) 
     with suppress(Exception):
         await delete_file(file.storage_key)
 
+    await lan_transfer_service.detach_drive_file(db, file.id)
     await db.delete(file)
     await db.commit()
     return True

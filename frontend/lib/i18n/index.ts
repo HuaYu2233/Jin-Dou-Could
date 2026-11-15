@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useI18nStore, type Locale, DEFAULT_LOCALE } from "@/stores/i18n";
 import { useIsHydrated } from "@/lib/hooks/useIsHydrated";
 import zhCN from "./locales/zh-CN";
@@ -46,7 +47,9 @@ export function useTranslation() {
   const locale = useI18nStore((s) => s.locale);
   const hydrated = useIsHydrated();
   const activeLocale = hydrated ? locale : DEFAULT_LOCALE;
-  const t = (key: TranslationKey, params?: TranslationParams): string =>
-    getTranslation(activeLocale, key, params);
+  const t = useCallback(
+    (key: TranslationKey, params?: TranslationParams): string => getTranslation(activeLocale, key, params),
+    [activeLocale]
+  );
   return { t, locale: activeLocale };
 }

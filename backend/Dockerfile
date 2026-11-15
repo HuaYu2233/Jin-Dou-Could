@@ -34,7 +34,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
        curl \
     && rm -rf /var/lib/apt/lists/*
 
-RUN groupadd -r appuser && useradd -r -g appuser appuser
+RUN groupadd -r appuser && useradd -r -g appuser appuser \
+    && mkdir -p /home/appuser \
+    && chown -R appuser:appuser /home/appuser
 
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin

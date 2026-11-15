@@ -46,8 +46,8 @@
 
 | 配置项                | 说明                     | 默认值                | 必填 |
 | --------------------- | ------------------------ | --------------------- | ---- |
-| `NEXT_PUBLIC_API_URL` | 浏览器访问后端地址       | http://localhost:8000 | 是   |
-| `API_URL`             | Docker 内部后端地址      | http://backend:8000   | 否   |
+| `NEXT_PUBLIC_API_URL` | 浏览器访问后端地址（留空=同源反代，仅 `npm run dev` 直连时填写） | 空 | 否 |
+| `API_URL`             | Docker 内部后端地址（Next.js 反代目标） | http://backend:8000   | 否   |
 | `CORS_ORIGINS`        | 允许的前端源（逗号分隔） | http://localhost:3000 | 是   |
 
 ## 4. 管理与配额
@@ -181,14 +181,35 @@ Webhook 类型：`generic` / `dingtalk` / `feishu` / `wechat`
 
 > `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` 仅被 grafana 容器读取，不属于 `Settings` 字段。生产环境必须修改默认密码。
 
-## 14. 生产环境配置检查清单
+## 14. 局域网快传
+
+| 配置项                                 | 说明                                     | 默认值        |
+| -------------------------------------- | ---------------------------------------- | ------------- |
+| `LAN_TRANSFER_ENABLED`                 | 功能总开关                               | true          |
+| `LAN_TRANSFER_ROOM_TTL_HOURS`          | 房间默认有效期（小时）                   | 24            |
+| `LAN_TRANSFER_MAX_ACTIVE_ROOMS`        | 单用户活跃房间数上限（0=不限制）         | 5             |
+| `LAN_TRANSFER_MIN_FREE_BYTES`          | 磁盘剩余低于该值时暂停创建与上传         | 2147483648    |
+| `LAN_TRANSFER_MAX_FILES_PER_ROOM`      | 单房间文件数上限                         | 100           |
+| `LAN_TRANSFER_JOIN_RATE_LIMIT`         | 同 IP 加入失败次数上限                   | 5             |
+| `LAN_TRANSFER_JOIN_RATE_WINDOW_SECONDS`| 加入失败统计窗口（秒）                   | 300           |
+| `LAN_TRANSFER_PART_SIZE`               | 分片大小（字节）                         | 16777216      |
+| `LAN_TRANSFER_CHUNK_THRESHOLD`         | 触发分片上传的阈值（字节）               | 33554432      |
+| `LAN_TRANSFER_PUBLIC_BASE_URL`         | 对外访问基址，留空按请求 origin 生成     | 空            |
+| `LAN_TRANSFER_DIRECT_MINIO`            | 下载改走 MinIO 直链（保留开关）          | false         |
+| `LAN_TRANSFER_DISK_PATH`               | 磁盘余量探测路径                         | /minio-data   |
+| `LAN_TRANSFER_REQUIRE_SAME_SUBNET`     | 是否提示非同网段访问                     | false         |
+| `LAN_TRANSFER_ALLOWED_CIDRS`           | 允许的网段（逗号分隔，留空表示内网即通过）| 空            |
+
+> `LAN_TRANSFER_DIRECT_MINIO=true` 需要把 MinIO 端口暴露到局域网，默认关闭时下载走后端流式代理。`LAN_TRANSFER_DISK_PATH` 指向 `minio_data` 卷挂载点，容器内以只读方式挂载。
+
+## 15. 生产环境配置检查清单
 
 - [ ] `SECRET_KEY` 设为 32+ 字符强随机值
 - [ ] `POSTGRES_PASSWORD` 设为强密码
 - [ ] `REDIS_PASSWORD` 设为强密码
 - [ ] `MINIO_ROOT_PASSWORD` 设为强密码
 - [ ] `ENVIRONMENT=production`
-- [ ] `NEXT_PUBLIC_API_URL` 改为实际域名
+- [ ] `NEXT_PUBLIC_API_URL` 保持留空（同源反代），确认 `API_URL` 指向后端容器
 - [ ] `CORS_ORIGINS` 改为实际域名
 - [ ] `MINIO_PUBLIC_ENDPOINT` 改为公网可达域名（预签名下载链接指向它）
 - [ ] `TRUSTED_PROXIES` 配置反向代理 IP，否则限流按同一 IP 计数
@@ -201,6 +222,6 @@ Webhook 类型：`generic` / `dingtalk` / `feishu` / `wechat`
 - [ ] `BACKUP_ENCRYPT_KEY` 设为加密密钥
 - [ ] 连接池配置合理：WORKERS × (POOL_SIZE + MAX_OVERFLOW) < DB_MAX_CONNECTIONS
 
-## 15. 配置透传校验
+## 16. 配置透传校验
 
 `.env` 的值只有在 `docker-compose.yml` 的 `environment` 中以 `${VAR}` 引用才会进入容器。新增或修改配置后建议做一次双向校验，命令与已知例外见 [pitfalls.md 第 19 条](./pitfalls.md)。

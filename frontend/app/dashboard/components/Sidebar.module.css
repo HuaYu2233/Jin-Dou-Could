@@ -31,7 +31,6 @@
 .navItem {
   display: flex;
   align-items: center;
-  gap: 10px;
   width: 100%;
   padding: 6px 10px;
   border: none;
@@ -59,29 +58,6 @@
 .navItemActive:hover {
   background: var(--qk-primary-soft);
   color: var(--qk-primary);
-}
-
-.navIcon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  flex-shrink: 0;
-  border-radius: 8px;
-  background: var(--qk-surface-3);
-  font-size: 15px;
-  line-height: 1;
-  transition: background 0.16s ease, box-shadow 0.16s ease;
-}
-
-.navItem:hover .navIcon {
-  background: var(--qk-surface);
-}
-
-.navItemActive .navIcon {
-  background: var(--qk-surface);
-  box-shadow: var(--qk-shadow-sm);
 }
 
 .navLabel {
@@ -154,18 +130,14 @@
 
 @media (max-width: 640px) {
   .sidebar {
-    width: 60px;
+    width: 112px;
     padding: 8px 8px 12px;
   }
   .navGroupTitle {
     display: none;
   }
   .navItem {
-    justify-content: center;
-    padding: 6px 4px;
-  }
-  .navLabel {
-    display: none;
+    padding: 6px 8px;
   }
   .storageTitle {
     display: none;

@@ -16,8 +16,8 @@ const RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 16000];
 const MAX_RECONNECT = 5;
 
 function getWsUrl(): string {
-  const base = API_BASE_URL.replace(/^http/, "ws");
-  return `${base}/api/v1/ws/connect`;
+  const base = API_BASE_URL || (typeof window !== "undefined" ? window.location.origin : "");
+  return `${base.replace(/^http/, "ws")}/api/v1/ws/connect`;
 }
 
 function hasAuthCookie(): boolean {

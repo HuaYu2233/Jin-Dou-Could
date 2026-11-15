@@ -94,3 +94,7 @@ class AdminStats(BaseModel):
     admin_users: int
     total_quota: int
     total_used: int
+    disk_total: int = 0
+    disk_free: int = 0
+    lan_transfer_available: bool = True
+    lan_transfer_active_rooms: int = 0

@@ -37,7 +37,6 @@ export default function LanguageSwitcher() {
         aria-label={t("header.language")}
         aria-expanded={open}
       >
-        <span className={styles.icon}>🌐</span>
         <span className={styles.short}>{current.shortLabel}</span>
       </button>
       {open && (
