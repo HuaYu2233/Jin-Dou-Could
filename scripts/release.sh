@@ -12,6 +12,7 @@ ENV_EXAMPLE=".env.example"
 ENV_FILE=".env"
 CHANGELOG="doc/changelog.md"
 COMPOSE_FILE="docker-compose.yml"
+COMPOSE_OPS_FILE="docker-compose.ops.yml"
 
 VERSION=""
 REMOTE=""
@@ -112,6 +113,7 @@ command -v git >/dev/null 2>&1 || die "未找到 git"
 [ -d .git ] || die "当前目录不是 git 仓库"
 [ -f "$PYPROJECT" ] || die "缺少 ${PYPROJECT}"
 [ -f "$CHANGELOG" ] || die "缺少 ${CHANGELOG}"
+[ -f "$COMPOSE_OPS_FILE" ] || die "缺少 ${COMPOSE_OPS_FILE}"
 
 if [ -n "$(git --no-pager status --porcelain 2>/dev/null)" ]; then
   git --no-pager status --short >&2
@@ -155,6 +157,7 @@ rewrite 's/^version = "[^"]*"/version = "'"${VERSION}"'"/' "$PYPROJECT"
 rewrite 's/^    APP_VERSION: str = "[^"]*"/    APP_VERSION: str = "'"${VERSION}"'"/' "$CONFIG_PY"
 rewrite 's/^APP_VERSION=.*/APP_VERSION='"${VERSION}"'/' "$ENV_EXAMPLE"
 rewrite 's/APP_VERSION:-[0-9A-Za-z.-]+}/APP_VERSION:-'"${VERSION}"'}/' "$COMPOSE_FILE"
+rewrite 's/APP_VERSION:-[0-9A-Za-z.-]+}/APP_VERSION:-'"${VERSION}"'}/' "$COMPOSE_OPS_FILE"
 if [ -f "$ENV_FILE" ]; then
   if grep -q '^APP_VERSION=' "$ENV_FILE"; then
     rewrite 's/^APP_VERSION=.*/APP_VERSION='"${VERSION}"'/' "$ENV_FILE"
@@ -168,14 +171,16 @@ if (cd backend && uv lock >/dev/null 2>&1); then
 else
   warn "backend/uv.lock 刷新失败，请在 backend 目录执行 uv lock 后补提交"
 fi
-ok "已同步 ${PYPROJECT} / ${CONFIG_PY} / ${ENV_EXAMPLE} / ${COMPOSE_FILE} / frontend"
+ok "已同步 ${PYPROJECT} / ${CONFIG_PY} / ${ENV_EXAMPLE} / ${COMPOSE_FILE} / ${COMPOSE_OPS_FILE} / frontend"
 
 grep -q "version = \"${VERSION}\"" "$PYPROJECT" || die "pyproject 版本号同步失败"
 grep -q "\"version\": \"${VERSION}\"" "${FRONTEND_DIR}/package.json" || die "package.json 版本号同步失败"
+grep -q "APP_VERSION:-${VERSION}}" "$COMPOSE_FILE" || die "${COMPOSE_FILE} 版本号同步失败"
+grep -q "APP_VERSION:-${VERSION}}" "$COMPOSE_OPS_FILE" || die "${COMPOSE_OPS_FILE} 版本号同步失败"
 ok "版本号一致性校验通过"
 
 section "4/6 提交"
-git add "$PYPROJECT" "backend/uv.lock" "$CONFIG_PY" "$ENV_EXAMPLE" "$COMPOSE_FILE" "$CHANGELOG" \
+git add "$PYPROJECT" "backend/uv.lock" "$CONFIG_PY" "$ENV_EXAMPLE" "$COMPOSE_FILE" "$COMPOSE_OPS_FILE" "$CHANGELOG" \
   "${FRONTEND_DIR}/package.json" "${FRONTEND_DIR}/package-lock.json"
 if git diff --cached --quiet; then
   note "版本号与记录已是最新，跳过提交，直接在当前 HEAD 打标签"
