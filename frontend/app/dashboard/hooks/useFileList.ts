@@ -32,6 +32,8 @@ export function useFileList(category: CategoryId) {
   const [keyword, setKeyword] = useState("");
   const [debouncedKeyword, setDebouncedKeyword] = useState("");
   const [cursorMap, setCursorMap] = useState<Record<number, string>>({});
+  const [errorState, setErrorState] = useState<{ scope: string; message: string } | null>(null);
+  const [totalState, setTotalState] = useState<{ scope: string; value: number } | null>(null);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -48,7 +50,7 @@ export function useFileList(category: CategoryId) {
     keyword: debouncedKeyword,
   });
 
-  const { data, isLoading, error, refetch } = useQuery<FileListResult>({
+  const { data, isLoading, error } = useQuery<FileListResult>({
     queryKey,
     enabled,
     queryFn: async () => {
@@ -91,24 +93,28 @@ export function useFileList(category: CategoryId) {
     await queryClient.invalidateQueries({ queryKey: queryKeys.files.all });
   }
 
+  const errorScope = `${category}|${currentFolderId ?? ""}|${debouncedKeyword}|${page}`;
+  const totalScope = `${category}|${currentFolderId ?? ""}|${debouncedKeyword}`;
+  const manualError = errorState?.scope === errorScope ? errorState.message : "";
+  const manualTotal = totalState?.scope === totalScope ? totalState.value : null;
+
   return {
     files: data?.files ?? [],
     folders: data?.folders ?? [],
     trashedFolders: data?.trashedFolders ?? [],
-    total: data?.total ?? 0,
+    total: manualTotal ?? data?.total ?? 0,
     page,
     loading: isLoading,
-    error: error ? (error instanceof Error ? error.message : "加载失败") : "",
+    error: manualError || (error ? (error instanceof Error ? error.message : "加载失败") : ""),
     breadcrumbs: data?.breadcrumbs ?? [{ id: "root", name: "全部文件", path: "/" }],
     keyword,
     currentFolderId,
     PAGE_SIZE,
     setPage: (p: number) => { setPage(p); },
     setKeyword,
-    setError: (_msg?: string) => {},
+    setError: (msg?: string) => { setErrorState({ scope: errorScope, message: msg ?? "" }); },
     setCurrentFolderId: (id: string | null) => { setCurrentFolderId(id); setPage(1); setCursorMap({}); },
-    setTotal: () => {},
-    loadFiles: async (_active?: boolean) => { await refetch(); },
+    setTotal: (value: number) => { setTotalState({ scope: totalScope, value }); },
     invalidateFiles,
   };
 }

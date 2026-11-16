@@ -30,18 +30,21 @@ export default function TransfersView() {
   const resumeTask = useTransferStore((s) => s.resumeTask);
   const cancelTask = useTransferStore((s) => s.cancelTask);
 
-  const activeCount = tasks.filter(
-    (t) => t.status === "pending" || t.status === "transferring"
-  ).length;
+  const transferringCount = tasks.filter((t) => t.status === "transferring").length;
+  const pendingCount = tasks.filter((t) => t.status === "pending").length;
+  const activeLabel = [
+    transferringCount > 0 ? `${transferringCount} 个传输中` : null,
+    pendingCount > 0 ? `${pendingCount} 个排队` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <div className={styles.container}>
       <div className={styles.header}>
         <div className={styles.headerLeft}>
           <h3 className={styles.title}>传输列表</h3>
-          {activeCount > 0 && (
-            <span className={styles.activeBadge}>{activeCount} 个进行中</span>
-          )}
+          {activeLabel && <span className={styles.activeBadge}>{activeLabel}</span>}
         </div>
         {tasks.some((t) => t.status !== "transferring" && t.status !== "pending") && (
           <button className={styles.clearBtn} onClick={clearCompleted}>

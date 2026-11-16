@@ -157,8 +157,6 @@ export async function downloadFileWithProgress(
   document.body.removeChild(link);
 }
 
-
-
 export async function deleteFile(id: string): Promise<void> {
   return client<void>(`/api/v1/files/${id}`, { method: "DELETE" });
 }

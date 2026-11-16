@@ -257,6 +257,7 @@ class TestCreateRoom:
         with (
             patch.object(svc.settings, "LAN_TRANSFER_ENABLED", True),
             patch.object(svc.settings, "LAN_TRANSFER_MAX_ACTIVE_ROOMS", 5),
+            patch.object(svc, "get_disk_usage", return_value=(10**12, 0, 10**12)),
             pytest.raises(Conflict),
         ):
             await svc.create_room(db, owner)

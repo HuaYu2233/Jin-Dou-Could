@@ -49,7 +49,7 @@ export default function DashboardPage() {
     keyword, currentFolderId,
     PAGE_SIZE,
     setPage, setKeyword, setError, setCurrentFolderId, setTotal,
-    loadFiles, invalidateFiles,
+    invalidateFiles,
   } = useFileList(category);
 
   const {
@@ -57,6 +57,7 @@ export default function DashboardPage() {
     handleFileSelect,
     handleDrop,
     handleDownload,
+    handleBatchDownload,
     handleDelete,
     handleRestore,
     handlePurge,
@@ -70,7 +71,6 @@ export default function DashboardPage() {
     selectedIds,
     currentFolderId,
     folderDialog,
-    loadFiles,
     invalidateFiles,
     fetchMe,
     setSelectedIds,
@@ -129,7 +129,11 @@ export default function DashboardPage() {
   }
 
   const selectedCount = selectedIds.size;
-  const selectedFile = files.find((f) => selectedIds.has(f.id));
+
+  function handleSelectedDownload() {
+    if (selectedCount === 0) return;
+    handleBatchDownload(files.filter((file) => selectedIds.has(file.id)));
+  }
 
   return (
     <div className={pageStyles.layout}>
@@ -150,7 +154,7 @@ export default function DashboardPage() {
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           onUpload={() => fileInputRef.current?.click()}
-          onDownload={() => selectedFile && handleDownload(selectedFile)}
+          onDownload={handleSelectedDownload}
           onDelete={handleDelete}
           onShare={async () => {
             const results = await handleCreateShare();

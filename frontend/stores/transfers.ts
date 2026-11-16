@@ -17,17 +17,30 @@ export interface TransferTask {
   isMultipart?: boolean;
 }
 
+export interface TransferRunnerContext {
+  taskId: string;
+  signal: AbortSignal;
+  onProgress: (loaded: number, total: number) => void;
+}
+
+export type TransferRunner = (ctx: TransferRunnerContext) => Promise<void>;
+
+interface NewTaskInput {
+  filename: string;
+  type: TransferType;
+  total: number;
+  fileId?: string;
+  isMultipart?: boolean;
+}
+
 const abortControllers = new Map<string, AbortController>();
+const runners = new Map<string, TransferRunner>();
+const QUEUE_LIMITS: Partial<Record<TransferType, number>> = { upload: 3, download: 3 };
 
 interface TransferState {
   tasks: TransferTask[];
-  addTask: (task: {
-    filename: string;
-    type: TransferType;
-    total: number;
-    fileId?: string;
-    isMultipart?: boolean;
-  }) => string;
+  addTask: (task: NewTaskInput) => string;
+  enqueue: (task: NewTaskInput, runner: TransferRunner) => string;
   updateTask: (id: string, updates: Partial<TransferTask>) => void;
   removeTask: (id: string) => void;
   clearCompleted: () => void;
@@ -35,8 +48,6 @@ interface TransferState {
   pauseTask: (id: string) => void;
   resumeTask: (id: string) => void;
   cancelTask: (id: string) => void;
-  registerAbortController: (id: string, controller: AbortController) => void;
-  getAbortController: (id: string) => AbortController | undefined;
 }
 
 const MAX_COMPLETED_TASKS = 30;
@@ -44,6 +55,74 @@ let counter = 0;
 function genId() {
   counter += 1;
   return `transfer-${Date.now()}-${counter}`;
+}
+
+function findTask(id: string): TransferTask | undefined {
+  return useTransferStore.getState().tasks.find((t) => t.id === id);
+}
+
+function pumpQueue(): void {
+  const state = useTransferStore.getState();
+  const running: Partial<Record<TransferType, number>> = {};
+  for (const task of state.tasks) {
+    if (task.status === "transferring") {
+      running[task.type] = (running[task.type] ?? 0) + 1;
+    }
+  }
+  const queued = state.tasks
+    .filter((task) => task.status === "pending" && runners.has(task.id))
+    .sort((a, b) => a.createdAt - b.createdAt);
+
+  for (const task of queued) {
+    const limit = QUEUE_LIMITS[task.type] ?? 1;
+    const active = running[task.type] ?? 0;
+    if (active >= limit) continue;
+    running[task.type] = active + 1;
+    void startTask(task.id);
+  }
+}
+
+async function startTask(taskId: string): Promise<void> {
+  const runner = runners.get(taskId);
+  if (!runner) return;
+  const controller = new AbortController();
+  abortControllers.set(taskId, controller);
+  useTransferStore.getState().updateTask(taskId, {
+    status: "transferring",
+    loaded: 0,
+    progress: 0,
+    error: undefined,
+  });
+
+  try {
+    await runner({
+      taskId,
+      signal: controller.signal,
+      onProgress: (loaded, total) =>
+        useTransferStore.getState().updateTask(taskId, { loaded, total }),
+    });
+    const task = findTask(taskId);
+    if (task && task.status === "transferring") {
+      useTransferStore.getState().updateTask(
+        taskId,
+        task.total > 0
+          ? { status: "completed", loaded: task.total, progress: 100 }
+          : { status: "completed", progress: 100 }
+      );
+    }
+  } catch (err) {
+    const task = findTask(taskId);
+    const interrupted = task?.status === "paused" || task?.status === "canceled";
+    if (!interrupted) {
+      useTransferStore.getState().updateTask(taskId, {
+        status: "error",
+        error: err instanceof Error ? err.message : "传输失败",
+      });
+    }
+  } finally {
+    abortControllers.delete(taskId);
+    pumpQueue();
+  }
 }
 
 export const useTransferStore = create<TransferState>((set, get) => ({
@@ -67,6 +146,13 @@ export const useTransferStore = create<TransferState>((set, get) => ({
     return id;
   },
 
+  enqueue(task, runner) {
+    const id = get().addTask(task);
+    runners.set(id, runner);
+    pumpQueue();
+    return id;
+  },
+
   updateTask(id, updates) {
     set((state) => {
       const updated = state.tasks.map((t) =>
@@ -76,10 +162,13 @@ export const useTransferStore = create<TransferState>((set, get) => ({
               ...updates,
               progress:
                 updates.total !== undefined || updates.loaded !== undefined
-                  ? Math.round(
-                      ((updates.loaded ?? t.loaded) /
-                        (updates.total ?? (t.total || 1))) *
-                        100
+                  ? Math.min(
+                      100,
+                      Math.round(
+                        ((updates.loaded ?? t.loaded) /
+                          (updates.total ?? (t.total || 1))) *
+                          100
+                      )
                     )
                   : t.progress,
             }
@@ -102,6 +191,7 @@ export const useTransferStore = create<TransferState>((set, get) => ({
 
   removeTask(id) {
     abortControllers.delete(id);
+    runners.delete(id);
     set((state) => ({ tasks: state.tasks.filter((t) => t.id !== id) }));
   },
 
@@ -113,7 +203,10 @@ export const useTransferStore = create<TransferState>((set, get) => ({
       const remove = state.tasks.filter(
         (t) => t.status === "completed" || t.status === "error" || t.status === "canceled"
       );
-      for (const t of remove) abortControllers.delete(t.id);
+      for (const t of remove) {
+        abortControllers.delete(t.id);
+        runners.delete(t.id);
+      }
       return { tasks: keep };
     });
   },
@@ -135,6 +228,7 @@ export const useTransferStore = create<TransferState>((set, get) => ({
         t.id === id && t.status === "transferring" ? { ...t, status: "paused" } : t
       ),
     }));
+    pumpQueue();
   },
 
   resumeTask(id) {
@@ -143,6 +237,7 @@ export const useTransferStore = create<TransferState>((set, get) => ({
         t.id === id && t.status === "paused" ? { ...t, status: "pending" } : t
       ),
     }));
+    pumpQueue();
   },
 
   cancelTask(id) {
@@ -158,13 +253,6 @@ export const useTransferStore = create<TransferState>((set, get) => ({
           : t
       ),
     }));
-  },
-
-  registerAbortController(id, controller) {
-    abortControllers.set(id, controller);
-  },
-
-  getAbortController(id) {
-    return abortControllers.get(id);
+    pumpQueue();
   },
 }));

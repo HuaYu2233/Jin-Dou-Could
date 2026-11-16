@@ -111,7 +111,7 @@ export default function Toolbar({
             <button
               className={styles.secondaryBtn}
               onClick={onDownload}
-              disabled={selectedCount !== 1}
+              disabled={selectedCount === 0}
               title={t("toolbar.download")}
               aria-label={t("toolbar.download")}
             >
