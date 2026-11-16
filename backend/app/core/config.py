@@ -61,6 +61,15 @@ class Settings(BaseSettings):
     BACKUP_DIR: str = "/backups"
     BACKUP_TRIGGER_CMD: str = ""
 
+    # 可视化部署
+    DEPLOY_ENABLED: bool = False
+    DEPLOY_QUEUE_DIR: str = "/deploy"
+    DEPLOY_TASK_TIMEOUT: int = 1800
+    DEPLOY_HEARTBEAT_TIMEOUT: int = 30
+    DEPLOY_MAX_LOG_LINES: int = 500
+    DEPLOY_ALLOWED_ACTIONS: str = "check,deploy,restart,rollback"
+    DEPLOY_REQUIRE_BACKUP: bool = True
+
     # 找回密码
     RESET_PASSWORD_SMTP_HOST: str = ""
     RESET_PASSWORD_SMTP_PORT: int = 465

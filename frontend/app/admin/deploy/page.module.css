@@ -1,0 +1,264 @@
+.page {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  background: var(--qk-bg);
+}
+
+.loading,
+.error,
+.notice {
+  padding: 24px;
+  font-size: 14px;
+  color: var(--qk-text-4);
+}
+
+.error {
+  color: var(--qk-danger);
+}
+
+.notice {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--qk-surface);
+  border: 1px solid var(--qk-border);
+  border-radius: var(--qk-radius-lg);
+  padding: 20px;
+  box-shadow: var(--qk-shadow-sm);
+}
+
+.noticeTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--qk-text);
+}
+
+.noticeDesc {
+  font-size: 13px;
+  color: var(--qk-text-3);
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.section {
+  background: var(--qk-surface);
+  border: 1px solid var(--qk-border);
+  border-radius: var(--qk-radius-lg);
+  padding: 20px;
+  box-shadow: var(--qk-shadow-sm);
+  transition: box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.section:hover {
+  border-color: var(--qk-border-strong);
+  box-shadow: var(--qk-shadow);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--qk-text);
+}
+
+.sectionDesc {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--qk-text-3);
+}
+
+.link {
+  font-size: 14px;
+  color: var(--qk-primary);
+}
+
+.link:hover {
+  color: var(--qk-primary-hover);
+}
+
+.kvList {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 10px 20px;
+  margin-top: 16px;
+  font-size: 13px;
+}
+
+.kvKey {
+  color: var(--qk-text-3);
+}
+
+.kvValue {
+  color: var(--qk-text);
+  word-break: break-all;
+}
+
+.badgeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.badge {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: var(--qk-surface-2);
+  color: var(--qk-text-3);
+  border: 1px solid var(--qk-border);
+}
+
+.badgeOk {
+  color: var(--qk-success);
+  border-color: var(--qk-success);
+  background: transparent;
+}
+
+.badgeWarn {
+  color: var(--qk-danger);
+  border-color: var(--qk-danger);
+  background: transparent;
+}
+
+.actionBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.actionBtn {
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid var(--qk-border-strong);
+  border-radius: 8px;
+  background: var(--qk-surface);
+  color: var(--qk-text-2);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+
+.actionBtn:not(:disabled):hover {
+  background: var(--qk-surface-2);
+  color: var(--qk-text);
+  border-color: var(--qk-primary);
+}
+
+.actionBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.actionPrimary {
+  border: none;
+  background: var(--qk-primary-gradient);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(30, 111, 255, 0.24);
+}
+
+.actionPrimary:not(:disabled):hover {
+  filter: brightness(1.05);
+  color: #fff;
+}
+
+.actionSelect {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--qk-border-strong);
+  border-radius: 8px;
+  background: var(--qk-surface);
+  color: var(--qk-text);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.actionHint {
+  font-size: 13px;
+  color: var(--qk-text-3);
+}
+
+.actionLink {
+  margin-left: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 13px;
+  color: var(--qk-primary);
+  cursor: pointer;
+}
+
+.actionLink:hover {
+  color: var(--qk-primary-hover);
+}
+
+.taskMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--qk-text-3);
+}
+
+.tableScroll {
+  overflow-x: auto;
+  margin-top: 16px;
+}
+
+.table {
+  width: 100%;
+  font-size: 13px;
+  border-collapse: collapse;
+}
+
+.th {
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 500;
+  color: var(--qk-text-3);
+  background: var(--qk-surface-2);
+  white-space: nowrap;
+}
+
+.td {
+  padding: 10px 12px;
+  color: var(--qk-text);
+  border-top: 1px solid var(--qk-border);
+  white-space: nowrap;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--qk-text-3);
+}
+
+.empty {
+  padding: 20px 0 0;
+  font-size: 13px;
+  color: var(--qk-text-4);
+}
+
+@media (max-width: 768px) {
+  .page {
+    padding: 12px;
+    gap: 16px;
+  }
+  .cardGrid {
+    grid-template-columns: 1fr;
+  }
+}

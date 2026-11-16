@@ -202,7 +202,34 @@ Webhook 类型：`generic` / `dingtalk` / `feishu` / `wechat`
 
 > `LAN_TRANSFER_DIRECT_MINIO=true` 需要把 MinIO 端口暴露到局域网，默认关闭时下载走后端流式代理。`LAN_TRANSFER_DISK_PATH` 指向 `minio_data` 卷挂载点，容器内以只读方式挂载。
 
-## 15. 生产环境配置检查清单
+## 15. 可视化部署
+
+| 配置项                    | 说明                                   | 默认值              |
+| ------------------------- | -------------------------------------- | ------------------- |
+| `DEPLOY_ENABLED`          | 部署控制台总开关                       | false               |
+| `DEPLOY_QUEUE_DIR`        | 共享卷挂载点（queue/running/results）  | /deploy             |
+| `DEPLOY_TASK_TIMEOUT`     | 单任务硬超时（秒）                     | 1800                |
+| `DEPLOY_HEARTBEAT_TIMEOUT`| 执行器离线阈值（秒）                   | 30                  |
+| `DEPLOY_MAX_LOG_LINES`    | 任务日志返回上限（行）                 | 500                 |
+| `DEPLOY_ALLOWED_ACTIONS`  | 允许的动作（逗号分隔）                 | check,deploy,restart,rollback |
+| `DEPLOY_REQUIRE_BACKUP`   | 部署前强制备份                         | true                |
+| `DEPLOY_REPO_PATH`        | 宿主机仓库绝对路径（ops compose 同路径挂载）| /opt/jindou-cloud |
+| `DEPLOY_POLL_INTERVAL`    | runner 轮询队列间隔（秒）              | 2                   |
+| `DEPLOY_SNAPSHOT_INTERVAL`| runner 容器快照刷新间隔（秒）          | 15                  |
+| `DEPLOY_RETENTION_DAYS`   | 任务文件保留天数                       | 7                   |
+| `DEPLOY_HEALTH_TIMEOUT`   | 健康检查等待上限（秒）                 | 180                 |
+
+> `DEPLOY_ENABLED=false` 时全部部署接口返回 403，前端展示「部署控制台未启用」占位。`DEPLOY_REPO_PATH` / `DEPLOY_POLL_INTERVAL` / `DEPLOY_SNAPSHOT_INTERVAL` / `DEPLOY_RETENTION_DAYS` / `DEPLOY_HEALTH_TIMEOUT` 由 ops compose 与 runner 容器读取，不属于 `Settings` 字段，因此不写入 backend / celery-worker 的 `environment`。
+
+启动执行器（独立 compose 文件，不并入主文件）：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.ops.yml up -d deploy-runner
+```
+
+> `DEPLOY_REPO_PATH` 必须写成宿主机仓库的绝对路径，并在 runner 内以**同路径**挂载。若改成 `- .:/repo`，runner 执行 `docker compose up -d` 时 compose 会把 `./backups` 等相对路径解析到 `/repo/backups`（不存在），容器直接起不来。
+
+## 16. 生产环境配置检查清单
 
 - [ ] `SECRET_KEY` 设为 32+ 字符强随机值
 - [ ] `POSTGRES_PASSWORD` 设为强密码
@@ -222,6 +249,6 @@ Webhook 类型：`generic` / `dingtalk` / `feishu` / `wechat`
 - [ ] `BACKUP_ENCRYPT_KEY` 设为加密密钥
 - [ ] 连接池配置合理：WORKERS × (POOL_SIZE + MAX_OVERFLOW) < DB_MAX_CONNECTIONS
 
-## 16. 配置透传校验
+## 17. 配置透传校验
 
 `.env` 的值只有在 `docker-compose.yml` 的 `environment` 中以 `${VAR}` 引用才会进入容器。新增或修改配置后建议做一次双向校验，命令与已知例外见 [pitfalls.md 第 19 条](./pitfalls.md)。

@@ -152,6 +152,13 @@ services:
       - RESET_PASSWORD_CODE_LENGTH=${RESET_PASSWORD_CODE_LENGTH:-6}
       - BACKUP_DIR=/backups
       - BACKUP_TRIGGER_CMD=${BACKUP_TRIGGER_CMD:-}
+      - DEPLOY_ENABLED=${DEPLOY_ENABLED:-false}
+      - DEPLOY_QUEUE_DIR=${DEPLOY_QUEUE_DIR:-/deploy}
+      - DEPLOY_TASK_TIMEOUT=${DEPLOY_TASK_TIMEOUT:-1800}
+      - DEPLOY_HEARTBEAT_TIMEOUT=${DEPLOY_HEARTBEAT_TIMEOUT:-30}
+      - DEPLOY_MAX_LOG_LINES=${DEPLOY_MAX_LOG_LINES:-500}
+      - DEPLOY_ALLOWED_ACTIONS=${DEPLOY_ALLOWED_ACTIONS:-check,deploy,restart,rollback}
+      - DEPLOY_REQUIRE_BACKUP=${DEPLOY_REQUIRE_BACKUP:-true}
       - CELERY_BROKER_URL=${CELERY_BROKER_URL:-}
       - CELERY_RESULT_BACKEND_URL=${CELERY_RESULT_BACKEND_URL:-}
       - CELERY_TASK_ALWAYS_EAGER=${CELERY_TASK_ALWAYS_EAGER:-false}
@@ -177,6 +184,7 @@ services:
       - JWT_PUBLIC_KEY_PATH=${JWT_PUBLIC_KEY_PATH:-}
     volumes:
       - ./backups:/backups
+      - deploy_queue:${DEPLOY_QUEUE_DIR:-/deploy}
       - minio_data:/minio-data:ro
       - jwt_keys:/run/secrets:ro
     ports:
@@ -378,5 +386,6 @@ volumes:
   prometheus_data:
   grafana_data:
   jwt_keys:
+  deploy_queue:
   frontend_node_modules:
   frontend_next_cache:

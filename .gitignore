@@ -61,7 +61,6 @@ next-env.d.ts
 # ===== 项目文档（可选忽略） =====
 开发文档.md
 CloudDrive_开发计划.md
-doc/pitfalls.md
 
 # ===== 本地测试脚本 =====
 test/
@@ -69,6 +68,7 @@ test/
 # ===== 运行时数据目录 =====
 backups/
 backend/logs/
+.e2e-sandbox/
 
 # ===== 日志归档（*.log 已覆盖，补充压缩归档）=====
 *.log.zip

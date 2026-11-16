@@ -4,8 +4,8 @@
 
 | 模块 | 框架   | 测试数量 | 目录            |
 | ---- | ------ | -------- | --------------- |
-| 后端 | pytest | 246      | backend/tests/  |
-| 前端 | vitest | 46       | frontend/tests/ |
+| 后端 | pytest | 403      | backend/tests/  |
+| 前端 | vitest | 83       | frontend/tests/ |
 
 ## 2. 后端测试
 
@@ -156,10 +156,10 @@ npx vitest run tests/stores/i18n.test.ts
 | 阶段               | 触发条件 | 内容                          |
 | ------------------ | -------- | ----------------------------- |
 | Backend Lint       | push/PR  | `ruff check .` + `ruff format --check .` |
-| Backend Test       | push/PR  | `pytest` 246 个测试 + 覆盖率  |
+| Backend Test       | push/PR  | `pytest` 403 个测试 + 覆盖率  |
 | Frontend Lint      | push/PR  | next lint (ESLint)            |
 | Frontend TypeCheck | push/PR  | tsc --noEmit                  |
-| Frontend Test      | push/PR  | vitest run 46 个测试          |
+| Frontend Test      | push/PR  | vitest run 83 个测试          |
 
 触发条件：push 到 `main` / `dev`，或向 `main` 发起 PR。
 

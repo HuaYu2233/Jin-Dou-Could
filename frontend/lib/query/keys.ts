@@ -14,6 +14,14 @@ export const queryKeys = {
     stats: () => [...queryKeys.admin.all, "stats"] as const,
     users: (page: number) => [...queryKeys.admin.all, "users", page] as const,
     backups: () => [...queryKeys.admin.all, "backups"] as const,
+    deploy: {
+      all: () => [...queryKeys.admin.all, "deploy"] as const,
+      status: () => [...queryKeys.admin.deploy.all(), "status"] as const,
+      containers: () => [...queryKeys.admin.deploy.all(), "containers"] as const,
+      versions: () => [...queryKeys.admin.deploy.all(), "versions"] as const,
+      history: (limit: number) => [...queryKeys.admin.deploy.all(), "history", limit] as const,
+      task: (taskId: string) => [...queryKeys.admin.deploy.all(), "task", taskId] as const,
+    },
   },
   auth: {
     all: ["auth"] as const,

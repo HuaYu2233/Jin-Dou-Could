@@ -223,3 +223,19 @@ HTTPS_REDIRECT=true
 ENVIRONMENT=production
 TRUSTED_PROXIES=<反向代理 IP，部署在 Nginx/Cloudflare 之后必填>
 ```
+
+## 10. 安全加固清单
+
+| 模块      | 措施                                                                                                  |
+| --------- | ----------------------------------------------------------------------------------------------------- |
+| 基础设施  | Docker socket 移除、端口绑定 127.0.0.1、Redis 密码 + 禁用 FLUSHALL                                    |
+| 认证      | JWT 增加 `type` 字段，防止 access/refresh token 混用                                                  |
+| JWT RS256 | 支持 RS256 非对称签名，私钥签名/公钥验证，密钥分离部署，防止对称密钥泄露导致 Token 伪造               |
+| 启动检查  | 生产环境自动校验 SECRET_KEY 弱值/占位符、HS256 警告、HTTPS/安全头/限流配置，输出警告而非强制终止      |
+| 缓存      | Redis 用户缓存脱敏（移除密码、密保问题/答案）                                                         |
+| 上传      | python-magic 真实 MIME 检测 + 白名单 + 文件名净化                                                     |
+| 限流      | 全局 IP 滑动窗口限流 + 登录/注册路径严格限流（可配置次数/分钟）；仅信任代理 IP 读取 X-Forwarded-For   |
+| 响应头    | CSP（connect-src 动态读取 MINIO_PUBLIC_ENDPOINT）/ HSTS / X-Frame-Options / nosniff / Referrer-Policy |
+| CSRF      | 纯 ASGI 中间件，避免 BaseHTTPMiddleware 开销；scope 级 cookie/header 解析，不构造 Request             |
+| WebSocket | 首条消息认证（非 URL 参数传 Token），5 秒认证超时，4KB 消息长度限制                                   |
+| 告警      | 降级发送使用 `asyncio.to_thread` 避免阻塞事件循环；`create_task` 异常回调捕获                         |

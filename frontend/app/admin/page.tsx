@@ -40,6 +40,7 @@ export default function AdminDashboardPage() {
           <a href="/admin/users" className={styles.link}>{t("admin.overview.manageQuotaLink")}</a>
         </div>
         <StorageBar used={stats.total_used} total={stats.total_quota} />
+        <p className={styles.sectionDesc}>{t("admin.overview.storageUsageHint")}</p>
       </div>
 
       <div className={styles.section}>
@@ -47,8 +48,18 @@ export default function AdminDashboardPage() {
           <h2 className={styles.sectionTitle}>{t("admin.overview.lanTransfer")}</h2>
         </div>
         <div className={styles.cardGrid}>
-          <StatCard label={t("admin.overview.diskTotal")} value={formatSize(stats.disk_total)} color="blue" />
-          <StatCard label={t("admin.overview.diskFree")} value={formatSize(stats.disk_free)} color="green" />
+          <StatCard
+            label={t("admin.overview.diskTotal")}
+            value={formatSize(stats.disk_total)}
+            hint={t("admin.overview.diskTotalHint")}
+            color="blue"
+          />
+          <StatCard
+            label={t("admin.overview.diskFree")}
+            value={formatSize(stats.disk_free)}
+            hint={t("admin.overview.diskFreeHint")}
+            color="green"
+          />
           <StatCard
             label={t("admin.overview.lanTransfer")}
             value={stats.lan_transfer_available ? t("admin.users.status.active") : t("admin.users.status.inactive")}

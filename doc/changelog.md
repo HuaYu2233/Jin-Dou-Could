@@ -164,19 +164,37 @@
 
 ## 5. 性能优化
 
-| 优化项         | 措施                                           |
-| -------------- | ---------------------------------------------- |
-| 流式上传       | 直传 MinIO，内存 O(1)                          |
-| 虚拟滚动       | react-virtuoso，仅渲染可视区域 DOM             |
-| 请求缓存       | TanStack Query，staleTime 30s，自动去重/缓存   |
-| 游标分页       | 替代 offset 分页，避免深分页性能问题           |
-| 三元组搜索     | pg_trgm + GIN 索引，替代 ILIKE                 |
-| S3 批量删除    | delete_objects 分批 1000 key，失败降级逐个重试 |
-| GZip 压缩      | ≥500B 自动压缩                                 |
-| 多 Worker      | Gunicorn 多 worker + Redis Pub/Sub WS 广播     |
-| 连接池         | 可配置 pool_size/max_overflow/pool_timeout     |
-| 缩略图渐进加载 | shimmer → blur → sharp                         |
-| Docker 多阶段  | backend 315MB / frontend 216MB                 |
+| 优化项         | 措施                                                                                                                              |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| 流式上传       | 直传 MinIO，内存 O(1)（非 O(N×文件大小)）                                                                                          |
+| 分片上传       | ≥16MB 自动分片，MinIO Multipart API 三阶段（init→part→complete），Redis Hash 存会话状态（TTL 24h），支持断点续传/暂停/恢复/取消     |
+| MinIO 异步     | `run_in_threadpool` 包装，不阻塞事件循环                                                                                           |
+| S3 批量删除    | `delete_objects` 分批 1000 key，失败降级逐个重试                                                                                   |
+| S3 初始化      | `asyncio.Lock` 保护客户端初始化与关闭，防止并发重复创建                                                                            |
+| 虚拟滚动       | react-virtuoso（TableVirtuoso + VirtuosoGrid），仅渲染可视区域 DOM                                                                 |
+| 请求缓存       | TanStack Query，staleTime 30s，自动去重/缓存/stale-while-revalidate，mutation 后精准失效                                           |
+| 游标分页       | 移除 OFFSET 回退，skip>0 用子查询取分界点走 keyset 分页；前端 `cursorMap` 维护游标状态                                             |
+| 三元组搜索     | pg_trgm `similarity()` + GIN 索引，替代低效 `ilike`                                                                                |
+| 分页一致性     | `share_service.list_shares` 改两次查询（count + data），避免窗口函数跨分页 total 不一致                                            |
+| 文件夹查询     | `list_folder_contents` 文件查询与 count 合并（3 次→2 次）；`delete_folder`/`restore_folder` 用 SQL SUM 替代 Python 遍历求和         |
+| 缓存失效       | Redis Hash 分组存储替代独立 key，`HKEYS`+`HDEL` 按用户精确删除，避免 `SCAN` 全库遍历；TTL 30s/15s 提升至 120s/60s                   |
+| GZip 压缩      | 中间件，≥500B 自动压缩                                                                                                            |
+| 多 Worker      | Gunicorn 多 worker + Redis Pub/Sub WS 广播                                                                                         |
+| WS 按需订阅    | Redis Pub/Sub 从 `psubscribe("ws:user:*")` 通配符改为按需 `subscribe`/`unsubscribe`，避免消息风暴                                  |
+| 连接池         | 可配置 `pool_size`/`max_overflow`/`pool_timeout`/`pool_recycle`                                                                    |
+| PgBouncer      | 数据库连接池代理，所有服务通过 pgbouncer:6432 连接，实际 DB 连接数从 60+ 降至 20                                                  |
+| 缩略图         | 上传后异步生成 256×256 缩略图，前端渐进加载（shimmer → blur → sharp），列表优先请求缩略图                                          |
+| MIME 异步      | `magic.from_buffer` 改为 `asyncio.to_thread` 避免阻塞事件循环                                                                      |
+| 图片优化       | Next.js `remotePatterns` 配置 MinIO 图片优化，WebP 转码 + 按设备尺寸缩放 + 缓存 TTL 7200s                                          |
+| 请求日志       | 纯 ASGI 中间件替代 BaseHTTPMiddleware，避免消耗 request body 和流式响应                                                            |
+| 请求追踪       | `ContextVar` 注入 `request_id`+`user_id` 到所有日志；上游 `X-Request-ID` → 下游 `X-Correlation-ID` 跨服务追踪                      |
+| Nginx 缓存     | MinIO 缩略图（120min）+ 文件下载（60min）代理缓存层；API 60r/m + 下载 30r/m 限流                                                   |
+| 可观测性       | Prometheus 指标（`PROMETHEUS_ENABLED=true`），暴露 `/metrics`，采集请求量/延迟/错误率/在途请求                                     |
+| 监控仪表盘     | Grafana + Prometheus + Redis/PostgreSQL/MinIO Exporter，预配置仪表盘 + 7 条告警规则                                                |
+| Docker         | 多阶段构建：backend 315MB / frontend 216MB，生产无 `--reload`，非 root 运行，HEALTHCHECK                                           |
+| Celery 镜像    | 独立 `Dockerfile.celery` 轻量镜像，不含 Gunicorn/Uvicorn/curl，减小体积和攻击面                                                     |
+| 生命周期管理   | FastAPI lifespan 统一管理 S3 客户端、Redis 连接、数据库引擎、WS Pub/Sub 的初始化与优雅关闭                                          |
+| 传输管理       | 已完成/失败任务自动清理，最多保留 30 条历史记录                                                                                    |
 
 ## 6. 版本记录
 

@@ -1,0 +1,38 @@
+.scroll {
+  overflow-x: auto;
+  margin-top: 16px;
+}
+
+.table {
+  width: 100%;
+  font-size: 13px;
+  border-collapse: collapse;
+}
+
+.th {
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 500;
+  color: var(--qk-text-3);
+  background: var(--qk-surface-2);
+  white-space: nowrap;
+}
+
+.td {
+  padding: 10px 12px;
+  color: var(--qk-text);
+  border-top: 1px solid var(--qk-border);
+  white-space: nowrap;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--qk-text-3);
+}
+
+.empty {
+  padding: 20px 0 0;
+  font-size: 13px;
+  color: var(--qk-text-4);
+}

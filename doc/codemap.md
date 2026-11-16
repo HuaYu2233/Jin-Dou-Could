@@ -2,18 +2,18 @@
 
 由 `make map` 生成，请勿手工编辑。修改 `backend/app` 后重新生成。
 
-覆盖 `backend/app` 下 68 个 Python 文件。`L<数字>` 为定义起始行号，可据此定向读取行区间。
+覆盖 `backend/app` 下 72 个 Python 文件。`L<数字>` 为定义起始行号，可据此定向读取行区间。
 
 ## 目录
 
 - (root): `__init__`、`main`
-- api: `admin`、`api`、`auth`、`backups`、`deps`、`files`、`folders`、`health`、`lan_transfer`、`shares`、`tasks`、`users`、`ws`
+- api: `admin`、`api`、`auth`、`backups`、`deploy`、`deps`、`files`、`folders`、`health`、`lan_transfer`、`shares`、`tasks`、`users`、`ws`
 - core: `alerting`、`celery_app`、`client_ip`、`config`、`exceptions`、`logging`、`redis`、`security`、`smtp`、`storage`、`webhook`、`ws_manager`
 - db: `base`、`base_class`
 - middleware: `__init__`、`csrf`、`rate_limit`、`request_logging`、`security_headers`
 - models: `__init__`、`file`、`folder`、`share`、`transfer_room`、`user`
-- schemas: `__init__`、`backup`、`file`、`folder`、`reset_password`、`share`、`token`、`transfer_room`、`user`
-- services: `admin_service`、`auth_service`、`backup_service`、`email_service`、`file_multipart`、`file_service`、`file_validation`、`folder_service`、`health_service`、`lan_transfer_service`、`reset_password_service`、`share_service`、`storage_accounting`、`user_service`
+- schemas: `__init__`、`backup`、`deploy`、`file`、`folder`、`reset_password`、`share`、`token`、`transfer_room`、`user`
+- services: `admin_service`、`auth_service`、`backup_service`、`deploy_protocol`、`deploy_service`、`email_service`、`file_multipart`、`file_service`、`file_validation`、`folder_service`、`health_service`、`lan_transfer_service`、`reset_password_service`、`share_service`、`storage_accounting`、`user_service`
 - tasks: `__init__`、`alert_tasks`、`backup_tasks`、`email_tasks`、`thumbnail_tasks`
 
 ## 符号
@@ -27,7 +27,7 @@
 - `async def get_full_user(user, db)` L124
 - `async def get_current_admin(current_user)` L137
 - `class RoomContext` L146
-- `async def get_room_context(request, db)` L152
+- `async def get_room_context(request, db)` L154
 
 ### `backend/app/api/v1/endpoints/admin.py`
 
@@ -54,6 +54,16 @@
 - `async def trigger_backup(_)` L18
 - `async def download_backup(timestamp, file, _)` L24
 - `async def delete_backup(timestamp, _)` L40
+
+### `backend/app/api/v1/endpoints/deploy.py`
+
+- `async def get_status(_)` L22
+- `async def get_containers(_)` L27
+- `async def get_versions(_)` L32
+- `async def get_history(limit, _)` L37
+- `async def post_confirm(payload, admin)` L45
+- `async def post_action(payload, admin)` L57
+- `async def get_task(task_id, _)` L71
 
 ### `backend/app/api/v1/endpoints/files.py`
 
@@ -93,21 +103,22 @@
 
 ### `backend/app/api/v1/endpoints/lan_transfer.py`
 
-- `def _room_payload(room, used_size, file_count, join_url)` L37
-- `def _file_item(record, uploader)` L53
-- `def _upload_size(file)` L65
-- `async def create_room(request, body, db, current_user)` L75
-- `async def get_room_detail(room_id, request, db, current_user)` L97
-- `async def close_room(room_id, db, current_user)` L115
-- `async def join_room(request, code, body, db)` L127
-- `async def list_room_files(ctx, db)` L155
-- `async def upload_room_file(file, ctx, db)` L172
-- `async def init_room_multipart(body, ctx, db)` L192
-- `async def upload_room_multipart_part(request, upload_id, part_number, ctx)` L210
-- `async def complete_room_multipart(body, ctx, db)` L223
-- `async def abort_room_multipart(upload_id, storage_key, ctx)` L243
-- `async def download_room_file(request, file_id, ctx, db)` L254
-- `async def delete_room_file(file_id, ctx, db)` L296
+- `def _room_payload(room, used_size, file_count, join_url)` L40
+- `def _file_item(record, uploader)` L56
+- `def _upload_size(file)` L68
+- `async def create_room(request, body, db, current_user)` L78
+- `async def get_room_detail(room_id, request, db, current_user)` L100
+- `async def close_room(room_id, db, current_user)` L118
+- `async def send_from_drive_files(room_id, body, db, current_user)` L130
+- `async def join_room(request, code, body, db)` L148
+- `async def list_room_files(ctx, db)` L176
+- `async def upload_room_file(file, ctx, db)` L193
+- `async def init_room_multipart(body, ctx, db)` L213
+- `async def upload_room_multipart_part(request, upload_id, part_number, ctx)` L232
+- `async def complete_room_multipart(body, ctx, db)` L245
+- `async def abort_room_multipart(upload_id, storage_key, ctx)` L265
+- `async def download_room_file(request, file_id, ctx, db)` L276
+- `async def delete_room_file(file_id, ctx, db)` L318
 
 ### `backend/app/api/v1/endpoints/shares.py`
 
@@ -167,8 +178,8 @@
 ### `backend/app/core/config.py`
 
 - `class Settings`(BaseSettings) L7
-  - `def _validate_secret_key(v)` L128
-- `def get_settings()` L153
+  - `def _validate_secret_key(v)` L136
+- `def get_settings()` L161
 
 ### `backend/app/core/exceptions.py`
 
@@ -187,7 +198,14 @@
 - `class Unauthorized`(AppError) L77
 - `class RateLimited`(AppError) L83
 - `class ServiceUnavailable`(AppError) L89
-- `def register_exception_handlers(app)` L95
+- `class DeployDisabled`(AppError) L95
+- `class DeployInvalidAction`(AppError) L101
+- `class DeployConfirmRequired`(AppError) L107
+- `class DeployTaskNotFound`(AppError) L113
+- `class DeployBusy`(AppError) L119
+  - `def __init__(running_task_id, message)` L124
+  - `def to_payload()` L128
+- `def register_exception_handlers(app)` L134
 
 ### `backend/app/core/logging.py`
 
@@ -344,6 +362,20 @@
 - `class BackupInfo`(BaseModel) L29
 - `class BackupTriggerResponse`(BaseModel) L38
 
+### `backend/app/schemas/deploy.py`
+
+- `class DeployLastResult`(BaseModel) L4
+- `class DeployStatus`(BaseModel) L11
+- `class DeployContainerItem`(BaseModel) L19
+- `class DeployContainers`(BaseModel) L30
+- `class DeployVersions`(BaseModel) L39
+- `class DeployActionRequest`(BaseModel) L47
+- `class DeployActionResponse`(BaseModel) L54
+- `class DeployConfirmRequest`(BaseModel) L59
+- `class DeployConfirmResponse`(BaseModel) L64
+- `class DeployTaskDetail`(BaseModel) L69
+- `class DeployHistoryItem`(BaseModel) L84
+
 ### `backend/app/schemas/file.py`
 
 - `class FileResponse`(BaseModel) L7
@@ -396,10 +428,12 @@
 - `class RoomJoinResponse`(BaseModel) L31
 - `class RoomFileItem`(BaseModel) L43
 - `class RoomFileListResponse`(BaseModel) L56
-- `class RoomMultipartInitRequest`(BaseModel) L63
-- `class RoomMultipartInitResponse`(BaseModel) L70
-- `class RoomMultipartPartResponse`(BaseModel) L77
-- `class RoomMultipartCompleteRequest`(BaseModel) L82
+- `class RoomAttachDriveFilesRequest`(BaseModel) L63
+- `class RoomAttachDriveFilesResponse`(BaseModel) L67
+- `class RoomMultipartInitRequest`(BaseModel) L73
+- `class RoomMultipartInitResponse`(BaseModel) L80
+- `class RoomMultipartPartResponse`(BaseModel) L87
+- `class RoomMultipartCompleteRequest`(BaseModel) L92
 
 ### `backend/app/schemas/user.py`
 
@@ -447,6 +481,63 @@
 - `async def trigger_backup()` L102
 - `def delete_backup(timestamp)` L109
 
+### `backend/app/services/deploy_protocol.py`
+
+- `def root_dir()` L16
+- `def ensure_dirs()` L20
+- `def validate_task_id(task_id)` L26
+- `def _safe_path(path)` L32
+- `def task_path(kind, task_id)` L40
+- `def log_path(task_id)` L47
+- `def read_json(path)` L52
+- `def write_json_atomic(path, payload)` L61
+- `def enqueue_task(task)` L71
+- `def next_queue_task()` L78
+- `def claim_task(task_id)` L92
+- `def update_running(task_id, patch)` L106
+- `def finish_task(task_id, result)` L117
+- `def task_state(task_id)` L130
+- `def locate_task(task_id)` L141
+- `def _list_kind(kind)` L150
+- `def list_queue()` L159
+- `def list_running()` L163
+- `def _parse_lines(raw_lines)` L167
+- `def read_log_events(task_id, offset)` L181
+- `def read_log_tail(task_id, limit)` L200
+- `def container_snapshot()` L215
+- `def meta_snapshot()` L219
+- `def heartbeat_age_seconds()` L223
+- `def runner_online()` L232
+- `def latest_result()` L239
+- `def recent_results(limit)` L244
+- `def task_result(task_id)` L258
+- `def task_payload(task_id, kind)` L266
+- `def task_detail(task_id, max_log_lines)` L274
+- `def is_stalled(task_id, timeout_seconds)` L315
+
+### `backend/app/services/deploy_service.py`
+
+- `def allowed_actions()` L34
+- `def ensure_enabled()` L38
+- `def _running_task_ids()` L43
+- `def _latest_result()` L52
+- `def get_status()` L64
+- `def get_containers()` L76
+- `def get_versions()` L101
+- `def get_history(limit)` L116
+- `def _now_iso()` L137
+- `def log_action()` L141
+- `def _validate_action(action)` L158
+- `def _validate_params(action, params)` L165
+- `def _validate_target(action, target)` L179
+- `def _confirm_key(token)` L188
+- `async def issue_confirm_token()` L192
+- `async def _consume_confirm_token()` L206
+- `async def _current_lock_owner()` L223
+- `async def _find_idempotent_task(action, target)` L228
+- `async def submit_action()` L244
+- `def get_task(task_id)` L321
+
 ### `backend/app/services/email_service.py`
 
 - `def send_verification_code_async(to_email, code)` L1
@@ -470,13 +561,13 @@
 - `async def move_files(db, owner_id, file_ids, target_folder_id)` L233
 - `async def list_trash_files(db, owner_id, skip, limit, cursor)` L253
 - `async def soft_delete_file(db, file_id, owner_id)` L275
-- `async def restore_file(db, file_id, owner_id)` L286
-- `async def purge_file(db, file_id, owner_id)` L304
-- `async def recalculate_used_storage(db, owner_id)` L324
-- `async def prepare_upload(user, file_size)` L328
-- `async def get_preview_url(file)` L334
-- `async def get_thumbnail_url(thumbnail_key)` L340
-- `async def get_download_url(file)` L346
+- `async def restore_file(db, file_id, owner_id)` L287
+- `async def purge_file(db, file_id, owner_id)` L305
+- `async def recalculate_used_storage(db, owner_id)` L326
+- `async def prepare_upload(user, file_size)` L330
+- `async def get_preview_url(file)` L336
+- `async def get_thumbnail_url(thumbnail_key)` L342
+- `async def get_download_url(file)` L348
 
 ### `backend/app/services/file_validation.py`
 
@@ -511,45 +602,52 @@
 
 ### `backend/app/services/lan_transfer_service.py`
 
-- `def get_disk_usage()` L55
-- `def is_feature_available()` L65
-- `def ensure_feature_available()` L71
-- `def _ensure_disk_for(size)` L78
-- `def resolve_limits(user)` L84
-- `def _reserved_key(room_id)` L95
-- `def _used_key(room_id)` L99
-- `def _files_key(room_id)` L103
-- `async def _invalidate_room_caches(room_id)` L107
-- `async def get_room_used(db, room_id)` L112
-- `async def get_room_file_count(db, room_id)` L125
-- `async def reserve_capacity(room, used_size, size)` L136
-- `async def release_capacity(room_id, size)` L145
-- `async def check_room_rate_limit(room_id, jti, limit)` L155
-- `async def _generate_code(db)` L171
-- `def _now()` L180
-- `def _as_aware(value)` L184
-- `def _is_expired(room)` L190
-- `async def create_room(db, owner, title, password, ttl_hours)` L194
-- `async def get_room(db, room_id)` L221
-- `async def get_owned_room(db, room_id, owner_id)` L232
-- `async def _record_join_failure(code, client_ip)` L239
-- `def _same_subnet_hint(client_ip)` L252
-- `async def join_room(db, code, password, client_ip)` L269
-- `async def list_room_files(db, room_id)` L307
-- `async def get_room_file(db, room_id, file_id)` L317
-- `def _validate_mime(declared, detected)` L326
-- `async def _check_size_and_count(db, room, size)` L333
-- `async def _reserve_room_capacity(db, room, size)` L343
-- `def _prepare_filename_and_mime(filename, mime_type)` L347
-- `async def add_room_file(db, room, uploader_id, filename, fileobj, mime_type, size)` L356
-- `async def init_room_multipart(db, room, filename, mime_type, total_size, total_parts)` L413
-- `async def upload_room_part(room, upload_id, part_number, data)` L461
-- `async def complete_room_multipart(db, room, upload_id, storage_key, filename, mime_type, total_size, parts)` L501
-- `async def abort_room_multipart(room, upload_id, storage_key)` L575
-- `async def delete_room_file(db, room, file_id)` L595
-- `async def close_room(db, room)` L604
-- `def build_join_url(code, origin, referer)` L616
-- `async def cleanup_expired_rooms()` L629
+- `def get_disk_usage()` L59
+- `def is_feature_available()` L69
+- `def ensure_feature_available()` L75
+- `def _ensure_disk_for(size)` L82
+- `def resolve_limits(user)` L88
+- `def _reserved_key(room_id)` L93
+- `def _used_key(room_id)` L97
+- `def _files_key(room_id)` L101
+- `async def _invalidate_room_caches(room_id)` L105
+- `async def get_room_used(db, room_id)` L110
+- `async def get_room_file_count(db, room_id)` L123
+- `async def reserve_capacity(room, used_size, size)` L134
+- `async def release_capacity(room_id, size)` L143
+- `def _owner_reserved_key(owner_id)` L153
+- `async def reserve_owner_capacity(owner_id, used_storage, quota, size)` L157
+- `async def release_owner_capacity(owner_id, size)` L168
+- `async def check_room_rate_limit(room_id, jti, limit, bucket)` L178
+- `async def _generate_code(db)` L199
+- `def _now()` L208
+- `def _as_aware(value)` L212
+- `def _is_expired(room)` L218
+- `async def _ensure_active_room_slots(db, owner_id)` L222
+- `async def create_room(db, owner, title, password, ttl_hours)` L237
+- `async def get_room(db, room_id)` L265
+- `async def get_owned_room(db, room_id, owner_id)` L276
+- `async def _record_join_failure(code, client_ip)` L283
+- `def _same_subnet_hint(client_ip)` L296
+- `async def join_room(db, code, password, client_ip)` L313
+- `async def list_room_files(db, room_id)` L351
+- `async def get_room_file(db, room_id, file_id)` L361
+- `def _validate_mime(declared, detected)` L370
+- `async def attach_drive_files(db, room, file_ids)` L377
+- `async def detach_drive_file(db, file_id)` L452
+- `async def _check_size_and_count(db, room, size)` L465
+- `async def _reserve_room_capacity(db, room, size)` L475
+- `async def _release_room_capacity(room, size)` L488
+- `def _prepare_filename_and_mime(filename, mime_type)` L495
+- `async def add_room_file(db, room, uploader_id, filename, fileobj, mime_type, size)` L504
+- `async def init_room_multipart(db, room, filename, mime_type, total_size, total_parts, uploader_id)` L560
+- `async def upload_room_part(room, upload_id, part_number, data)` L609
+- `async def complete_room_multipart(db, room, upload_id, storage_key, filename, mime_type, total_size, parts)` L649
+- `async def abort_room_multipart(room, upload_id, storage_key)` L722
+- `async def delete_room_file(db, room, file_id)` L741
+- `async def close_room(db, room)` L752
+- `def build_join_url(code, origin, referer)` L776
+- `async def cleanup_expired_rooms()` L789
 
 ### `backend/app/services/reset_password_service.py`
 
@@ -576,13 +674,13 @@
 
 ### `backend/app/services/storage_accounting.py`
 
-- `def has_room(owner, size)` L11
-- `def ensure_quota(owner, size)` L15
-- `def add(owner, size)` L20
-- `def subtract(owner, size)` L24
-- `async def get_owner(db, owner_id)` L28
-- `async def adjust(db, owner_id, size)` L33
-- `async def recalculate(db, owner_id)` L47
+- `def has_room(owner, size)` L12
+- `def ensure_quota(owner, size)` L16
+- `def add(owner, size)` L21
+- `def subtract(owner, size)` L25
+- `async def get_owner(db, owner_id)` L29
+- `async def adjust(db, owner_id, size)` L34
+- `async def recalculate(db, owner_id)` L48
 
 ### `backend/app/services/user_service.py`
 

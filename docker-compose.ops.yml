@@ -1,0 +1,24 @@
+services:
+  deploy-runner:
+    build:
+      context: ./scripts
+      dockerfile: Dockerfile.deploy
+    container_name: cloud-drive-deploy-runner
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${DEPLOY_REPO_PATH:?DEPLOY_REPO_PATH 必须设置为宿主机仓库绝对路径}:${DEPLOY_REPO_PATH}
+      - deploy_queue:${DEPLOY_QUEUE_DIR:-/deploy}
+    environment:
+      - DEPLOY_REPO_PATH=${DEPLOY_REPO_PATH}
+      - DEPLOY_QUEUE_DIR=${DEPLOY_QUEUE_DIR:-/deploy}
+      - COMPOSE_FILE=${DEPLOY_REPO_PATH}/docker-compose.yml
+      - DEPLOY_POLL_INTERVAL=${DEPLOY_POLL_INTERVAL:-2}
+      - DEPLOY_SNAPSHOT_INTERVAL=${DEPLOY_SNAPSHOT_INTERVAL:-15}
+      - DEPLOY_RETENTION_DAYS=${DEPLOY_RETENTION_DAYS:-7}
+      - DEPLOY_HEALTH_TIMEOUT=${DEPLOY_HEALTH_TIMEOUT:-180}
+      - APP_VERSION=${APP_VERSION:-1.1.0}
+    working_dir: ${DEPLOY_REPO_PATH}
+
+volumes:
+  deploy_queue:

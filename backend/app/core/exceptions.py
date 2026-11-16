@@ -92,6 +92,45 @@ class ServiceUnavailable(AppError):
     default_message = "服务暂不可用"
 
 
+class DeployDisabled(AppError):
+    code = "deploy_disabled"
+    status_code = 403
+    default_message = "部署控制台未启用"
+
+
+class DeployInvalidAction(AppError):
+    code = "deploy_invalid_action"
+    status_code = 400
+    default_message = "不支持的动作或目标"
+
+
+class DeployConfirmRequired(AppError):
+    code = "deploy_confirm_required"
+    status_code = 403
+    default_message = "危险动作需要确认令牌"
+
+
+class DeployTaskNotFound(AppError):
+    code = "deploy_task_not_found"
+    status_code = 404
+    default_message = "任务不存在"
+
+
+class DeployBusy(AppError):
+    code = "deploy_busy"
+    status_code = 409
+    default_message = "已有任务执行中"
+
+    def __init__(self, running_task_id: str, message: str | None = None):
+        super().__init__(message)
+        self.running_task_id = running_task_id
+
+    def to_payload(self) -> dict:
+        payload = super().to_payload()
+        payload["running_task_id"] = self.running_task_id
+        return payload
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def _app_error_handler(request: Request, exc: AppError) -> JSONResponse:

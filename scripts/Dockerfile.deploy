@@ -1,0 +1,8 @@
+FROM docker:cli
+
+RUN apk add --no-cache bash curl jq coreutils git tzdata
+
+COPY deploy-runner.sh /usr/local/bin/deploy-runner.sh
+RUN chmod +x /usr/local/bin/deploy-runner.sh
+
+ENTRYPOINT ["/usr/local/bin/deploy-runner.sh"]

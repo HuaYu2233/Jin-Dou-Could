@@ -34,13 +34,7 @@ prod-build:
 	@DOCKER_BUILDKIT=1 $(DC) build backend celery-worker frontend
 
 preflight-prod:
-	@$(DC) config > $(PROD_CONFIG) || { echo "✗ 生产编排校验失败：检查 .env（SECRET_KEY 必填）"; exit 1; }
-	@grep -Eq 'ENVIRONMENT[:=] *production' $(PROD_CONFIG) || { echo "✗ 拒绝启动：ENVIRONMENT 必须为 production"; exit 1; }
-	@! grep -q 'npm run dev' $(PROD_CONFIG) || { echo "✗ 拒绝启动：检测到前端 dev 命令（dev 编排混入生产）"; exit 1; }
-	@! grep -q -- '--reload' $(PROD_CONFIG) || { echo "✗ 拒绝启动：检测到后端 --reload（dev 编排混入生产）"; exit 1; }
-	@! grep -q 'target: /app/app' $(PROD_CONFIG) || { echo "✗ 拒绝启动：检测到后端源码 bind mount（dev 编排混入生产）"; exit 1; }
-	@! grep -Eq 'target: /app$$' $(PROD_CONFIG) || { echo "✗ 拒绝启动：检测到前端源码 bind mount（dev 编排混入生产）"; exit 1; }
-	@echo "✓ 生产编排校验通过（无 dev 挂载、无热重载）"
+	@bash scripts/preflight.sh --output $(PROD_CONFIG)
 
 prod: preflight-prod
 	@$(DC) up -d

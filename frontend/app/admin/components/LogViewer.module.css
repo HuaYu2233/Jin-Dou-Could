@@ -1,0 +1,24 @@
+.viewer {
+  margin-top: 16px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 12px 14px;
+  border-radius: var(--qk-radius);
+  background: var(--qk-surface-2);
+  border: 1px solid var(--qk-border);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--qk-text-2);
+}
+
+.line {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.empty {
+  padding: 20px 0 0;
+  font-size: 13px;
+  color: var(--qk-text-4);
+}

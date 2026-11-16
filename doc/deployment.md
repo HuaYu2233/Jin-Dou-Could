@@ -294,20 +294,28 @@ docker compose logs -f backend
 ### 8.1 流水线阶段
 
 ```
-Backend Lint  ┐
-Backend Test  ├─→ 三个 job 并行，全部通过才算绿灯
-Frontend Check┘
+backend-lint ┐
+backend-test ┤
+frontend-check┘
+      │
+      ├─→ docker-build（backend / celery-worker / frontend 三个镜像）
+      └─→ security-audit（pip-audit + npm audit）
+
+release-verify：仅在推送 v* 标签时运行，校验版本号一致性
 ```
 
-| Job              | 内容                                                          |
-| ---------------- | ------------------------------------------------------------- |
-| `backend-lint`   | `ruff check .` + `ruff format --check .`                      |
-| `backend-test`   | `pytest tests/ -v` + 覆盖率（Service Container: PG16 + Redis7）|
-| `frontend-check` | `npm run lint` + `npx tsc --noEmit` + `npm run test`          |
+| Job              | 内容                                                           |
+| ---------------- | -------------------------------------------------------------- |
+| `backend-lint`   | `ruff check .` + `ruff format --check .`                       |
+| `backend-test`   | `pytest tests/ -v` + 覆盖率（Service Container: PG16 + Redis7） |
+| `frontend-check` | `npm run lint` + `npx tsc --noEmit` + `npm run test`           |
+| `docker-build`   | 三镜像构建验证（`push: false`，仅校验可构建）                   |
+| `security-audit` | `pip-audit` + `npm audit --audit-level=high`（失败不阻断）      |
+| `release-verify` | 标签版本与 `pyproject.toml` / `package.json` 一致性校验         |
 
-触发条件：push 到 `main` / `dev`，或向 `main` 发起 PR。
+触发条件：push 到 `main` / `dev`，或向 `main` 发起 PR；`release-verify` 额外要求 `refs/tags/v*`。
 
-> 当前流水线**只做门禁校验，不含 Docker 构建与自动部署**。生产发布仍按第 7 节手动执行 `git pull` + `docker compose up -d --build`。
+> 流水线**不含自动部署**。生产发布仍按第 7 节手动执行 `git pull` + `docker compose up -d --build`。
 
 ### 8.2 本地等价命令
 
