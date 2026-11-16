@@ -212,7 +212,39 @@
 - 运行时通过 `/health/ready` 的 `version` 字段暴露，备份清单 `manifest.json` 的 `app_version` 记录升级前版本。
 - 数据库迁移遵守 expand/contract：先加表/加列（向后兼容），下个 MAJOR 再删旧结构，保证 PATCH/MINOR 可回滚。
 
-### 6.2 v1.1.0（2026-11-12）
+### 6.2 v1.2.0（2026-11-16）
+
+#### 新增
+
+- 可视化部署控制台 `/admin/deploy`：容器与服务状态、版本确认、部署时间线、任务日志查看
+- 部署接口 `/api/v1/deploy`：白名单动作 `check`/`deploy`/`restart`/`rollback`，并发锁 + 确认令牌 + 历史与日志读取
+- 独立执行器 `deploy-runner`（`docker-compose.ops.yml` + `scripts/deploy-runner.sh`）：仅该容器持有 `docker.sock`，经 `/deploy` 共享卷文件协议串行执行，含心跳、容器快照、健康校验与失败自动回滚
+- 新增 `scripts/preflight.sh`，`Makefile` 的 `preflight-prod` 改为复用该脚本
+- 文档：新增 `doc/visual-deployment.md`、`doc/pitfalls.md`、`doc/codemap.md`
+
+#### 变更
+
+- 管理概览新增配额与磁盘口径提示
+- 新增 12 个 `DEPLOY_*` 配置项，`DEPLOY_ENABLED=false` 默认关闭，旧部署不改配置即可运行
+- README 精简，导航收敛到 `AGENTS.md` 与 `doc/`
+
+#### 修复
+
+- dashboard 的 `setError`/`setTotal` 空桩改为真实实现，操作错误条与分享分类总数恢复正常
+- 传输队列新增 `enqueue` + runner 调度：上传/下载各限 3 并发，完成后 FIFO 自动推进，暂停/取消/移除时回收 runner
+- 清理 `downloadFilesAsZip` 等 ZIP 残留与 `loadFiles` 死参数，传输视图区分传输中与排队
+
+#### 升级注意
+
+- 控制台默认关闭；启用需在 `.env` 设置 `DEPLOY_ENABLED=true` 与 `DEPLOY_REPO_PATH`（宿主机仓库绝对路径），再按 `doc/visual-deployment.md` 启动执行器
+- 不启用控制台时无需部署 `deploy-runner`，主编排行为不变
+- `deploy-runner` 与主编排同项目运行，控制台内不得使用 `--remove-orphans`，否则会删除执行器自身
+
+#### 数据库迁移
+
+- 无新增迁移
+
+### 6.3 v1.1.0（2026-11-12）
 
 #### 新增
 
@@ -241,7 +273,7 @@
 
 - 新增 1 个迁移（`n9o0p1q2r3s4`），仅加表与索引，向后兼容
 
-### 6.3 v1.0.0（2026-11-12）
+### 6.4 v1.0.0（2026-11-12）
 
 首个正式版本，功能清单见上文第 1~5 节。
 
