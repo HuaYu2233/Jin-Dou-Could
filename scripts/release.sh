@@ -19,6 +19,7 @@ REMOTE=""
 ASSUME_YES=false
 SKIP_TESTS=false
 NO_PUSH=false
+PUSH_TAGS=false
 
 usage() {
   cat <<'USAGE'
@@ -30,6 +31,7 @@ usage() {
 
 选项:
   --remote <name> 推送目标远端，默认取当前分支的上游（无上游则 origin）
+  --push-tags     除当前版本标签外，一并推送本地所有标签（用于补推历史标签）
   --skip-tests    跳过测试与 lint 门禁（不推荐）
   --no-push       只提交与打标签，不推送到远端
   -y, --yes       非交互模式，跳过确认
@@ -78,6 +80,10 @@ while [ $# -gt 0 ]; do
       NO_PUSH=true
       shift
       ;;
+    --push-tags)
+      PUSH_TAGS=true
+      shift
+      ;;
     --remote)
       [ $# -ge 2 ] || die "--remote 需要一个远端名称"
       REMOTE="$2"
@@ -107,6 +113,9 @@ done
 [ -n "$VERSION" ] || { usage; exit 2; }
 printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$' \
   || die "版本号格式非法: ${VERSION}（应为 MAJOR.MINOR.PATCH）"
+if [ "$PUSH_TAGS" = true ] && [ "$NO_PUSH" = true ]; then
+  die "--push-tags 与 --no-push 不能同时使用"
+fi
 
 section "1/6 前置检查"
 command -v git >/dev/null 2>&1 || die "未找到 git"
@@ -195,7 +204,7 @@ ok "已创建附注标签 v${VERSION}"
 
 section "6/6 推送"
 if [ "$NO_PUSH" = true ]; then
-  note "已跳过推送（--no-push），手动推送: git push <remote> ${branch} && git push <remote> v${VERSION}"
+  note "已跳过推送（--no-push），手动推送: git push <remote> ${branch} && git push <remote> v${VERSION}（或 git push <remote> --tags 补推全部标签）"
 else
   if [ -z "$REMOTE" ]; then
     REMOTE=$(git --no-pager rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null | cut -d/ -f1 || true)
@@ -205,10 +214,15 @@ else
     || die "远端 ${REMOTE} 不存在，现有远端: $(git --no-pager remote | tr '\n' ' ')"
   note "推送目标: ${REMOTE}"
   git push "$REMOTE" "$branch"
-  git push "$REMOTE" "v${VERSION}"
-  ok "分支与标签已推送到 ${REMOTE}"
+  if [ "$PUSH_TAGS" = true ]; then
+    git push "$REMOTE" --tags
+    ok "分支与全部标签已推送到 ${REMOTE}"
+  else
+    git push "$REMOTE" "v${VERSION}"
+    ok "分支与标签已推送到 ${REMOTE}"
+  fi
   if [ "$REMOTE" != origin ]; then
-    warn "标签仅推送到 ${REMOTE}；GitHub CI 需推送到 origin 才会触发（git push origin ${branch} && git push origin v${VERSION}）"
+    warn "标签仅推送到 ${REMOTE}；GitHub CI 需推送到 origin 才会触发（git push origin ${branch} --tags）"
   fi
 fi
 
