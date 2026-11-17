@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     JWT_PUBLIC_KEY_PATH: str = ""
 
     ENVIRONMENT: str = "development"
-    APP_VERSION: str = "1.2.0"
+    APP_VERSION: str = "1.3.0"
     MAX_UPLOAD_SIZE: int = 104857600
 
     BACKEND_WORKERS: int = 4
