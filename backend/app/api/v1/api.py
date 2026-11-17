@@ -1,6 +1,19 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import admin, auth, backups, deploy, files, folders, lan_transfer, shares, tasks, users, ws
+from app.api.v1.endpoints import (
+    admin,
+    auth,
+    backups,
+    deploy,
+    env_config,
+    files,
+    folders,
+    lan_transfer,
+    shares,
+    tasks,
+    users,
+    ws,
+)
 
 api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
@@ -12,5 +25,6 @@ api_router.include_router(lan_transfer.router, prefix="/lan-transfer", tags=["la
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 api_router.include_router(backups.router, prefix="/admin/backups", tags=["backups"])
 api_router.include_router(deploy.router, prefix="/admin/deploy", tags=["deploy"])
+api_router.include_router(env_config.router, prefix="/admin/env-config", tags=["env-config"])
 api_router.include_router(tasks.router, prefix="/admin/tasks", tags=["tasks"])
 api_router.include_router(ws.router, prefix="/ws", tags=["websocket"])

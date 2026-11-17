@@ -46,6 +46,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: "/admin/users", labelKey: "admin.nav.users" as TranslationKey },
     { href: "/admin/backups", labelKey: "admin.nav.backups" as TranslationKey },
     { href: "/admin/deploy", labelKey: "admin.nav.deploy" as TranslationKey },
+    { href: "/admin/config", labelKey: "admin.nav.envConfig" as TranslationKey },
   ];
 
   return (

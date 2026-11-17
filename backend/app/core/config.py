@@ -131,6 +131,9 @@ class Settings(BaseSettings):
     PROMETHEUS_ENABLED: bool = False
     METRICS_TOKEN: str = ""
 
+    # 运维配置面板（读取/回写宿主机 .env，由编排挂载注入，为空表示禁用）
+    ENV_FILE_PATH: str = ""
+
     @field_validator("SECRET_KEY")
     @classmethod
     def _validate_secret_key(cls, v: str) -> str:

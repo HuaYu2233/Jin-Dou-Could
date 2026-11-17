@@ -2,7 +2,7 @@ DC = docker compose
 DC_DEV = docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile dev
 PROD_CONFIG = /tmp/jindou-cloud-prod-config.yml
 
-.PHONY: help dev dev-build dev-restart prod prod-build preflight-prod hot-reload logs down setup map
+.PHONY: help dev dev-build dev-restart prod prod-build preflight-prod hot-reload logs down setup map config-wizard
 
 help:
 	@echo "Commands:"
@@ -13,12 +13,16 @@ help:
 	@echo "  make prod         - 生产模式启动（含编排校验）"
 	@echo "  make hot-reload   - 热更新后端代码（docker cp）"
 	@echo "  make setup        - 初始化 git 性能优化（fsmonitor）"
+	@echo "  make config-wizard - 启动首次部署可视化配置向导（生成 .env）"
 	@echo "  make logs         - 查看日志"
 	@echo "  make down         - 停止所有服务"
 	@echo "  make map          - 重新生成 doc/codemap.md（后端符号索引）"
 
 setup:
 	@git config core.fsmonitor true && git config core.untrackedCache true && git config feature.manyFiles true && git fsmonitor--daemon start 2>/dev/null; echo "Git performance config applied (fsmonitor + untrackedCache)"
+
+config-wizard:
+	@python3 scripts/config-wizard/config-wizard.py
 
 dev-build:
 	@DOCKER_BUILDKIT=1 $(DC_DEV) build frontend

@@ -212,7 +212,35 @@
 - 运行时通过 `/health/ready` 的 `version` 字段暴露，备份清单 `manifest.json` 的 `app_version` 记录升级前版本。
 - 数据库迁移遵守 expand/contract：先加表/加列（向后兼容），下个 MAJOR 再删旧结构，保证 PATCH/MINOR 可回滚。
 
-### 6.2 v1.2.0（2026-11-16）
+### 6.2 v1.3.0（2026-11-17）
+
+#### 新增
+
+- 图形化配置面板 `/admin/config`：分组编辑后端 `.env`（数据库/Redis/MinIO/JWT/前端/CORS/管理员/配额/备份/告警/部署/监控/快传），保存时校验必填项与弱口令并写回宿主 `.env`，自动生成 `.env.bak.*` 备份
+- 后端接口：`GET/POST /admin/env-config` 读取与保存、`POST /generate` 随机生成敏感键；复用管理权限校验
+- 冷启动初始化向导 `scripts/config-wizard/config-wizard.py`：纯标准库宿主机侧程序，在容器栈无法启动时生成合法 `.env`，使 `docker compose config` 通过；`Makefile` 新增 `config-wizard` 目标
+- 管理侧入口 `getAdminEnvConfig`/`useAdminEnvConfig`，布局侧栏挂载配置菜单，支持三语（zh-CN/zh-TW/en）
+
+#### 变更
+
+- `docker-compose.yml`：backend 挂载宿主机项目根到 `/runtime`，使 `.env` 作为普通文件可原子回写（单文件挂载下 `os.replace` 会报 `EBUSY`）；新增 `ENV_FILE_PATH` 注入与 `BACKEND_UID`/`BACKEND_GID` 可选编排
+- `backend/Dockerfile`：源码统一 `chmod a+rX` 并与宿主机属主对齐运行，`/runtime`/`/backups`/`/app/logs` 放行写入
+
+#### 修复
+
+- 保存配置后端报 500「配置校验未通过」：`REQUIRED_KEYS` 误用 compose 派生键 `MINIO_ACCESS_KEY`/`MINIO_SECRET_KEY`，改为真实键 `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD`；`generate_sensitive_values` 同步修正
+- 保存配置报 `PermissionError`/`EBUSY`：容器按宿主机属主运行使宿主 `.env` 可写，改为目录级挂载避免原子替换冲突
+
+#### 升级注意
+
+- 配置面板默认可通过 `/admin/config` 使用；backend 需以可写宿主 `.env` 的身份运行（macOS 下默认 501:20，可通过 `BACKEND_UID`/`BACKEND_GID` 覆盖）
+- 首次部署若 `.env` 缺失/不合法，先执行 `make config-wizard` 生成合法 `.env` 再启动
+
+#### 数据库迁移
+
+- 无新增迁移
+
+### 6.3 v1.2.0（2026-11-16）
 
 #### 新增
 
@@ -244,7 +272,7 @@
 
 - 无新增迁移
 
-### 6.3 v1.1.0（2026-11-12）
+### 6.4 v1.1.0（2026-11-12）
 
 #### 新增
 
@@ -273,7 +301,7 @@
 
 - 新增 1 个迁移（`n9o0p1q2r3s4`），仅加表与索引，向后兼容
 
-### 6.4 v1.0.0（2026-11-12）
+### 6.5 v1.0.0（2026-11-12）
 
 首个正式版本，功能清单见上文第 1~5 节。
 

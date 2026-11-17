@@ -22,6 +22,10 @@ export const queryKeys = {
       history: (limit: number) => [...queryKeys.admin.deploy.all(), "history", limit] as const,
       task: (taskId: string) => [...queryKeys.admin.deploy.all(), "task", taskId] as const,
     },
+    envConfig: {
+      all: () => [...queryKeys.admin.all, "envConfig"] as const,
+      config: () => [...queryKeys.admin.envConfig.all(), "config"] as const,
+    },
   },
   auth: {
     all: ["auth"] as const,

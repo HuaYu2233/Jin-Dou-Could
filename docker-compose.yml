@@ -89,6 +89,10 @@ services:
       dockerfile: Dockerfile
     container_name: cloud-drive-backend
     restart: unless-stopped
+    # 以宿主机属主(uid:gid)运行，使 backend 可写挂载的宿主机 .env
+    # (macOS Docker bind-mount 权限受宿主 uid 约束；镜像内源码已 chmod 归一。
+    #  可通过 BACKEND_UID/BACKEND_GID 覆盖，如 BACKEND_UID=0 即退回以 root 运行)
+    user: "${BACKEND_UID:-501}:${BACKEND_GID:-20}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
       - "localhost:host-gateway"
@@ -179,11 +183,15 @@ services:
       - LAN_TRANSFER_ALLOWED_CIDRS=${LAN_TRANSFER_ALLOWED_CIDRS:-}
       - PROMETHEUS_ENABLED=${PROMETHEUS_ENABLED:-false}
       - METRICS_TOKEN=${METRICS_TOKEN:-}
+      - ENV_FILE_PATH=${ENV_FILE_PATH:-/runtime/.env}
       - ALGORITHM=${ALGORITHM:-HS256}
       - JWT_PRIVATE_KEY_PATH=${JWT_PRIVATE_KEY_PATH:-}
       - JWT_PUBLIC_KEY_PATH=${JWT_PUBLIC_KEY_PATH:-}
     volumes:
       - ./backups:/backups
+      # 目录级挂载宿主机项目根，使 .env 是普通文件(可原子 replace)
+      # 而非单文件挂载点(单文件挂载下 os.replace 会报 EBUSY)
+      - ./:/runtime
       - deploy_queue:${DEPLOY_QUEUE_DIR:-/deploy}
       - minio_data:/minio-data:ro
       - jwt_keys:/run/secrets:ro

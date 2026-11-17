@@ -45,8 +45,10 @@ COPY --chown=appuser:appuser app ./app
 COPY --chown=appuser:appuser alembic ./alembic
 COPY --chown=appuser:appuser alembic.ini ./alembic.ini
 
-RUN mkdir -p /app/logs /backups \
-    && chown -R appuser:appuser /app/logs /backups
+RUN chmod -R a+rX /app/app /app/alembic \
+    && mkdir -p /app/logs /backups /runtime \
+    && chmod a+rwx /app/logs /backups /runtime \
+    && chown -R appuser:appuser /app/logs /backups /runtime
 
 USER appuser
 
